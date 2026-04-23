@@ -1,0 +1,92 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f4f6fb;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --surface: #ffffff;
+  --border: #d9e2ec;
+}
+
+:root.light {
+  --background: #f4f6fb;
+  --foreground: #0f172a;
+  --muted: #64748b;
+  --surface: #ffffff;
+  --border: #d9e2ec;
+}
+
+:root.dark {
+  --background: #020617;
+  --foreground: #e2e8f0;
+  --muted: #94a3b8;
+  --surface: #0f172a;
+  --border: #1f2937;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --background: #020617;
+    --foreground: #e2e8f0;
+    --muted: #94a3b8;
+    --surface: #0f172a;
+    --border: #1f2937;
+  }
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+  min-height: 100vh;
+  background-image:
+    radial-gradient(1200px 600px at 0% -20%, rgba(37, 99, 235, 0.14), transparent 45%),
+    radial-gradient(900px 500px at 100% 0%, rgba(15, 118, 110, 0.09), transparent 40%);
+  background-attachment: fixed;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.2);
+  color: #0f172a;
+}
+
+.dark ::selection {
+  background: rgba(96, 165, 250, 0.35);
+  color: #e2e8f0;
+}
+
+.prose img,
+.prose figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+}
+
+.prose figure {
+  margin: 0.75rem 0;
+}
+
+.prose figcaption {
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
