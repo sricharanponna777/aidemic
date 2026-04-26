@@ -10,6 +10,7 @@
  *               @tiptap/extension-color @tiptap/extension-highlight
  */
 
+import { useId } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -93,6 +94,8 @@ function ToolbarButton({ onClick, active, disabled, title, children }: ToolbarBu
   return (
     <button
       type="button"
+      aria-label={title}
+      aria-pressed={active ? true : undefined}
       title={title}
       disabled={disabled}
       onMouseDown={(e) => {
@@ -140,7 +143,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-slate-50 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800/60">
+    <div role="toolbar" aria-label="Formatting controls" className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-slate-50 px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800/60">
       {/* History */}
       <ToolbarButton
         title="Undo"
@@ -311,6 +314,9 @@ export function RichTextEditor({
   label,
   minHeightClassName = 'min-h-[180px]',
 }: RichTextEditorProps) {
+  const editorId = useId();
+  const editorLabel = label || placeholder;
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -335,6 +341,8 @@ export function RichTextEditor({
     },
     editorProps: {
       attributes: {
+        id: editorId,
+        'aria-label': editorLabel,
         class: [
           'prose prose-sm max-w-none outline-none',
           'text-slate-900 dark:text-slate-100',
@@ -407,9 +415,9 @@ export function RichTextEditor({
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/60">
           {label && (
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+            <label htmlFor={editorId} className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               {label}
-            </p>
+            </label>
           )}
           <span className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-400">
             WYSIWYG

@@ -238,9 +238,9 @@ export default function DeckPage() {
   if (!deck) return <p className="text-red-600">Deck not found.</p>;
 
   return (
-    <div className="space-y-7">
+    <main className="space-y-7" aria-labelledby="deck-page-title">
       <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
+        <h1 id="deck-page-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
         {deck.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{deck.description}</p> : null}
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
           <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">{deck.card_count || cards.length} cards</span>
@@ -260,6 +260,7 @@ export default function DeckPage() {
                 : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
             }`}
             onClick={() => setActiveFilterTagId('')}
+            aria-label="Show all cards"
           >
             All cards
           </button>
@@ -268,6 +269,7 @@ export default function DeckPage() {
               key={tag.id}
               onClick={() => setActiveFilterTagId((prev) => (prev === tag.id ? '' : tag.id))}
               className="rounded-full px-3 py-1 text-xs font-semibold text-white transition hover:opacity-85"
+              aria-label={`Filter cards by tag ${tag.name}`}
               style={{
                 backgroundColor: tag.color || '#2563eb',
                 boxShadow: activeFilterTagId === tag.id ? '0 0 0 2px rgba(15,23,42,0.4)' : undefined,
@@ -282,6 +284,7 @@ export default function DeckPage() {
             value={newTag}
             onChange={(event) => setNewTag(event.target.value)}
             placeholder="Create a new tag"
+            aria-label="New tag name"
             className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
           />
           <button onClick={handleAddTag} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500">
@@ -342,7 +345,11 @@ export default function DeckPage() {
             <Plus className="h-4 w-4" />
             Add card
           </button>
-          {status ? <p className="text-sm text-slate-600 dark:text-slate-300">{status}</p> : null}
+          {status ? (
+            <p role="status" aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">
+              {status}
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -355,6 +362,7 @@ export default function DeckPage() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search card text..."
+              aria-label="Search cards"
               className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
             />
           </div>
@@ -377,6 +385,7 @@ export default function DeckPage() {
                       onClick={() => handleEditCard(card)}
                       className="rounded-md p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/50"
                       title="Edit card"
+                      aria-label="Edit card"
                     >
                       <Edit className="h-4 w-4" />
                     </button>
@@ -385,6 +394,7 @@ export default function DeckPage() {
                       onClick={() => handleDeleteCard(card.id)}
                       className="rounded-md p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50"
                       title="Delete card"
+                      aria-label="Delete card"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -415,8 +425,13 @@ export default function DeckPage() {
       {editingCard ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={handleCancelEdit} />
-          <div className="relative z-10 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Edit Card</h2>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-card-heading"
+            className="relative z-10 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+          >
+            <h2 id="edit-card-heading" className="text-xl font-semibold text-slate-900 dark:text-slate-100">Edit Card</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Update the card content and tags.</p>
 
             <div className="mt-4 space-y-4">
@@ -480,6 +495,6 @@ export default function DeckPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </main>
   );
 }

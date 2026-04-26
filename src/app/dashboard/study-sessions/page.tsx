@@ -226,11 +226,29 @@ export default function StudySessions() {
   };
 
   return (
-    <div className="space-y-8">
+    <main className="space-y-8" aria-labelledby="study-sessions-title">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Study Sessions</h1>
+        <h1 id="study-sessions-title" className="text-3xl font-bold text-gray-900 dark:text-gray-100">Study Sessions</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">Start a new study session</p>
       </div>
+
+      <section aria-labelledby="study-overview-heading" className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h2 id="study-overview-heading" className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Study overview</h2>
+          <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{stats?.total_sessions ?? 0}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">sessions completed</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Average score</p>
+          <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{stats?.average_score ?? 0}%</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">across sessions</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Pending history</p>
+          <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{sessions.length}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">recent study records</p>
+        </div>
+      </section>
 
       {phase === 'idle' && (
         <div className="rounded-lg bg-linear-to-br from-blue-600 to-blue-800 p-8 text-white shadow-lg dark:from-blue-800 dark:to-blue-950">
@@ -249,7 +267,12 @@ export default function StudySessions() {
       {phase === 'choosing' && (
         <div className="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h2 className="mb-4 text-xl font-bold text-gray-900 dark:text-gray-100">Select a deck</h2>
+          <label htmlFor="deck-select" className="sr-only">
+            Choose the deck to review
+          </label>
           <select
+            id="deck-select"
+            aria-label="Choose the deck to review"
             className="mb-4 w-full rounded border border-gray-300 p-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             value={selectedDeckId}
             onChange={(e) => setSelectedDeckId(e.target.value)}
@@ -285,22 +308,23 @@ export default function StudySessions() {
             Study: {deckList.find((d) => d.id === selectedDeckId)?.name}
           </h2>
           <p className="text-gray-700 dark:text-gray-300">Card {currentCardIndex + 1} of {cardsToReview.length}</p>
-          <div className="rounded border border-gray-200 p-6 dark:border-gray-700">
-            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">Q: {currentCard.front}</p>
+          <div className="rounded border border-gray-200 p-6 dark:border-gray-700" aria-labelledby="current-card-heading">
+            <p id="current-card-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">Q: {currentCard.front}</p>
             {showBack ? (
               <p className="mt-4 text-gray-700 dark:text-gray-300">A: {currentCard.back}</p>
             ) : (
               <button
                 className="mt-4 rounded bg-yellow-300 px-4 py-2 text-gray-900 transition hover:bg-yellow-400 dark:bg-yellow-500 dark:text-slate-900 dark:hover:bg-yellow-400"
                 onClick={() => setShowBack(true)}
+                aria-label="Reveal answer"
               >
                 Show Answer
               </button>
             )}
           </div>
           {showBack && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Rate your recall:</p>
+            <div className="space-y-4" role="group" aria-labelledby="recall-rating-label">
+              <p id="recall-rating-label" className="text-sm text-gray-600 dark:text-gray-400">Rate your recall:</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Again', quality: 0, color: 'bg-red-600 hover:bg-red-700' },
@@ -320,6 +344,7 @@ export default function StudySessions() {
                       key={quality}
                       className={`rounded px-4 py-3 text-white transition ${color}`}
                       onClick={() => handleGrade(quality)}
+                      aria-label={`${label}: review in ${formatInterval(preview.interval_days)}`}
                     >
                       <div className="text-sm font-semibold">{label}</div>
                       <div className="text-xs opacity-90">{formatInterval(preview.interval_days)}</div>
@@ -331,6 +356,6 @@ export default function StudySessions() {
           )}
         </div>
       )}
-    </div>
+    </main>
   );
 }
