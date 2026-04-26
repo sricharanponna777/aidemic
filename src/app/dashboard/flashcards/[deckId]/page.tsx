@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -24,6 +24,10 @@ export default function DeckPage() {
   const [activeFilterTagId, setActiveFilterTagId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
+  const [editFront, setEditFront] = useState('');
+  const [editBack, setEditBack] = useState('');
+  const [editSelectedTags, setEditSelectedTags] = useState<string[]>([]);
 
   const loadDeck = useCallback(async () => {
     setLoading(true);
@@ -163,6 +167,73 @@ export default function DeckPage() {
     await supabase.from('flashcard_decks').update({ card_count: nextCount }).eq('id', deckId);
   };
 
+  const handleEditCard = (card: Flashcard) => {
+    setEditingCard(card);
+    setEditFront(card.front);
+    setEditBack(card.back);
+    setEditSelectedTags(cardTags[card.id] || []);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCard || !editFront.trim() || !editBack.trim()) {
+      setStatus('Both front and back are required.');
+      return;
+    }
+
+    const supabase = createClient();
+    
+    // Update the card content
+    const { error: cardError } = await supabase
+      .from('flashcards')
+      .update({ 
+        front: editFront.trim(), 
+        back: editBack.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', editingCard.id);
+
+    if (cardError) {
+      setStatus(cardError.message);
+      return;
+    }
+
+    // Update tags - remove old mappings and add new ones
+    await supabase.from('flashcard_tag_mapping').delete().eq('flashcard_id', editingCard.id);
+    
+    if (editSelectedTags.length > 0) {
+      await supabase.from('flashcard_tag_mapping').insert(
+        editSelectedTags.map((tagId) => ({
+          flashcard_id: editingCard.id,
+          tag_id: tagId,
+        }))
+      );
+    }
+
+    // Update local state
+    setCards((prev) => prev.map((card) => 
+      card.id === editingCard.id 
+        ? { ...card, front: editFront.trim(), back: editBack.trim(), updated_at: new Date().toISOString() }
+        : card
+    ));
+    setCardTags((prev) => ({
+      ...prev,
+      [editingCard.id]: [...editSelectedTags],
+    }));
+
+    setEditingCard(null);
+    setEditFront('');
+    setEditBack('');
+    setEditSelectedTags([]);
+    setStatus('Card updated.');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCard(null);
+    setEditFront('');
+    setEditBack('');
+    setEditSelectedTags([]);
+  };
+
   if (loading) return <p className="text-slate-600 dark:text-slate-300">Loading deck...</p>;
   if (!deck) return <p className="text-red-600">Deck not found.</p>;
 
@@ -300,14 +371,24 @@ export default function DeckPage() {
                     <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Back</p>
                     <div className="prose prose-sm mt-1 max-w-none text-slate-800 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: card.back }} />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteCard(card.id)}
-                    className="rounded-md p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50"
-                    title="Delete card"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleEditCard(card)}
+                      className="rounded-md p-2 text-slate-400 transition hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/50"
+                      title="Edit card"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCard(card.id)}
+                      className="rounded-md p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50"
+                      title="Delete card"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {cardTags[card.id] && cardTags[card.id].length > 0 ? (
@@ -330,6 +411,75 @@ export default function DeckPage() {
           <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">No cards match this filter.</p>
         )}
       </section>
+
+      {editingCard ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50" onClick={handleCancelEdit} />
+          <div className="relative z-10 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Edit Card</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Update the card content and tags.</p>
+
+            <div className="mt-4 space-y-4">
+              <RichTextEditor
+                value={editFront}
+                onChange={setEditFront}
+                label="Front"
+                placeholder="Question, prompt, or cue..."
+                minHeightClassName="min-h-[140px]"
+              />
+              <RichTextEditor
+                value={editBack}
+                onChange={setEditBack}
+                label="Back"
+                placeholder="Answer, explanation, or mnemonic..."
+                minHeightClassName="min-h-[180px]"
+              />
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Attach tags</p>
+                <div className="flex flex-wrap gap-2">
+                  {tags.map((tag) => {
+                    const selected = editSelectedTags.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() =>
+                          setEditSelectedTags((prev) => (selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]))
+                        }
+                        className="rounded-full border px-3 py-1 text-xs font-semibold transition"
+                        style={{
+                          borderColor: tag.color || '#2563eb',
+                          color: selected ? '#ffffff' : tag.color || '#2563eb',
+                          backgroundColor: selected ? tag.color || '#2563eb' : 'transparent',
+                        }}
+                      >
+                        {selected ? <X className="mr-1 inline h-3 w-3" /> : <Plus className="mr-1 inline h-3 w-3" />}
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </button>
+                <button 
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  onClick={handleSaveEdit}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

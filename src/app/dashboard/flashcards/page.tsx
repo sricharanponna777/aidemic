@@ -135,7 +135,7 @@ export default function Flashcards() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">Flashcards</p>
             <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">Study Deck Studio</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-              Build and organise decks. Use the dedicated AI Questions section for interactive exam-style MCQs.
+              Build and organise decks, or create AI-generated flashcard decks.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -147,11 +147,11 @@ export default function Flashcards() {
               New Deck
             </button>
             <Link
-              href="/dashboard/ai-questions"
+              href="/dashboard/flashcards/ai"
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               <Sparkles className="h-4 w-4" />
-              AI Questions
+              AI Flashcards
             </Link>
           </div>
         </div>

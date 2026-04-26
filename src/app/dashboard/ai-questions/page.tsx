@@ -405,28 +405,88 @@ export default function AIQuestionsPage() {
         </section>
       ) : null}
 
-      {hasFinished ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Results</h2>
-          <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-            You scored <strong>{score}</strong> out of <strong>{questions.length}</strong> (
-            {Math.round((score / Math.max(questions.length, 1)) * 100)}%).
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={restartWithSameQuestions}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Retry same questions
-            </button>
-            <button type="button" onClick={resetToGenerator} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
-              Generate new set
-            </button>
-          </div>
-        </section>
-      ) : null}
+      {hasFinished ? (() => {
+        const percentage = Math.round((score / Math.max(questions.length, 1)) * 100);
+        const performanceLevel =
+          percentage >= 90 ? 'excellent' : percentage >= 75 ? 'good' : percentage >= 60 ? 'satisfactory' : 'needs-improvement';
+        const performanceColors = {
+          excellent: 'from-background to-gray-500 text-blue-50',
+          good: 'from-background to-gray-500 text-cyan-50',
+          satisfactory: 'from-background to-blue-50 dark:to-blue-950 text-orange-50',
+          'needs-improvement': 'from-background to-gray-500 text-amber-50',
+        };
+        const performanceLabels = {
+          excellent: 'Excellent! 🎉',
+          good: 'Well done! 👍',
+          satisfactory: 'Good effort! 💪',
+          'needs-improvement': 'Keep practicing! 📚',
+        };
+        const textColorMap = {
+          excellent: 'text-blue-900 dark:text-blue-200',
+          good: 'text-cyan-900 dark:text-cyan-200',
+          satisfactory: 'text-orange-900 dark:text-orange-200',
+          'needs-improvement': 'text-amber-900 dark:text-amber-200',
+        };
+
+        return (
+          <section className={`overflow-hidden rounded-2xl border-2 bg-linear-to-br ${performanceColors[performanceLevel]} p-8 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.2)] dark:shadow-[0_24px_60px_-24px_rgba(0,0,0,0.5)]`}>
+            <div className="text-center">
+              <p className="text-sms font-semibold uppercase tracking-widest opacity-90">Quiz Completed</p>
+              <h2 className="mt-3 text-4xl font-black">Results</h2>
+
+              <div className="mt-8 grid grid-cols-3 gap-4 md:gap-6">
+                <div className="rounded-xl border-2 border-white/20 bg-white/10 backdrop-blur-sm p-4">
+                  <p className={`text-sm font-semibold uppercase tracking-wider opacity-75 ${textColorMap[performanceLevel]}`}>Score</p>
+                  <p className={`mt-3 text-3xl font-black ${textColorMap[performanceLevel]}`}>{score}</p>
+                  <p className={`mt-1 text-xs font-medium opacity-60 ${textColorMap[performanceLevel]}`}>out of {questions.length}</p>
+                </div>
+
+                <div className="rounded-xl border-2 border-white/20 bg-white/10 backdrop-blur-sm p-4">
+                  <p className={`text-sm font-semibold uppercase tracking-wider opacity-75 ${textColorMap[performanceLevel]}`}>Accuracy</p>
+                  <p className={`mt-3 text-3xl font-black ${textColorMap[performanceLevel]}`}>{percentage}%</p>
+                  <p className={`mt-1 text-xs font-medium opacity-60 ${textColorMap[performanceLevel]}`}>correct answers</p>
+                </div>
+
+                <div className="rounded-xl border-2 border-white/20 bg-white/10 backdrop-blur-sm p-4">
+                  <p className={`text-sm font-semibold uppercase tracking-wider opacity-75 ${textColorMap[performanceLevel]}`}>Questions</p>
+                  <p className={`mt-3 text-3xl font-black ${textColorMap[performanceLevel]}`}>{questions.length}</p>
+                  <p className={`mt-1 text-xs font-medium opacity-60 ${textColorMap[performanceLevel]}`}>total questions</p>
+                </div>
+              </div>
+
+              <div className="mt-8 mx-auto max-w-xs">
+                <div className="mb-2 flex items-end justify-between">
+                  <span className={`text-sm font-semibold ${textColorMap[performanceLevel]}`}>Performance</span>
+                  <span className={`text-2xl font-black ${textColorMap[performanceLevel]}`}>{percentage}%</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-black/10 backdrop-blur-sm">
+                  <div className="h-full bg-white/60 transition-all duration-500" style={{ width: `${percentage}%` }} />
+                </div>
+              </div>
+
+              <p className={`mt-8 text-lg font-bold ${textColorMap[performanceLevel]}`}>{performanceLabels[performanceLevel]}</p>
+
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={restartWithSameQuestions}
+                  className="inline-flex items-center gap-2 rounded-lg border-2 border-white/40 bg-white/10 px-6 py-3 font-semibold backdrop-blur-sm transition-all hover:border-white/60 hover:bg-white/20"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={resetToGenerator}
+                  className="rounded-lg border-2 border-white/40 bg-white/10 px-6 py-3 font-semibold backdrop-blur-sm transition-all hover:border-white/60 hover:bg-white/20"
+                >
+                  New set
+                </button>
+              </div>
+            </div>
+          </section>
+        );
+      })() : null}
     </div>
   );
 }

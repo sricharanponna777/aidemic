@@ -1,10 +1,10 @@
 'use client';
 
-import { Play, MoreVertical } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { StudySession, FlashcardDeck, Flashcard } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase-client';
-import { updateSpacedRepetition } from '@/lib/spacedRepetition';
+import { updateSpacedRepetition, previewNextReview, formatInterval } from '@/lib/spacedRepetition';
 
 export default function StudySessions() {
   type Session = Pick<
@@ -121,7 +121,9 @@ export default function StudySessions() {
     }
     const due = (cards || []).filter((c) => {
       if (!c.next_review_date) return true;
-      return new Date(c.next_review_date) <= new Date();
+      const nextDate = new Date(c.next_review_date);
+      if (Number.isNaN(nextDate.getTime())) return true;
+      return nextDate <= new Date();
     });
     if (due.length === 0) {
       alert('No cards are due for review in this deck.');
@@ -198,8 +200,7 @@ export default function StudySessions() {
     setSelectedDeckId('');
   };
 
-  const handleGrade = async (wasCorrect: boolean) => {
-    const quality = wasCorrect ? 5 : 2;
+  const handleGrade = async (quality: number) => {
     const card = cardsToReview[currentCardIndex];
     if (card) {
       const prev = {
@@ -212,9 +213,9 @@ export default function StudySessions() {
       const supabase = createClient();
       await supabase.from('flashcards').update(updated).eq('id', card.id);
     }
-    setResults((p) => [...p, { flashcard_id: card.id, was_correct: wasCorrect }]);
+    setResults((p) => [...p, { flashcard_id: card.id, was_correct: quality >= 2 }]);
     setCardsStudied((c) => c + 1);
-    if (wasCorrect) setCardsCorrect((c) => c + 1);
+    if (quality >= 2) setCardsCorrect((c) => c + 1);
     const nextIndex = currentCardIndex + 1;
     if (nextIndex < cardsToReview.length) {
       setCurrentCardIndex(nextIndex);
@@ -298,13 +299,34 @@ export default function StudySessions() {
             )}
           </div>
           {showBack && (
-            <div className="flex gap-4">
-              <button className="rounded bg-green-600 px-4 py-2 text-white transition hover:bg-green-700" onClick={() => handleGrade(true)}>
-                Correct
-              </button>
-              <button className="rounded bg-red-600 px-4 py-2 text-white transition hover:bg-red-700" onClick={() => handleGrade(false)}>
-                Incorrect
-              </button>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Rate your recall:</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Again', quality: 0, color: 'bg-red-600 hover:bg-red-700' },
+                  { label: 'Hard', quality: 1, color: 'bg-orange-600 hover:bg-orange-700' },
+                  { label: 'Good', quality: 2, color: 'bg-blue-600 hover:bg-blue-700' },
+                  { label: 'Easy', quality: 3, color: 'bg-green-600 hover:bg-green-700' },
+                ].map(({ label, quality, color }) => {
+                  const prev = {
+                    ease_factor: currentCard.ease_factor || 2.5,
+                    interval_days: currentCard.interval_days || 0,
+                    repetition_count: currentCard.repetition_count || 0,
+                    consecutive_correct: currentCard.consecutive_correct || 0,
+                  };
+                  const preview = previewNextReview(prev, quality);
+                  return (
+                    <button
+                      key={quality}
+                      className={`rounded px-4 py-3 text-white transition ${color}`}
+                      onClick={() => handleGrade(quality)}
+                    >
+                      <div className="text-sm font-semibold">{label}</div>
+                      <div className="text-xs opacity-90">{formatInterval(preview.interval_days)}</div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
