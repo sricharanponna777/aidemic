@@ -265,10 +265,78 @@ const getAIConfig = () => {
   return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName };
 };
 
-const normalizeCard = (item: FlashcardItem): FlashcardItem | null => {
+const normalizeMathExpression = (expression: string) => {
+  let next = expression;
+
+  // Handle fractions: (a)/(b) -> \frac{a}{b}
+  next = next.replace(/\(\s*([^()]+?)\s*\)\s*\/\s*\(\s*([^()]+?)\s*\)/g, '\\frac{$1}{$2}');
+
+  // Handle existing superscripts: x^2 -> x^{2}
+  next = next.replace(/([A-Za-z0-9)\]])\^([A-Za-z0-9+\-]+)/g, '$1^{$2}');
+
+  // Handle existing subscripts: x_2 -> x_{2}
+  next = next.replace(/([A-Za-z0-9)\]])_([A-Za-z0-9+\-]+)/g, '$1_{$2}');
+
+  // Handle implicit superscripts: x2, x3, etc. (when followed by letter or end)
+  next = next.replace(/([A-Za-z])\s*(\d+)(?=\s*[A-Za-z]|$|\s*[\+\-\*\/\=\(\)\[\]\{\}\s]|$)/g, '$1^{$2}');
+
+  // Handle coefficients with variables: 3x2 -> 3x^{2}, 2x^2 -> 2x^{2}
+  next = next.replace(/(\d+)\s*([A-Za-z])\s*(\d+)/g, '$1$2^{$3}');
+
+  // Handle square roots: sqrt(x) -> \sqrt{x}
+  next = next.replace(/sqrt\s*\(\s*([^()]+?)\s*\)/g, '\\sqrt{$1}');
+
+  // Handle pi and e constants
+  next = next.replace(/\bpi\b/g, '\\pi');
+  next = next.replace(/\be\b/g, '\\mathrm{e}');
+
+  // imaginary and complex numbers
+  next = next.replace(/\bi\b/g, '\\mathrm{i}');
+
+  // Handle infinity
+  next = next.replace(/\binf\b/g, '\\infty');
+
+  return next;
+};
+
+const normalizeMathNotation = (text: string, subject: SupportedSubject | null) => {
+  // Apply math normalization to subjects that commonly use mathematical notation
+  const mathSubjects: SupportedSubject[] = ['mathematics', 'physics', 'chemistry', 'computer science'];
+  if (!mathSubjects.includes(subject as SupportedSubject)) return text;
+
+  let hasMathDelimiters = false;
+  let next = text;
+
+  next = next.replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `\\(${normalizeMathExpression(expression)}\\)`;
+  });
+
+  next = next.replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `\\[${normalizeMathExpression(expression)}\\]`;
+  });
+
+  next = next.replace(/\$\$([\s\S]*?)\$\$/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `$$${normalizeMathExpression(expression)}$$`;
+  });
+
+  next = next.replace(/\$([^$\n]+)\$/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `$${normalizeMathExpression(expression)}$`;
+  });
+
+  if (hasMathDelimiters) return next;
+  return normalizeMathExpression(next);
+};
+
+const normalizeCard = (item: FlashcardItem, subject: SupportedSubject | null): FlashcardItem | null => {
+  const front = normalizeMathNotation(safe(item.front || ''), subject);
+  const back = normalizeMathNotation(safe(item.back || ''), subject);
   const card = {
-    front: txt(safe(item.front || ''), 520),
-    back: txt(safe(item.back || ''), 520),
+    front: txt(front, 520),
+    back: txt(back, 520),
     tags: Array.isArray(item.tags) ? item.tags.map(tag => txt(safe(tag), 50)).filter(tag => tag.length > 0) : [],
   };
   if (!card.front || !card.back) return null;
@@ -292,6 +360,10 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     'Only use comparison when the card explicitly asks to compare two or more items, processes, concepts, or methods. Do not use comparison for a simple definition or explanation question.',
     'If it asks for reasoning, use analysis. If it asks for a diagram, use diagram.',
     'Use only the most relevant 1-3 tags per flashcard.',
+    'When writing math, use explicit MathJax/LaTeX with grouping and brackets.',
+    'Wrap math in $...$ and always bracket powers/subscripts: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
+    'Use grouped fractions: \\frac{numerator}{denominator}, e.g. \\frac{(x^{4}y^{2})}{(xy^{3})}.',
+    'Never use ambiguous shorthand such as x2, xy3, x^n+1, or (x4y^2)/(xy3).',
     `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
     payload.specification ? `Specification focus: ${payload.specification}` : '',
     `Topic: ${payload.topic}.`,
@@ -421,7 +493,7 @@ export async function POST(request: Request) {
 
     const aiResult = await aiGenerate(payload);
     const normalizedCards = (Array.isArray(aiResult.flashcards) ? aiResult.flashcards : [])
-      .map((item) => normalizeCard(item))
+      .map((item) => normalizeCard(item, payload.subject))
       .filter((item): item is FlashcardItem => item !== null);
 
     if (normalizedCards.length === 0) {

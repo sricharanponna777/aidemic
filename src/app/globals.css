@@ -90,3 +90,32 @@ h3 {
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+/* KaTeX Math Styles */
+.math-inline {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.math-display {
+  display: block;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.math-error {
+  color: #cc0000;
+  border: 1px solid #cc0000;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+}
+
+/* Ensure KaTeX renders properly in dark mode */
+.dark .katex {
+  color: var(--foreground);
+}
+
+.dark .katex .base {
+  color: var(--foreground);
+}

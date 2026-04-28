@@ -6,22 +6,26 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase-client";
 import { UserStatistics } from "@/types";
+import { calculateRetentionRate, getMotivationMessage } from "@/lib/spacedRepetition";
 
 export default function Dashboard() {
   const { session } = useAuth();
 
   const [stats, setStats] = useState<UserStatistics | null>(null);
   const [deckCount, setDeckCount] = useState(0);
+  const [retentionRate, setRetentionRate] = useState(0);
 
   useEffect(() => {
     const loadStats = async () => {
       try {
         const supabase = createClient();
-        const { data, error } = await supabase.from("user_statistics").select("*").limit(1).single();
+        const { data, error } = await supabase.from("user_statistics").select("*").limit(1).maybeSingle();
         if (error) {
           console.error("Error fetching dashboard stats:", error.message);
-        } else {
+        } else if (data) {
           setStats(data);
+        } else {
+          console.warn("No dashboard stats row found.");
         }
       } catch (err) {
         console.error("Unexpected stat fetch error", err);
@@ -44,6 +48,31 @@ export default function Dashboard() {
     };
 
     loadDeckCount();
+
+    const loadRetentionRate = async () => {
+      try {
+        const supabase = createClient();
+        const { data: cards, error } = await supabase
+          .from("flashcards")
+          .select("repetition_count, consecutive_correct");
+
+        if (error) {
+          console.error("Error fetching cards for retention:", error.message);
+        } else if (cards) {
+          const rate = calculateRetentionRate(
+            cards.map((card) => ({
+              repetition_count: card.repetition_count || 0,
+              consecutive_correct: card.consecutive_correct || 0,
+            }))
+          );
+          setRetentionRate(rate);
+        }
+      } catch (err) {
+        console.error("Unexpected retention calculation error", err);
+      }
+    };
+
+    loadRetentionRate();
   }, []);
 
   // transform the stats row into an array suitable for the grid
@@ -61,10 +90,10 @@ export default function Dashboard() {
       color: "bg-cyan-600",
     },
     {
-      label: "Study Streak",
-      value: s.current_streak_days ? `${s.current_streak_days} days` : "0 days",
+      label: "Retention Rate",
+      value: `${retentionRate.toFixed(1)}%`,
       icon: BarChart3,
-      color: "bg-orange-500",
+      color: retentionRate >= 85 ? "bg-green-500" : retentionRate >= 70 ? "bg-yellow-500" : "bg-red-500",
     },
   ];
 
@@ -96,6 +125,21 @@ export default function Dashboard() {
             })
           : null}
       </div>
+
+      {/* Motivation Message */}
+      {stats?.current_streak_days && (
+        <div className="bg-linear-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Keep up the great work! 🎉</h3>
+              <p className="text-blue-100">
+                {getMotivationMessage(stats.current_streak_days, retentionRate)}
+              </p>
+            </div>
+            <div className="text-4xl">📚</div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-8 shadow dark:shadow-lg">

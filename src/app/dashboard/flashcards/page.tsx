@@ -6,7 +6,9 @@ import { Bot, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 
-type Deck = Pick<FlashcardDeck, 'id' | 'name' | 'card_count' | 'ai_generated' | 'updated_at' | 'created_at' | 'description'>;
+type Deck = Pick<FlashcardDeck, 'id' | 'name' | 'card_count' | 'ai_generated' | 'updated_at' | 'created_at' | 'description'> & {
+  due_count?: number;
+};
 
 type StatusTone = 'success' | 'error';
 type StatusMessage = {
@@ -35,7 +37,38 @@ export default function Flashcards() {
       if (error) {
         setStatus({ tone: 'error', text: error.message });
       } else {
-        setDecks((data || []) as Deck[]);
+        const fetchedDecks = (data || []) as Deck[];
+        const deckIds = fetchedDecks.map((deck) => deck.id);
+
+        if (deckIds.length > 0) {
+          const { data: cardData, error: cardError } = await supabase
+            .from('flashcards')
+            .select('deck_id, next_review_date')
+            .in('deck_id', deckIds);
+
+          if (!cardError && cardData) {
+            const now = new Date();
+            const dueCounts = new Map<string, number>();
+
+            cardData.forEach((card) => {
+              const nextReview = card.next_review_date ? new Date(card.next_review_date) : null;
+              const isDue = !nextReview || nextReview <= now;
+              if (isDue) {
+                dueCounts.set(card.deck_id, (dueCounts.get(card.deck_id) || 0) + 1);
+              }
+            });
+
+            const decksWithDue = fetchedDecks.map((deck) => ({
+              ...deck,
+              due_count: dueCounts.get(deck.id) || 0,
+            }));
+            setDecks(decksWithDue);
+          } else {
+            setDecks(fetchedDecks);
+          }
+        } else {
+          setDecks(fetchedDecks);
+        }
       }
     } catch (err) {
       console.error('Unexpected error loading decks', err);
@@ -54,8 +87,9 @@ export default function Flashcards() {
 
   const stats = useMemo(() => {
     const totalCards = decks.reduce((sum, deck) => sum + (deck.card_count || 0), 0);
+    const dueNow = decks.reduce((sum, deck) => sum + (deck.due_count || 0), 0);
     const aiDecks = decks.filter((deck) => deck.ai_generated).length;
-    return { totalDecks: decks.length, totalCards, aiDecks };
+    return { totalDecks: decks.length, totalCards, dueNow, aiDecks };
   }, [decks]);
 
   const filteredDecks = useMemo(() => {
@@ -165,6 +199,10 @@ export default function Flashcards() {
             <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cards</p>
             <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalCards}</p>
           </div>
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Due now</p>
+            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.dueNow}</p>
+          </div>
         </div>
       </section>
 
@@ -215,6 +253,9 @@ export default function Flashcards() {
 
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">{deck.card_count || 0} cards</span>
+              {deck.due_count ? (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{deck.due_count} due now</span>
+              ) : null}
               {deck.ai_generated ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
                   <Bot className="h-3 w-3" />

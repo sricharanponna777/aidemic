@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, LayoutDashboard, Settings, LogOut, Brain, Layers, Sparkles } from "lucide-react";
+import { BookOpen, LayoutDashboard, Settings, LogOut, Brain, Layers, Sparkles, GalleryHorizontal } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -34,6 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
     { href: "/dashboard/ai-questions", label: "AI Questions", icon: Sparkles },
+    { href: "/dashboard/slideshow", label: "Slideshow", icon: GalleryHorizontal },
     { href: "/dashboard/study-sessions", label: "Study Sessions", icon: Brain },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];

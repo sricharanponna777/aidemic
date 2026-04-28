@@ -28,7 +28,7 @@ type ExamBoard = 'aqa' | 'edexcel' | 'ocr';
 type ExamType = 'gcse' | 'a-level';
 
 const defaultPrompt =
-  'Generate concise study flashcards with clear front/back pairs. Make the front a revision prompt or question and the back a short, accurate answer. Keep the cards aligned to the selected exam board and syllabus. Return only JSON with a flashcards array.';
+  'Generate concise study flashcards with clear front/back pairs. Make the front a revision prompt or question and the back a short, accurate answer. Keep the cards aligned to the selected exam board and syllabus. For maths, use $...$ with explicit brackets like x^{2}, a_{n+1}, and \\frac{(x^{4}y^{2})}{(xy^{3})}; avoid ambiguous forms like x2 or (x4y^2)/(xy3). Return only JSON with a flashcards array.';
 
 export default function AIFlashcardsPage() {
   const router = useRouter();

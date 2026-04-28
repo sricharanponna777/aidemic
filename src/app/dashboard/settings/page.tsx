@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, useTheme } from "@/hooks/useTheme";
 import { useRouter } from "next/navigation";
-import { Lock, LogOut, Moon, Sun, User } from "lucide-react";
+import { LogOut, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function Settings() {
@@ -14,15 +14,6 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isThemeSaving, setIsThemeSaving] = useState(false);
   const { theme, setTheme } = useTheme();
-  // combine loaded profile with defaults for rendering
-  const profile = {
-    full_name: "",
-    bio: "",
-    preferred_study_time: "",
-    daily_study_goal_minutes: 0,
-    ...loadedProfile,
-  };
-
   useEffect(() => {
     if (loadedProfile?.theme === "light" || loadedProfile?.theme === "dark") {
       setTheme(loadedProfile.theme);

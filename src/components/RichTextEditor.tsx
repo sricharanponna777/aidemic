@@ -1,13 +1,14 @@
 'use client';
 
 /**
- * RichTextEditor — WYSIWYG implementation using Tiptap
+ * RichTextEditor — WYSIWYG implementation using Tiptap with KaTeX math support
  *
  * Dependencies to install:
  *   npm install @tiptap/react @tiptap/pm @tiptap/starter-kit \
  *               @tiptap/extension-underline @tiptap/extension-code-block \
  *               @tiptap/extension-placeholder @tiptap/extension-text-style \
- *               @tiptap/extension-color @tiptap/extension-highlight
+ *               @tiptap/extension-color @tiptap/extension-highlight \
+ *               katex
  */
 
 import { useId } from 'react';
@@ -22,6 +23,8 @@ import Color from '@tiptap/extension-color';
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import {
   Bold,
   Italic,
@@ -68,6 +71,93 @@ const ClozeExtension = Extension.create({
                     'data-cloze': match[1],
                   }),
                 );
+              }
+            });
+
+            return DecorationSet.create(doc, decorations);
+          },
+        },
+      }),
+    ];
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Math extension — renders LaTeX expressions with KaTeX
+// ---------------------------------------------------------------------------
+const MathExtension = Extension.create({
+  name: 'math',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('math'),
+        props: {
+          decorations(state) {
+            const { doc } = state;
+            const decorations: Decoration[] = [];
+
+            doc.descendants((node, pos) => {
+              if (!node.isText || !node.text) return;
+
+              // Match inline math: $...$
+              const inlinePattern = /\$([^$\n]+)\$/g;
+              let match: RegExpExecArray | null;
+              inlinePattern.lastIndex = 0;
+              while ((match = inlinePattern.exec(node.text)) !== null) {
+                const from = pos + match.index;
+                const to = from + match[0].length;
+                try {
+                  const html = katex.renderToString(match[1], {
+                    displayMode: false,
+                    throwOnError: false,
+                    errorColor: '#cc0000',
+                  });
+                  decorations.push(
+                    Decoration.widget(pos + match.index, (() => {
+                      const span = document.createElement('span');
+                      span.innerHTML = html;
+                      span.className = 'math-inline';
+                      return span;
+                    })(), { block: false })
+                  );
+                } catch (error) {
+                  // If KaTeX fails, show the original text
+                  decorations.push(
+                    Decoration.inline(from, to, {
+                      class: 'math-error',
+                    })
+                  );
+                }
+              }
+
+              // Match display math: $$...$$
+              const displayPattern = /\$\$([\s\S]*?)\$\$/g;
+              displayPattern.lastIndex = 0;
+              while ((match = displayPattern.exec(node.text)) !== null) {
+                const from = pos + match.index;
+                const to = from + match[0].length;
+                try {
+                  const html = katex.renderToString(match[1], {
+                    displayMode: true,
+                    throwOnError: false,
+                    errorColor: '#cc0000',
+                  });
+                  decorations.push(
+                    Decoration.widget(pos + match.index, (() => {
+                      const div = document.createElement('div');
+                      div.innerHTML = html;
+                      div.className = 'math-display';
+                      return div;
+                    })(), { block: true })
+                  );
+                } catch (error) {
+                  // If KaTeX fails, show the original text
+                  decorations.push(
+                    Decoration.inline(from, to, {
+                      class: 'math-error',
+                    })
+                  );
+                }
               }
             });
 
@@ -330,6 +420,7 @@ export function RichTextEditor({
       TextStyle,
       Color,
       ClozeExtension,
+      MathExtension,
       Placeholder.configure({
         placeholder,
         emptyEditorClass: 'is-editor-empty',

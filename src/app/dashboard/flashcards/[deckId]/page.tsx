@@ -6,6 +6,7 @@ import { Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
+import { MathContent } from '@/components/MathContent';
 
 const TAG_COLORS = ['#2563eb', '#0f766e', '#7c3aed', '#be123c', '#b45309', '#0284c7'];
 
@@ -375,9 +376,18 @@ export default function DeckPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Front</p>
-                    <div className="prose prose-sm mt-1 max-w-none text-slate-900 dark:text-slate-100" dangerouslySetInnerHTML={{ __html: card.front }} />
+                    <MathContent
+                      className="prose prose-sm mt-1 max-w-none text-slate-900 dark:text-slate-100"
+                      content={card.front}
+                      isHtml
+                    />
                     <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Back</p>
-                    <div className="prose prose-sm mt-1 max-w-none text-slate-800 dark:text-slate-200" dangerouslySetInnerHTML={{ __html: card.back }} />
+                    <MathContent
+                      className="prose prose-sm mt-1 max-w-none text-slate-800 dark:text-slate-200"
+                      content={card.back}
+                      isHtml
+                    />
+
                   </div>
                   <div className="flex gap-1">
                     <button
