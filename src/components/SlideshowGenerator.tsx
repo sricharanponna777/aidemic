@@ -111,7 +111,7 @@ function Slideshow({ slides, concept }: { slides: string[]; concept: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="relative min-h-[220px] overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+      <div className="relative min-h-55 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
         <AnimatePresence mode="wait">
           <motion.div
             key={index}
