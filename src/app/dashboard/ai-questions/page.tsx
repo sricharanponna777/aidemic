@@ -1,9 +1,11 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { RefreshCw, Sparkles } from 'lucide-react';
-import { MathContent } from '@/components/MathContent';
+import { ArrowRight, BookOpen, RefreshCw, Sparkles } from 'lucide-react';
+import { MarkdownContent } from '@/components/MarkdownContent';
+import { buttonStyles } from '@/components/ui/button';
 
 type CorrectOption = 'A' | 'B' | 'C' | 'D';
 
@@ -78,7 +80,7 @@ export default function AIQuestionsPage() {
   const [submitted, setSubmitted] = useState(false);
   const [answers, setAnswers] = useState<Array<CorrectOption | null>>([]);
 
-  const isGenerationValid = form.topic.trim().length >= 3 && form.prompt.trim().length >= 12;
+  const isGenerationValid = form.topic.trim().length >= 3;
   const inQuiz = questions.length > 0;
   const currentQuestion = inQuiz ? questions[currentIndex] : null;
 
@@ -102,7 +104,7 @@ export default function AIQuestionsPage() {
 
   const handleGenerate = async () => {
     if (!isGenerationValid) {
-      setStatus({ tone: 'error', text: 'Add a clear topic and prompt details for specific MCQs.' });
+      setStatus({ tone: 'error', text: 'Add a clear topic for specific MCQs.' });
       return;
     }
 
@@ -197,11 +199,23 @@ export default function AIQuestionsPage() {
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">AI Questions</p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">Interactive Exam Questions</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-          Generate and answer interactive MCQs for AQA, Edexcel, or OCR at GCSE and A-Level.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">Step 4 of 4</p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">MCQ Exam Practice</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+              Finish the flow with exam-board MCQs after notes, flashcards, and study sessions.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/notes"
+            className={buttonStyles({ variant: 'secondary' })}
+          >
+            <BookOpen className="h-4 w-4" />
+            New topic
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </section>
 
       {status ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassName}`}>{status.text}</div> : null}
@@ -300,22 +314,12 @@ export default function AIQuestionsPage() {
           </div>
 
           {!isGenerationValid ? (
-            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">Provide both a clear topic and prompt details (at least 12 chars).</p>
+            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">Provide a clear topic to generate MCQs.</p>
           ) : null}
-
-          <label className="mt-4 block text-sm text-slate-700 dark:text-slate-300">
-            Prompt details (required)
-            <textarea
-              value={form.prompt}
-              onChange={(event) => setForm((prev) => ({ ...prev, prompt: event.target.value }))}
-              placeholder="Include chapter scope, command words, common mistakes, and desired MCQ style."
-              className="mt-1 h-24 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-            />
-          </label>
 
           <div className="mt-5 flex justify-end">
             <button
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900"
+              className={buttonStyles({ variant: 'primary' })}
               onClick={handleGenerate}
               disabled={isGenerating || !isGenerationValid}
             >
@@ -337,7 +341,7 @@ export default function AIQuestionsPage() {
             </p>
           </div>
 
-          <MathContent
+          <MarkdownContent
             className="text-xl font-semibold text-slate-900 dark:text-slate-100"
             content={currentQuestion.question}
           />
@@ -373,10 +377,14 @@ export default function AIQuestionsPage() {
                     if (submitted) return;
                     setSelectedOption(option);
                   }}
-                  className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${style}`}
+                  className={buttonStyles({
+                    variant: 'plain',
+                    size: 'none',
+                    className: `justify-start rounded-lg border px-4 py-3 text-left text-sm font-medium ${style}`,
+                  })}
                 >
                   <span className="mr-2 font-bold">{option}.</span>
-                  <MathContent inline content={optionText(currentQuestion, option)} />
+                  <MarkdownContent inline content={optionText(currentQuestion, option)} />
                 </button>
               );
             })}
@@ -385,7 +393,7 @@ export default function AIQuestionsPage() {
           {submitted ? (
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-950">
               <p className="font-semibold text-slate-900 dark:text-slate-100">Correct answer: {currentQuestion.correctOption}</p>
-              <MathContent className="mt-1 text-slate-700 dark:text-slate-300" content={currentQuestion.explanation} />
+              <MarkdownContent className="mt-1 text-slate-700 dark:text-slate-300" content={currentQuestion.explanation} />
             </div>
           ) : null}
 
@@ -395,13 +403,13 @@ export default function AIQuestionsPage() {
                 type="button"
                 onClick={submitCurrentAnswer}
                 disabled={!selectedOption}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900"
+                className={buttonStyles({ variant: 'primary' })}
               >
                 Submit answer
               </button>
             ) : null}
             {submitted && !isFinalQuestion ? (
-              <button type="button" onClick={goNext} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-blue-600">
+              <button type="button" onClick={goNext} className={buttonStyles({ variant: 'primary' })}>
                 Next question
               </button>
             ) : null}
@@ -587,7 +595,7 @@ export default function AIQuestionsPage() {
           <button
             type="button"
             onClick={restartWithSameQuestions}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            className={buttonStyles({ variant: 'primary', size: 'lg' })}
           >
             <RefreshCw className="h-4 w-4" />
             Retry
@@ -596,7 +604,7 @@ export default function AIQuestionsPage() {
           <button
             type="button"
             onClick={resetToGenerator}
-            className="rounded-lg border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            className={buttonStyles({ variant: 'secondary', size: 'lg' })}
           >
             New set
           </button>

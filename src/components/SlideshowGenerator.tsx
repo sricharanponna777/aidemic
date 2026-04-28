@@ -1,10 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, CheckCircle, XCircle, BookOpen, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  BookOpen,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Pause,
+  Play,
+  XCircle,
+} from 'lucide-react';
+import { MarkdownContent } from '@/components/MarkdownContent';
+import { buttonStyles } from '@/components/ui/button';
 
 type SlideshowDuration = '30' | '60' | '120';
+type StudyContentMode = 'notes' | 'slideshow';
 
 interface SlideshowGeneratorProps {
   concept: string;
@@ -12,6 +24,7 @@ interface SlideshowGeneratorProps {
   flashcardId?: string;
   examBoard?: string;
   examType?: string;
+  mode?: StudyContentMode;
 }
 
 interface GeneratedContent {
@@ -22,18 +35,12 @@ interface GeneratedContent {
 }
 
 const DURATIONS: { value: SlideshowDuration; label: string; description: string }[] = [
-  { value: '30',  label: '30 sec',  description: 'Quick overview' },
-  { value: '60',  label: '60 sec',  description: 'Standard' },
-  { value: '120', label: '2 min',   description: 'In-depth' },
+  { value: '30', label: '30 sec', description: 'Quick overview' },
+  { value: '60', label: '60 sec', description: 'Standard' },
+  { value: '120', label: '2 min', description: 'In-depth' },
 ];
 
 const SLIDE_INTERVAL_MS = 5000;
-
-function slideLabel(index: number, total: number): string {
-  if (index === 0) return 'Introduction';
-  if (index === total - 1) return 'Summary';
-  return `Part ${index}`;
-}
 
 const BG_COLORS = [
   'from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40',
@@ -42,6 +49,12 @@ const BG_COLORS = [
   'from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40',
   'from-rose-50 to-pink-50 dark:from-rose-950/40 dark:to-pink-950/40',
 ];
+
+function slideLabel(index: number, total: number): string {
+  if (index === 0) return 'Introduction';
+  if (index === total - 1) return 'Summary';
+  return `Part ${index}`;
+}
 
 function OptionGroup<T extends string>({
   label,
@@ -63,16 +76,18 @@ function OptionGroup<T extends string>({
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`rounded-lg border px-3 py-1.5 text-left text-sm font-medium transition ${
-              value === opt.value
-                ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
-                : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
+            className={buttonStyles({
+              variant: 'plain',
+              size: 'none',
+              className: `justify-start rounded-lg border px-3 py-1.5 text-left text-sm font-medium ${
+                value === opt.value
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                  : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'
+              }`,
+            })}
           >
             <span>{opt.label}</span>
-            {opt.description && (
-              <span className="ml-1.5 text-xs opacity-60">{opt.description}</span>
-            )}
+            {opt.description ? <span className="ml-1.5 text-xs opacity-60">{opt.description}</span> : null}
           </button>
         ))}
       </div>
@@ -96,8 +111,7 @@ function Slideshow({ slides, concept }: { slides: string[]; concept: string }) {
 
   return (
     <div className="space-y-3">
-      {/* Slide area */}
-      <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700" style={{ minHeight: '220px' }}>
+      <div className="relative min-h-[220px] overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
         <AnimatePresence mode="wait">
           <motion.div
             key={index}
@@ -110,9 +124,10 @@ function Slideshow({ slides, concept }: { slides: string[]; concept: string }) {
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
               {slideLabel(index, slides.length)}
             </p>
-            <p className="text-lg font-medium leading-relaxed text-slate-800 dark:text-slate-100">
-              {slides[index]}
-            </p>
+            <MarkdownContent
+              className="text-lg font-medium leading-relaxed text-slate-800 dark:text-slate-100"
+              content={slides[index]}
+            />
           </motion.div>
         </AnimatePresence>
 
@@ -121,12 +136,14 @@ function Slideshow({ slides, concept }: { slides: string[]; concept: string }) {
         </div>
       </div>
 
-      {/* Controls */}
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => { goTo(index - 1); setPlaying(false); }}
-          className="rounded-lg border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+          onClick={() => {
+            goTo(index - 1);
+            setPlaying(false);
+          }}
+          className={buttonStyles({ variant: 'secondary', size: 'icon', className: 'h-8 w-8' })}
           aria-label="Previous slide"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -137,13 +154,20 @@ function Slideshow({ slides, concept }: { slides: string[]; concept: string }) {
             <button
               key={i}
               type="button"
-              onClick={() => { goTo(i); setPlaying(false); }}
+              onClick={() => {
+                goTo(i);
+                setPlaying(false);
+              }}
               aria-label={`Go to slide ${i + 1}`}
-              className={`h-2 rounded-full transition-all ${
-                i === index
-                  ? 'w-5 bg-blue-500'
-                  : 'w-2 bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500'
-              }`}
+              className={buttonStyles({
+                variant: 'plain',
+                size: 'none',
+                className: `h-2 rounded-full ${
+                  i === index
+                    ? 'w-5 bg-blue-500'
+                    : 'w-2 bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500'
+                }`,
+              })}
             />
           ))}
         </div>
@@ -152,15 +176,18 @@ function Slideshow({ slides, concept }: { slides: string[]; concept: string }) {
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}
-            className="rounded-lg border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            className={buttonStyles({ variant: 'secondary', size: 'icon', className: 'h-8 w-8' })}
             aria-label={playing ? 'Pause' : 'Play'}
           >
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </button>
           <button
             type="button"
-            onClick={() => { goTo(index + 1); setPlaying(false); }}
-            className="rounded-lg border border-slate-300 p-1.5 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            onClick={() => {
+              goTo(index + 1);
+              setPlaying(false);
+            }}
+            className={buttonStyles({ variant: 'secondary', size: 'icon', className: 'h-8 w-8' })}
             aria-label="Next slide"
           >
             <ChevronRight className="h-4 w-4" />
@@ -168,17 +195,62 @@ function Slideshow({ slides, concept }: { slides: string[]; concept: string }) {
         </div>
       </div>
 
-      {/* Concept label */}
       <p className="text-center text-xs text-slate-400 dark:text-slate-500">{concept}</p>
     </div>
   );
 }
 
-export function SlideshowGenerator({ concept, subject, flashcardId, examBoard, examType }: SlideshowGeneratorProps) {
+function StudyNotes({ script, slides, concept }: { script?: string; slides: string[]; concept: string }) {
+  const keyIdeas = slides.filter(Boolean).slice(0, 8);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-950/70">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Study notes</p>
+        {script ? (
+          <MarkdownContent
+            className="mt-3 text-sm leading-7 text-slate-800 dark:text-slate-200"
+            content={script}
+          />
+        ) : (
+          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">No notes were returned.</p>
+        )}
+      </div>
+
+      {keyIdeas.length > 0 ? (
+        <div className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Key checkpoints</p>
+          <ol className="mt-3 space-y-2">
+            {keyIdeas.map((idea, index) => (
+              <li key={`${idea}-${index}`} className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                  {index + 1}
+                </span>
+                <MarkdownContent content={idea} />
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+
+      <p className="text-center text-xs text-slate-400 dark:text-slate-500">{concept}</p>
+    </div>
+  );
+}
+
+export function SlideshowGenerator({
+  concept,
+  subject,
+  flashcardId,
+  examBoard,
+  examType,
+  mode = 'slideshow',
+}: SlideshowGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [content, setContent] = useState<GeneratedContent | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [duration, setDuration] = useState<SlideshowDuration>('60');
+  const isNotesMode = mode === 'notes';
 
   const generate = async () => {
     setIsGenerating(true);
@@ -187,7 +259,7 @@ export function SlideshowGenerator({ concept, subject, flashcardId, examBoard, e
       const response = await fetch('/api/ai/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ concept, subject, flashcardId, duration, examBoard, examType }),
+        body: JSON.stringify({ concept, subject, flashcardId, duration, examBoard, examType, mode }),
       });
 
       const data = await response.json();
@@ -204,36 +276,49 @@ export function SlideshowGenerator({ concept, subject, flashcardId, examBoard, e
     }
   };
 
-  const reset = () => { setContent(null); setErrorMessage(''); };
+  const reset = () => {
+    setContent(null);
+    setErrorMessage('');
+  };
+  const actionLabel = isNotesMode ? 'Create Study Notes' : 'Create Slideshow';
+  const loadingLabel = isNotesMode ? 'Generating notes...' : 'Generating slides...';
 
-  // ── Completed ──────────────────────────────────────────────────────────────
   if (content?.status === 'completed') {
     const slides = content.slides ?? [];
     return (
       <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-2">
           <CheckCircle className="h-4 w-4 text-green-500" />
-          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Slideshow ready</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+            {isNotesMode ? 'Study notes ready' : 'Slideshow ready'}
+          </span>
         </div>
 
-        {slides.length > 0 && <Slideshow slides={slides} concept={concept} />}
+        {isNotesMode ? (
+          <StudyNotes script={content.script} slides={slides} concept={concept} />
+        ) : (
+          <>
+            {slides.length > 0 ? <Slideshow slides={slides} concept={concept} /> : null}
 
-        {content.script && (
-          <details>
-            <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-              <BookOpen className="h-3.5 w-3.5" />
-              Full script
-            </summary>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              {content.script}
-            </p>
-          </details>
+            {content.script ? (
+              <details>
+                <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Full script
+                </summary>
+                <MarkdownContent
+                  className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300"
+                  content={content.script}
+                />
+              </details>
+            ) : null}
+          </>
         )}
 
         <button
           type="button"
           onClick={reset}
-          className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+          className={buttonStyles({ variant: 'ghost', size: 'sm', className: 'text-xs' })}
         >
           Generate again
         </button>
@@ -241,34 +326,37 @@ export function SlideshowGenerator({ concept, subject, flashcardId, examBoard, e
     );
   }
 
-  // ── In progress / failed ───────────────────────────────────────────────────
   if (content) {
     return (
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-2">
-          {content.status === 'failed'
-            ? <XCircle className="h-4 w-4 text-red-500" />
-            : <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+          {content.status === 'failed' ? (
+            <XCircle className="h-4 w-4 text-red-500" />
+          ) : (
+            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          )}
           <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-            {content.status === 'failed' ? 'Generation failed' : 'Generating slides…'}
+            {content.status === 'failed' ? 'Generation failed' : loadingLabel}
           </span>
         </div>
 
-        {content.status === 'failed' && (
-          <button type="button" onClick={reset}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+        {content.status === 'failed' ? (
+          <button
+            type="button"
+            onClick={reset}
+            className={buttonStyles({ variant: 'secondary' })}
+          >
             Try again
           </button>
-        )}
+        ) : null}
       </div>
     );
   }
 
-  // ── Form ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
       <OptionGroup
-        label="Script Length"
+        label={isNotesMode ? 'Notes depth' : 'Script length'}
         options={DURATIONS}
         value={duration}
         onChange={setDuration}
@@ -278,15 +366,13 @@ export function SlideshowGenerator({ concept, subject, flashcardId, examBoard, e
         type="button"
         onClick={generate}
         disabled={isGenerating}
-        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+        className={buttonStyles({ variant: 'primary' })}
       >
         {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-        {isGenerating ? 'Generating…' : 'Create Slideshow'}
+        {isGenerating ? loadingLabel : actionLabel}
       </button>
 
-      {errorMessage && (
-        <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
-      )}
+      {errorMessage ? <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p> : null}
     </div>
   );
 }

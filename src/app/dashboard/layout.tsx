@@ -4,8 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, LayoutDashboard, Settings, LogOut, Brain, Layers, Sparkles, GalleryHorizontal } from "lucide-react";
+import { BookOpen, LayoutDashboard, Settings, LogOut, Brain, Layers, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { buttonStyles } from "@/components/ui/button";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth();
@@ -32,10 +33,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/notes", label: "Notes", icon: BookOpen },
     { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
-    { href: "/dashboard/ai-questions", label: "AI Questions", icon: Sparkles },
-    { href: "/dashboard/slideshow", label: "Slideshow", icon: GalleryHorizontal },
     { href: "/dashboard/study-sessions", label: "Study Sessions", icon: Brain },
+    { href: "/dashboard/ai-questions", label: "MCQs", icon: Sparkles },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
 
@@ -52,7 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="text-sm text-slate-600 dark:text-slate-300">{session.user.email}</span>
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-600 hover:text-white dark:text-red-400 dark:hover:text-white"
+              className={buttonStyles({ variant: "danger-ghost", size: "sm" })}
             >
               <LogOut className="h-4 w-4" />
               Sign Out
@@ -68,7 +69,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <nav className="sticky top-8 space-y-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href;
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)) ||
+                  (item.href === "/dashboard/notes" && pathname.startsWith("/dashboard/slideshow"));
                 return (
                   <Link
                     key={item.href}

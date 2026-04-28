@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { buttonStyles } from '@/components/ui/button';
 
 type SelectStyle = 'inline' | 'stacked';
 
@@ -75,7 +76,10 @@ export function SelectTrigger({ children, className = '' }: SelectTriggerProps) 
     <button
       type="button"
       onClick={() => context.setOpen(!context.open)}
-      className={`flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 ${className}`.trim()}
+      className={buttonStyles({
+        variant: 'secondary',
+        className: `w-full justify-between font-normal text-slate-900 dark:bg-slate-950 dark:text-slate-100 ${className}`,
+      })}
     >
       {children}
       <span className="ml-2 text-slate-400">▼</span>
@@ -149,7 +153,11 @@ export function SelectItem({ value, children, className = '' }: SelectItemProps)
         context.onValueChange(value);
         context.setOpen(false);
       }}
-      className={`w-full px-4 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800 ${className}`.trim()}
+      className={buttonStyles({
+        variant: 'ghost',
+        size: 'none',
+        className: `w-full justify-start rounded-none px-4 py-2 text-left font-normal ${className}`,
+      })}
     >
       {children}
     </button>

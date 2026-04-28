@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import renderMathInElement from 'katex/contrib/auto-render';
 
 type MathContentProps = {
@@ -10,6 +10,8 @@ type MathContentProps = {
   inline?: boolean;
 };
 
+const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -17,14 +19,6 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function replaceCaretExponents(htmlText: string): string {
-  const exponentRegex = /([A-Za-z0-9)\]])\^(?:\{([^}]+)\}|\(([^)]+)\)|([A-Za-z0-9+\-]+))/g;
-  return htmlText.replace(exponentRegex, (_match, base, braceExp, parenExp, bareExp) => {
-    const exponent = braceExp ?? parenExp ?? bareExp ?? '';
-    return `${base}<sup>${exponent}</sup>`;
-  });
 }
 
 function applyPlainTextSuperscripts(root: HTMLElement) {
@@ -101,11 +95,12 @@ export function MathContent({
 
   const html = useMemo(() => {
     if (isHtml) return content || '';
-    const escaped = escapeHtml(content || '').replace(/\n/g, '<br />');
-    return replaceCaretExponents(escaped);
+    return escapeHtml(content || '').replace(/\n/g, '<br />');
   }, [content, isHtml]);
 
-  useEffect(() => {
+  const markup = useMemo(() => ({ __html: html }), [html]);
+
+  useBrowserLayoutEffect(() => {
     if (!ref.current) return;
 
     renderMathInElement(ref.current, {
@@ -128,7 +123,7 @@ export function MathContent({
       <span
         ref={setRef}
         className={className}
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={markup}
       />
     );
   }
@@ -137,7 +132,7 @@ export function MathContent({
     <div
       ref={setRef}
       className={className}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={markup}
     />
   );
 }

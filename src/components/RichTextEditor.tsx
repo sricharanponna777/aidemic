@@ -42,6 +42,7 @@ import {
   Heading3,
   Highlighter,
 } from 'lucide-react';
+import { buttonStyles } from '@/components/ui/button';
 
 // ---------------------------------------------------------------------------
 // Cloze extension — renders {{c1::text}} spans visually
@@ -120,7 +121,7 @@ const MathExtension = Extension.create({
                       return span;
                     })(), { block: false })
                   );
-                } catch (error) {
+                } catch {
                   // If KaTeX fails, show the original text
                   decorations.push(
                     Decoration.inline(from, to, {
@@ -150,7 +151,7 @@ const MathExtension = Extension.create({
                       return div;
                     })(), { block: true })
                   );
-                } catch (error) {
+                } catch {
                   // If KaTeX fails, show the original text
                   decorations.push(
                     Decoration.inline(from, to, {
@@ -193,10 +194,9 @@ function ToolbarButton({ onClick, active, disabled, title, children }: ToolbarBu
         onClick();
       }}
       className={[
-        'inline-flex items-center justify-center rounded-md p-1.5 text-sm transition-all duration-100',
-        'border',
+        buttonStyles({ variant: 'plain', size: 'icon', className: 'h-8 w-8 border text-sm' }),
         active
-          ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-900/40 dark:text-indigo-300'
+          ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/45 dark:text-blue-200'
           : 'border-transparent text-slate-600 hover:border-slate-300 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-700',
         disabled ? 'cursor-not-allowed opacity-30' : 'cursor-pointer',
       ].join(' ')}

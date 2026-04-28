@@ -361,6 +361,7 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     'If it asks for reasoning, use analysis. If it asks for a diagram, use diagram.',
     'Use only the most relevant 1-3 tags per flashcard.',
     'When writing math, use explicit MathJax/LaTeX with grouping and brackets.',
+    'Because the response is JSON, escape every LaTeX backslash as a double backslash, for example \\\\frac{1}{2}, \\\\text{det}(A), \\\\begin{pmatrix}, and \\\\end{pmatrix}.',
     'Wrap math in $...$ and always bracket powers/subscripts: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
     'Use grouped fractions: \\frac{numerator}{denominator}, e.g. \\frac{(x^{4}y^{2})}{(xy^{3})}.',
     'Never use ambiguous shorthand such as x2, xy3, x^n+1, or (x4y^2)/(xy3).',
@@ -467,9 +468,6 @@ export async function POST(request: Request) {
     const rawBody = (await request.json()) as FlashcardPayload;
     const payload = normalizePayload(rawBody);
 
-    if (!payload.name) {
-      return NextResponse.json({ error: 'Deck name is required.' }, { status: 400 });
-    }
     if (!payload.topic) {
       return NextResponse.json({ error: 'Topic is required.' }, { status: 400 });
     }
