@@ -79,6 +79,7 @@ export default function AIQuestionsPage() {
   const [selectedOption, setSelectedOption] = useState<CorrectOption | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [answers, setAnswers] = useState<Array<CorrectOption | null>>([]);
+  const [showResults, setShowResults] = useState(false);
 
   const isGenerationValid = form.topic.trim().length >= 3;
   const inQuiz = questions.length > 0;
@@ -92,13 +93,16 @@ export default function AIQuestionsPage() {
   }, [answers, questions]);
 
   const isFinalQuestion = currentIndex === questions.length - 1;
-  const hasFinished = inQuiz && answers.filter((answer) => answer !== null).length === questions.length;
+  const allQuestionsAnswered = inQuiz && answers.filter((answer) => answer !== null).length === questions.length;
+  const hasFinished = showResults && allQuestionsAnswered;
+  const currentAnswerIsCorrect = submitted && selectedOption === currentQuestion?.correctOption;
 
   const startQuiz = (nextQuestions: QuizQuestion[]) => {
     setQuestions(nextQuestions);
     setCurrentIndex(0);
     setSelectedOption(null);
     setSubmitted(false);
+    setShowResults(false);
     setAnswers(Array.from({ length: nextQuestions.length }, () => null));
   };
 
@@ -184,6 +188,7 @@ export default function AIQuestionsPage() {
     setCurrentIndex(0);
     setSelectedOption(null);
     setSubmitted(false);
+    setShowResults(false);
     setAnswers([]);
   };
 
@@ -392,7 +397,10 @@ export default function AIQuestionsPage() {
 
           {submitted ? (
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-950">
-              <p className="font-semibold text-slate-900 dark:text-slate-100">Correct answer: {currentQuestion.correctOption}</p>
+              <p className={`font-semibold ${currentAnswerIsCorrect ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+                {currentAnswerIsCorrect ? 'Correct' : 'Incorrect'}
+              </p>
+              <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">Correct answer: {currentQuestion.correctOption}</p>
               <MarkdownContent className="mt-1 text-slate-700 dark:text-slate-300" content={currentQuestion.explanation} />
             </div>
           ) : null}
@@ -411,6 +419,12 @@ export default function AIQuestionsPage() {
             {submitted && !isFinalQuestion ? (
               <button type="button" onClick={goNext} className={buttonStyles({ variant: 'primary' })}>
                 Next question
+              </button>
+            ) : null}
+            {submitted && isFinalQuestion ? (
+              <button type="button" onClick={() => setShowResults(true)} className={buttonStyles({ variant: 'primary' })}>
+                View results
+                <ArrowRight className="h-4 w-4" />
               </button>
             ) : null}
           </div>
