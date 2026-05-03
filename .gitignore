@@ -46,3 +46,6 @@ next-env.d.ts
 
 # queries
 *.sql
+
+# other
+DEMO_SCRIPT.md

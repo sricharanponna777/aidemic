@@ -4,8 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, useTheme } from "@/hooks/useTheme";
 import { useRouter } from "next/navigation";
-import { Lock, LogOut, Moon, Sun, User } from "lucide-react";
+import { LogOut, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { buttonStyles } from "@/components/ui/button";
 
 export default function Settings() {
   const { session, profile: loadedProfile } = useAuth();
@@ -14,15 +15,6 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isThemeSaving, setIsThemeSaving] = useState(false);
   const { theme, setTheme } = useTheme();
-  // combine loaded profile with defaults for rendering
-  const profile = {
-    full_name: "",
-    bio: "",
-    preferred_study_time: "",
-    daily_study_goal_minutes: 0,
-    ...loadedProfile,
-  };
-
   useEffect(() => {
     if (loadedProfile?.theme === "light" || loadedProfile?.theme === "dark") {
       setTheme(loadedProfile.theme);
@@ -69,11 +61,15 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => handleThemeChange("light")}
-            className={`rounded-xl border p-4 text-left transition ${
-              theme === "light"
-                ? "border-blue-500 bg-blue-50 shadow-sm dark:border-blue-400 dark:bg-blue-900/30"
-                : "border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"
-            }`}
+            className={buttonStyles({
+              variant: "plain",
+              size: "none",
+              className: `justify-start rounded-lg border p-4 text-left ${
+                theme === "light"
+                  ? "border-blue-500 bg-blue-50 shadow-sm dark:border-blue-400 dark:bg-blue-900/30"
+                  : "border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"
+              }`,
+            })}
           >
             <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
               <Sun className="h-4 w-4 text-amber-500" />
@@ -84,11 +80,15 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => handleThemeChange("dark")}
-            className={`rounded-xl border p-4 text-left transition ${
-              theme === "dark"
-                ? "border-blue-500 bg-blue-50 shadow-sm dark:border-blue-400 dark:bg-blue-900/30"
-                : "border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"
-            }`}
+            className={buttonStyles({
+              variant: "plain",
+              size: "none",
+              className: `justify-start rounded-lg border p-4 text-left ${
+                theme === "dark"
+                  ? "border-blue-500 bg-blue-50 shadow-sm dark:border-blue-400 dark:bg-blue-900/30"
+                  : "border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"
+              }`,
+            })}
           >
             <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
               <Moon className="h-4 w-4 text-indigo-500" />
@@ -109,7 +109,7 @@ export default function Settings() {
 
         <p className="mb-6 text-sm text-red-700 dark:text-red-300">Sign out of your account on this device. You&apos;ll need to sign in again to continue.</p>
 
-        <button onClick={handleSignOut} disabled={isLoading} className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-xl transition duration-200">
+        <button onClick={handleSignOut} disabled={isLoading} className={buttonStyles({ variant: "danger" })}>
           {isLoading ? "Signing out..." : "Sign Out"}
         </button>
       </div>

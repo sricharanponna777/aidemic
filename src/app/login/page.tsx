@@ -1,8 +1,9 @@
 'use client';
 
 import { createClient } from '@/lib/supabase-client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { buttonStyles } from '@/components/ui/button';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -10,15 +11,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
-  const [envError, setEnvError] = useState('');
   const router = useRouter();
 
-  // Check if Supabase is configured
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      setEnvError('⚠️ Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local');
-    }
-  }, []);
+  const envError =
+    !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      ? '⚠️ Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local'
+      : '';
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +150,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading || !!envError}
-            className="w-full bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 rounded-lg transition"
+            className={buttonStyles({ variant: 'primary', className: 'w-full' })}
           >
             {isLoading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
           </button>
@@ -166,7 +164,7 @@ export default function LoginPage() {
                 setIsSignUp(!isSignUp);
                 setError('');
               }}
-              className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+              className={buttonStyles({ variant: 'ghost', size: 'none', className: 'inline-flex px-2 py-1 align-baseline' })}
             >
               {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>

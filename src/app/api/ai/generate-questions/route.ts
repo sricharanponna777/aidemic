@@ -312,15 +312,103 @@ const getAIConfig = () => {
   return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName };
 };
 
-const normalizeQuestion = (question: QuizQuestion): QuizQuestion | null => {
+const buildCommonHeaders = (config: ReturnType<typeof getAIConfig>) => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (config.apiKey) {
+    headers.Authorization = `Bearer ${config.apiKey}`;
+  }
+  if (config.isOpenRouter) {
+    if (config.openRouterSiteUrl) {
+      headers['HTTP-Referer'] = config.openRouterSiteUrl;
+    }
+    if (config.openRouterAppName) {
+      headers['X-Title'] = config.openRouterAppName;
+    }
+  }
+  return headers;
+};
+
+const normalizeMathExpression = (expression: string) => {
+  let next = expression;
+
+  // Handle fractions: (a)/(b) -> \frac{a}{b}
+  next = next.replace(/\(\s*([^()]+?)\s*\)\s*\/\s*\(\s*([^()]+?)\s*\)/g, '\\frac{$1}{$2}');
+
+  // Handle existing superscripts: x^2 -> x^{2}
+  next = next.replace(/([A-Za-z0-9)\]])\^([A-Za-z0-9+\-]+)/g, '$1^{$2}');
+
+  // Handle existing subscripts: x_2 -> x_{2}
+  next = next.replace(/([A-Za-z0-9)\]])_([A-Za-z0-9+\-]+)/g, '$1_{$2}');
+
+  // Handle implicit superscripts: x2, x3, etc. (when followed by letter or end)
+  next = next.replace(/([A-Za-z])\s*(\d+)(?=\s*[A-Za-z]|$|\s*[\+\-\*\/\=\(\)\[\]\{\}\s]|$)/g, '$1^{$2}');
+
+  // Handle coefficients with variables: 3x2 -> 3x^{2}, 2x^2 -> 2x^{2}
+  next = next.replace(/(\d+)\s*([A-Za-z])\s*(\d+)/g, '$1$2^{$3}');
+
+  // Handle square roots: sqrt(x) -> \sqrt{x}
+  next = next.replace(/sqrt\s*\(\s*([^()]+?)\s*\)/g, '\\sqrt{$1}');
+
+  // Handle pi and e constants
+  next = next.replace(/\bpi\b/g, '\\pi');
+  next = next.replace(/\be\b/g, '\\mathrm{e}');
+
+  // Handle infinity
+  next = next.replace(/\binf\b/g, '\\infty');
+
+  return next;
+};
+
+const normalizeMathNotation = (text: string, subject: string) => {
+  // Apply math normalization to subjects that commonly use mathematical notation
+  const mathSubjects = ['mathematics', 'physics', 'chemistry', 'computer science'];
+  if (!mathSubjects.includes(subject)) return text;
+
+  let hasMathDelimiters = false;
+  let next = text;
+
+  next = next.replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `\\(${normalizeMathExpression(expression)}\\)`;
+  });
+
+  next = next.replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `\\[${normalizeMathExpression(expression)}\\]`;
+  });
+
+  next = next.replace(/\$\$([\s\S]*?)\$\$/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `$$${normalizeMathExpression(expression)}$$`;
+  });
+
+  next = next.replace(/\$([^$\n]+)\$/g, (_match, expression) => {
+    hasMathDelimiters = true;
+    return `$${normalizeMathExpression(expression)}$`;
+  });
+
+  if (hasMathDelimiters) return next;
+  return normalizeMathExpression(next);
+};
+
+const normalizeQuestion = (question: QuizQuestion, subject: string): QuizQuestion | null => {
+  const questionText = normalizeMathNotation(safe((question.question || '').replace(/^question\s*[:\-]\s*/i, '')), subject);
+  const optionA = normalizeMathNotation(safe(question.optionA || ''), subject);
+  const optionB = normalizeMathNotation(safe(question.optionB || ''), subject);
+  const optionC = normalizeMathNotation(safe(question.optionC || ''), subject);
+  const optionD = normalizeMathNotation(safe(question.optionD || ''), subject);
+  const explanation = normalizeMathNotation(safe(question.explanation || ''), subject);
+
   const normalized: QuizQuestion = {
-    question: txt(safe((question.question || '').replace(/^question\s*[:\-]\s*/i, '')), 520),
-    optionA: txt(safe(question.optionA || ''), 220),
-    optionB: txt(safe(question.optionB || ''), 220),
-    optionC: txt(safe(question.optionC || ''), 220),
-    optionD: txt(safe(question.optionD || ''), 220),
+    question: txt(questionText, 520),
+    optionA: txt(optionA, 220),
+    optionB: txt(optionB, 220),
+    optionC: txt(optionC, 220),
+    optionD: txt(optionD, 220),
     correctOption: txt((question.correctOption || '').toUpperCase(), 1) as CorrectOption,
-    explanation: txt(safe(question.explanation || ''), 520),
+    explanation: txt(explanation, 520),
     figureUrl: sanitizeFigureUrl(question.figureUrl || ''),
   };
 
@@ -362,6 +450,13 @@ const aiGenerate = async (
     'Exactly one option must be correct.',
     'Always include figureUrl in each question. Use an empty string when no figure is needed.',
     'Distractors must be plausible for exam revision.',
+    'Use clean GitHub-flavored Markdown inside string values where it improves readability, especially **bold** key terms in explanations. Do not use raw HTML.',
+    'When writing math, use explicit MathJax/LaTeX with grouping and brackets.',
+    'Because the response is JSON, escape every LaTeX backslash as a double backslash, for example \\\\frac{1}{2}, \\\\text{det}(A), \\\\begin{pmatrix}, and \\\\end{pmatrix}.',
+    'Wrap inline math in $...$ or \\\\(...\\\\), and display math in $$...$$ or \\\\[...\\\\]. Always bracket powers/subscripts: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
+    'Use grouped fractions: \\frac{numerator}{denominator}, e.g. \\frac{(x^{4}y^{2})}{(xy^{3})}.',
+    'Never use ambiguous shorthand such as x2, xy3, x^n+1, or (x4y^2)/(xy3).',
+    'Before finalizing each question, verify that correctOption is truly correct and explanation matches that option.',
     `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
     payload.specification ? `Specification focus: ${payload.specification}` : '',
     figureUrls.length > 0 ? 'Use provided figure URLs when a question references a figure.' : 'Do not invent figure URLs.',
@@ -379,27 +474,14 @@ const aiGenerate = async (
     .filter(Boolean)
     .join('\n\n');
 
-  const commonHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (config.apiKey) {
-    commonHeaders.Authorization = `Bearer ${config.apiKey}`;
-  }
-  if (config.isOpenRouter) {
-    if (config.openRouterSiteUrl) {
-      commonHeaders['HTTP-Referer'] = config.openRouterSiteUrl;
-    }
-    if (config.openRouterAppName) {
-      commonHeaders['X-Title'] = config.openRouterAppName;
-    }
-  }
+  const commonHeaders = buildCommonHeaders(config);
 
   const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
     method: 'POST',
     headers: commonHeaders,
     body: JSON.stringify({
       model: config.model,
-      temperature: 0.3,
+      temperature: 0.2,
       input: [
         { role: 'system', content: [{ type: 'input_text', text: system }] },
         { role: 'user', content: [{ type: 'input_text', text: user }] },
@@ -422,7 +504,7 @@ const aiGenerate = async (
     headers: commonHeaders,
     body: JSON.stringify({
       model: config.model,
-      temperature: 0.3,
+      temperature: 0.2,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -462,6 +544,101 @@ const aiGenerate = async (
   return parsed;
 };
 
+const aiAuditQuestions = async (
+  payload: ReturnType<typeof normalizePayload>,
+  questions: QuizQuestion[]
+): Promise<GeneratedQuiz> => {
+  const config = getAIConfig();
+  const system = [
+    'You audit exam-board multiple-choice questions for correctness.',
+    'Return strict JSON only using the provided schema.',
+    'For each question, identify the single best answer among A, B, C, D.',
+    'If correctOption is wrong, fix it.',
+    'Rewrite explanation so it supports the final correct option and why it is correct.',
+    'Keep question wording, options, and figureUrl unchanged unless there is a major factual or structural flaw.',
+    'Preserve the same number and order of questions.',
+    `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
+    payload.specification ? `Specification focus: ${payload.specification}` : '',
+    'Do not add or remove questions.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const user = [
+    `Topic: ${payload.topic}`,
+    'Audit this generated question JSON and correct wrong answer keys/explanations:',
+    JSON.stringify({ questions }, null, 2),
+  ].join('\n\n');
+
+  const commonHeaders = buildCommonHeaders(config);
+
+  const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
+    method: 'POST',
+    headers: commonHeaders,
+    body: JSON.stringify({
+      model: config.model,
+      temperature: 0,
+      input: [
+        { role: 'system', content: [{ type: 'input_text', text: system }] },
+        { role: 'user', content: [{ type: 'input_text', text: user }] },
+      ],
+      text: { format: { type: 'json_schema', name: 'mcq_questions_audit', schema: SCHEMA, strict: true } },
+    }),
+  });
+
+  if (responsesResponse.ok) {
+    const body = (await responsesResponse.json()) as OpenAIResponseBody;
+    const parsed = extractQuizFromResponsesBody(body);
+    if (!parsed) throw new Error('AI audit response was not valid question JSON.');
+    return parsed;
+  }
+
+  const responsesErrorText = await responsesResponse.text();
+  const chatResponse = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: commonHeaders,
+    body: JSON.stringify({
+      model: config.model,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'mcq_questions_audit',
+          schema: SCHEMA,
+          strict: true,
+        },
+      },
+    }),
+  });
+
+  if (!chatResponse.ok) {
+    const chatErrorText = await chatResponse.text();
+    throw new Error(`AI audit failed. /responses: ${responsesErrorText} | /chat/completions: ${chatErrorText}`);
+  }
+
+  const chatBody = (await chatResponse.json()) as ChatCompletionsResponseBody;
+  const firstMessage = chatBody.choices?.[0]?.message;
+  const parsedField = tryExtractFromUnknown(firstMessage?.parsed);
+  if (parsedField) return parsedField;
+
+  const content = firstMessage?.content;
+  const textContent =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content
+            .map((part) => (part?.type === 'text' ? part.text || '' : ''))
+            .join('\n')
+        : '';
+  const parsed = extractJson(textContent);
+  if (!parsed) throw new Error('AI audit chat/completions response was not valid question JSON.');
+  return parsed;
+};
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -497,16 +674,36 @@ export async function POST(request: Request) {
 
     const aiRaw = await aiGenerate(payload, figureUrls);
     const normalizedQuestions = (Array.isArray(aiRaw.questions) ? aiRaw.questions : [])
-      .map((question) => normalizeQuestion(question))
+      .map((question) => normalizeQuestion(question, payload.subject))
       .filter((question): question is QuizQuestion => question !== null);
 
     if (normalizedQuestions.length === 0) {
       return NextResponse.json({ error: 'AI did not return valid MCQs.' }, { status: 502 });
     }
 
+    let reviewedQuestions = normalizedQuestions;
+    try {
+      const auditedRaw = await aiAuditQuestions(payload, normalizedQuestions);
+      const auditedQuestions = (Array.isArray(auditedRaw.questions) ? auditedRaw.questions : [])
+        .map((question) => normalizeQuestion(question, payload.subject))
+        .filter((question): question is QuizQuestion => question !== null);
+
+      if (auditedQuestions.length === normalizedQuestions.length) {
+        reviewedQuestions = normalizedQuestions.map((question, index) => ({
+          ...question,
+          correctOption: auditedQuestions[index].correctOption,
+          explanation: auditedQuestions[index].explanation,
+        }));
+      } else {
+        warnings.push('Answer audit returned incomplete results. Using original generated answers.');
+      }
+    } catch {
+      warnings.push('Answer audit could not be completed. Using original generated answers.');
+    }
+
     const uniqueQuestions: QuizQuestion[] = [];
     const seen = new Set<string>();
-    for (const question of normalizedQuestions) {
+    for (const question of reviewedQuestions) {
       if (uniqueQuestions.length >= payload.questionCount) break;
       const key = question.question.toLowerCase();
       if (seen.has(key)) continue;

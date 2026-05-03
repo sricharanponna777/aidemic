@@ -80,6 +80,7 @@ export interface StudySession {
 
 export interface StudySessionResult {
   id: string;
+  user_id: string;
   session_id: string;
   flashcard_id: string;
   was_correct: boolean;

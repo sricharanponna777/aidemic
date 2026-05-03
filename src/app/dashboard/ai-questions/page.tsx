@@ -1,8 +1,11 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowRight, BookOpen, RefreshCw, Sparkles } from 'lucide-react';
+import { MarkdownContent } from '@/components/MarkdownContent';
+import { buttonStyles } from '@/components/ui/button';
 
 type CorrectOption = 'A' | 'B' | 'C' | 'D';
 
@@ -49,7 +52,7 @@ const defaultForm: AIGenerateForm = {
   topic: '',
   subject: 'biology',
   prompt:
-    'Generate exam-board style multiple choice questions with exactly 4 options (A-D), one correct answer, and concise exam rationale. Keep distractors plausible and topic-specific.',
+    'Generate exam-board style multiple choice questions with exactly 4 options (A-D), one correct answer, and concise exam rationale. Keep distractors plausible and topic-specific. For maths, use $...$ with explicit brackets like x^{2}, a_{n+1}, and \\frac{(x^{4}y^{2})}{(xy^{3})}; avoid ambiguous forms like x2 or (x4y^2)/(xy3).',
   examBoard: 'aqa',
   examType: 'gcse',
   specification: '',
@@ -76,8 +79,9 @@ export default function AIQuestionsPage() {
   const [selectedOption, setSelectedOption] = useState<CorrectOption | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [answers, setAnswers] = useState<Array<CorrectOption | null>>([]);
+  const [showResults, setShowResults] = useState(false);
 
-  const isGenerationValid = form.topic.trim().length >= 3 && form.prompt.trim().length >= 12;
+  const isGenerationValid = form.topic.trim().length >= 3;
   const inQuiz = questions.length > 0;
   const currentQuestion = inQuiz ? questions[currentIndex] : null;
 
@@ -89,19 +93,22 @@ export default function AIQuestionsPage() {
   }, [answers, questions]);
 
   const isFinalQuestion = currentIndex === questions.length - 1;
-  const hasFinished = inQuiz && answers.filter((answer) => answer !== null).length === questions.length;
+  const allQuestionsAnswered = inQuiz && answers.filter((answer) => answer !== null).length === questions.length;
+  const hasFinished = showResults && allQuestionsAnswered;
+  const currentAnswerIsCorrect = submitted && selectedOption === currentQuestion?.correctOption;
 
   const startQuiz = (nextQuestions: QuizQuestion[]) => {
     setQuestions(nextQuestions);
     setCurrentIndex(0);
     setSelectedOption(null);
     setSubmitted(false);
+    setShowResults(false);
     setAnswers(Array.from({ length: nextQuestions.length }, () => null));
   };
 
   const handleGenerate = async () => {
     if (!isGenerationValid) {
-      setStatus({ tone: 'error', text: 'Add a clear topic and prompt details for specific MCQs.' });
+      setStatus({ tone: 'error', text: 'Add a clear topic for specific MCQs.' });
       return;
     }
 
@@ -181,6 +188,7 @@ export default function AIQuestionsPage() {
     setCurrentIndex(0);
     setSelectedOption(null);
     setSubmitted(false);
+    setShowResults(false);
     setAnswers([]);
   };
 
@@ -196,11 +204,23 @@ export default function AIQuestionsPage() {
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">AI Questions</p>
-        <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">Interactive Exam Questions</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-          Generate and answer interactive MCQs for AQA, Edexcel, or OCR at GCSE and A-Level.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">Step 4 of 4</p>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">MCQ Exam Practice</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+              Finish the flow with exam-board MCQs after notes, flashcards, and study sessions.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/notes"
+            className={buttonStyles({ variant: 'secondary' })}
+          >
+            <BookOpen className="h-4 w-4" />
+            New topic
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </section>
 
       {status ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassName}`}>{status.text}</div> : null}
@@ -299,22 +319,12 @@ export default function AIQuestionsPage() {
           </div>
 
           {!isGenerationValid ? (
-            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">Provide both a clear topic and prompt details (at least 12 chars).</p>
+            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">Provide a clear topic to generate MCQs.</p>
           ) : null}
-
-          <label className="mt-4 block text-sm text-slate-700 dark:text-slate-300">
-            Prompt details (required)
-            <textarea
-              value={form.prompt}
-              onChange={(event) => setForm((prev) => ({ ...prev, prompt: event.target.value }))}
-              placeholder="Include chapter scope, command words, common mistakes, and desired MCQ style."
-              className="mt-1 h-24 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-            />
-          </label>
 
           <div className="mt-5 flex justify-end">
             <button
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900"
+              className={buttonStyles({ variant: 'primary' })}
               onClick={handleGenerate}
               disabled={isGenerating || !isGenerationValid}
             >
@@ -336,7 +346,10 @@ export default function AIQuestionsPage() {
             </p>
           </div>
 
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{currentQuestion.question}</h2>
+          <MarkdownContent
+            className="text-xl font-semibold text-slate-900 dark:text-slate-100"
+            content={currentQuestion.question}
+          />
           {currentQuestion.figureUrl ? (
             <Image
               src={currentQuestion.figureUrl}
@@ -369,10 +382,14 @@ export default function AIQuestionsPage() {
                     if (submitted) return;
                     setSelectedOption(option);
                   }}
-                  className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition ${style}`}
+                  className={buttonStyles({
+                    variant: 'plain',
+                    size: 'none',
+                    className: `justify-start rounded-lg border px-4 py-3 text-left text-sm font-medium ${style}`,
+                  })}
                 >
                   <span className="mr-2 font-bold">{option}.</span>
-                  {optionText(currentQuestion, option)}
+                  <MarkdownContent inline content={optionText(currentQuestion, option)} />
                 </button>
               );
             })}
@@ -380,8 +397,11 @@ export default function AIQuestionsPage() {
 
           {submitted ? (
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-950">
-              <p className="font-semibold text-slate-900 dark:text-slate-100">Correct answer: {currentQuestion.correctOption}</p>
-              <p className="mt-1 text-slate-700 dark:text-slate-300">{currentQuestion.explanation}</p>
+              <p className={`font-semibold ${currentAnswerIsCorrect ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
+                {currentAnswerIsCorrect ? 'Correct' : 'Incorrect'}
+              </p>
+              <p className="mt-1 font-semibold text-slate-900 dark:text-slate-100">Correct answer: {currentQuestion.correctOption}</p>
+              <MarkdownContent className="mt-1 text-slate-700 dark:text-slate-300" content={currentQuestion.explanation} />
             </div>
           ) : null}
 
@@ -391,42 +411,222 @@ export default function AIQuestionsPage() {
                 type="button"
                 onClick={submitCurrentAnswer}
                 disabled={!selectedOption}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900"
+                className={buttonStyles({ variant: 'primary' })}
               >
                 Submit answer
               </button>
             ) : null}
             {submitted && !isFinalQuestion ? (
-              <button type="button" onClick={goNext} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white dark:bg-blue-600">
+              <button type="button" onClick={goNext} className={buttonStyles({ variant: 'primary' })}>
                 Next question
+              </button>
+            ) : null}
+            {submitted && isFinalQuestion ? (
+              <button type="button" onClick={() => setShowResults(true)} className={buttonStyles({ variant: 'primary' })}>
+                View results
+                <ArrowRight className="h-4 w-4" />
               </button>
             ) : null}
           </div>
         </section>
       ) : null}
 
-      {hasFinished ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Results</h2>
-          <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-            You scored <strong>{score}</strong> out of <strong>{questions.length}</strong> (
-            {Math.round((score / Math.max(questions.length, 1)) * 100)}%).
+      {hasFinished ? (() => {
+  const percentage = Math.round((score / Math.max(questions.length, 1)) * 100);
+
+  // --- Determine grading system ---
+  const isALevel = form.examType === 'a-level';
+
+  // --- GCSE (9–1) approximate boundaries ---
+  const getGCSEGrade = (pct: number, board: string) => {
+    // Keep descending order explicit; object numeric keys are reordered ascending by JS.
+    const base: Array<[string, number]> = [
+      ['9', 85],
+      ['8', 78],
+      ['7', 70],
+      ['6', 60],
+      ['5', 50],
+      ['4', 40],
+      ['3', 30],
+      ['2', 20],
+      ['1', 10],
+    ];
+
+    // small board adjustments
+    const adjustment =
+      board === 'edexcel' ? -2 :
+      board === 'ocr' ? -1 :
+      0;
+
+    const adjusted = base.map(([grade, boundary]) => [
+      grade,
+      boundary + adjustment,
+    ] as const);
+
+    for (const [grade, boundary] of adjusted) {
+      if (pct >= boundary) return grade;
+    }
+    return 'U';
+  };
+
+  // --- A-Level (A*-E) approximate boundaries ---
+  const getALevelGrade = (pct: number, board: string) => {
+    const base: Array<[string, number]> = [
+      ['A*', 85],
+      ['A', 75],
+      ['B', 65],
+      ['C', 55],
+      ['D', 45],
+      ['E', 35],
+    ];
+
+    const adjustment =
+      board === 'edexcel' ? -2 :
+      board === 'ocr' ? -1 :
+      0;
+
+    const adjusted = base.map(([grade, boundary]) => [
+      grade,
+      boundary + adjustment,
+    ] as const);
+
+    for (const [grade, boundary] of adjusted) {
+      if (pct >= boundary) return grade;
+    }
+    return 'U';
+  };
+
+  const grade = isALevel
+    ? getALevelGrade(percentage, form.examBoard)
+    : getGCSEGrade(percentage, form.examBoard);
+
+  // --- Performance tone ---
+  const performanceTone =
+    percentage >= 75
+      ? 'text-blue-600 dark:text-blue-400'
+      : percentage >= 50
+      ? 'text-slate-700 dark:text-slate-300'
+      : 'text-red-600 dark:text-red-400';
+
+  const performanceLabel =
+    percentage >= 85
+      ? 'Outstanding performance'
+      : percentage >= 70
+      ? 'Strong understanding'
+      : percentage >= 50
+      ? 'Developing well'
+      : 'Needs more practice';
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="text-center">
+        <p className="text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+          Quiz Completed
+        </p>
+
+        <h2 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
+          Your Results
+        </h2>
+
+        {/* --- Grade Display --- */}
+        <div className="mt-6">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Estimated Grade
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={restartWithSameQuestions}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Retry same questions
-            </button>
-            <button type="button" onClick={resetToGenerator} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
-              Generate new set
-            </button>
+          <p className={`mt-2 text-5xl font-black ${performanceTone}`}>
+            {grade}
+          </p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {isALevel ? 'A-Level (A*–E)' : 'GCSE (9–1)'} · {form.examBoard.toUpperCase()}
+          </p>
+        </div>
+
+        {/* --- Stats --- */}
+        <div className="mt-8 grid grid-cols-3 gap-4 md:gap-6">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Score
+            </p>
+            <p className={`mt-2 text-3xl font-bold ${performanceTone}`}>
+              {score}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              out of {questions.length}
+            </p>
           </div>
-        </section>
-      ) : null}
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Accuracy
+            </p>
+            <p className={`mt-2 text-3xl font-bold ${performanceTone}`}>
+              {percentage}%
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              correct
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Questions
+            </p>
+            <p className={`mt-2 text-3xl font-bold ${performanceTone}`}>
+              {questions.length}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              total
+            </p>
+          </div>
+        </div>
+
+        {/* --- Progress bar --- */}
+        <div className="mt-8 mx-auto max-w-xs">
+          <div className="mb-2 flex items-end justify-between">
+            <span className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+              Performance
+            </span>
+            <span className={`text-xl font-bold ${performanceTone}`}>
+              {percentage}%
+            </span>
+          </div>
+
+          <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+            <div
+              className="h-full bg-blue-600 transition-all duration-500"
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
+        </div>
+
+        {/* --- Feedback --- */}
+        <p className={`mt-6 text-lg font-semibold ${performanceTone}`}>
+          {performanceLabel}
+        </p>
+
+        {/* --- Actions --- */}
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={restartWithSameQuestions}
+            className={buttonStyles({ variant: 'primary', size: 'lg' })}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Retry
+          </button>
+
+          <button
+            type="button"
+            onClick={resetToGenerator}
+            className={buttonStyles({ variant: 'secondary', size: 'lg' })}
+          >
+            New set
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+})() : null}
     </div>
   );
 }
