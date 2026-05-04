@@ -31,7 +31,7 @@ An AI-powered study platform built with Next.js. Generate flashcard decks from a
 ### 1. Install Dependencies
 
 ```bash
-npm install
+bun install
 ```
 
 ### 2. Set Up Supabase
@@ -39,6 +39,7 @@ npm install
 1. Create a project at https://supabase.com.
 2. Open the Supabase SQL editor.
 3. Run [queries.sql](./queries.sql) once to create the tables, indexes, and RLS policies.
+   Warning: this script drops and recreates tables, so it will delete existing Supabase data. Use it only on a new/demo project or after backing up your data.
 4. Copy your project URL and anon key.
 
 ### 3. Configure Environment Variables
@@ -60,7 +61,7 @@ AI_API_KEY=your-api-key
 ### 4. Run The App
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 Open http://localhost:3000.
@@ -109,7 +110,7 @@ AI_API_KEY=
 
 ## Database
 
-The schema lives in [queries.sql](./queries.sql). It matches the names used in the application code.
+The schema lives in [queries.sql](./queries.sql). It matches the names used in the application code. This script is destructive: it drops and recreates the app tables, which deletes existing Supabase data.
 
 Key tables:
 
@@ -166,8 +167,8 @@ src/
 ## Scripts
 
 ```bash
-npm run dev
-npm run build
-npm run start
-npm run lint
+bun run dev
+bun run build
+bun run start
+bun run lint
 ```
