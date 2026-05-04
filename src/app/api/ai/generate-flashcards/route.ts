@@ -1,5 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { extractFromResponsesBody, extractJsonWithCoercer, tryExtractWithCoercer, type OpenAIResponseBody, type ChatCompletionsResponseBody } from '@/lib/ai/json';
+import { normalizeMathNotation } from '@/lib/ai/math';
+import { MAX_AI_ERROR_TEXT, safe, txt } from '@/lib/ai/text';
+import {
+  clampCount,
+  normalizeBoard,
+  normalizeExamType,
+  normalizeSubject,
+  SUPPORTED_EXAM_BOARDS,
+  SUPPORTED_EXAM_TYPES,
+  SUPPORTED_SUBJECTS,
+  type SupportedSubject,
+} from '@/lib/ai/validation';
 
 type FlashcardPayload = {
   name?: string;
@@ -19,100 +33,8 @@ type FlashcardItem = {
   tags?: string[];
 };
 
-const SUPPORTED_SUBJECTS = [
-  'biology',
-  'chemistry',
-  'physics',
-  'mathematics',
-  'english',
-  'history',
-  'geography',
-  'economics',
-  'psychology',
-  'business',
-  'computer science',
-] as const;
-
-type SupportedSubject = (typeof SUPPORTED_SUBJECTS)[number];
-
-type SupportedBoard = 'aqa' | 'edexcel' | 'ocr';
-type SupportedExamType = 'gcse' | 'a-level';
-
-const SUPPORTED_EXAM_BOARDS: SupportedBoard[] = ['aqa', 'edexcel', 'ocr'];
-const SUPPORTED_EXAM_TYPES: SupportedExamType[] = ['gcse', 'a-level'];
-
-type OpenAIResponseBody = {
-  output_text?: string;
-  output?: Array<{ content?: Array<{ json?: unknown; text?: string; type?: string }> }>;
-};
-
-type ChatCompletionsResponseBody = {
-  choices?: Array<{
-    message?: {
-      content?: string | Array<{ type?: string; text?: string }>;
-      parsed?: unknown;
-    };
-  }>;
-};
-
 const MIN_CARDS = 6;
 const MAX_CARDS = 40;
-const MAX_TEXT = 2400;
-const OPENAI_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
-
-const txt = (s: string, len: number) =>
-  s
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim()
-    .slice(0, len);
-
-const safe = (s: string) =>
-  s
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
-    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/<[^>]*>/g, '');
-
-const extractFirstJsonObject = (text: string) => {
-  let start = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (ch === '\\') {
-        escaped = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (ch === '"') {
-      inString = true;
-      continue;
-    }
-    if (ch === '{') {
-      if (depth === 0) start = i;
-      depth += 1;
-      continue;
-    }
-    if (ch === '}') {
-      if (depth === 0) continue;
-      depth -= 1;
-      if (depth === 0 && start >= 0) {
-        return text.slice(start, i + 1);
-      }
-    }
-  }
-  return '';
-};
 
 const SCHEMA = {
   type: 'object',
@@ -163,75 +85,15 @@ const coerceGeneratedFlashcards = (value: unknown): { flashcards: FlashcardItem[
   return null;
 };
 
-const extractJson = (rawText: string): { flashcards: FlashcardItem[]; deckName?: string } | null => {
-  const trimmed = rawText.trim();
-  if (!trimmed) return null;
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    return coerceGeneratedFlashcards(parsed);
-  } catch {
-    const fenceMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/i) || trimmed.match(/```\s*([\s\S]*?)\s*```/i);
-    if (fenceMatch?.[1]) {
-      try {
-        const parsed = JSON.parse(fenceMatch[1]) as unknown;
-        const coerced = coerceGeneratedFlashcards(parsed);
-        if (coerced) return coerced;
-      } catch {
-        // ignore
-      }
-    }
-    const candidate = extractFirstJsonObject(trimmed);
-    if (!candidate) return null;
-    try {
-      const parsed = JSON.parse(candidate) as unknown;
-      return coerceGeneratedFlashcards(parsed);
-    } catch {
-      return null;
-    }
-  }
-};
+const extractJson = (rawText: string): { flashcards: FlashcardItem[]; deckName?: string } | null =>
+  extractJsonWithCoercer(rawText, coerceGeneratedFlashcards);
 
 const tryExtractFromUnknown = (value: unknown) => {
-  const coerced = coerceGeneratedFlashcards(value);
-  if (coerced) return coerced;
-  if (typeof value === 'string') return extractJson(value);
-  return null;
+  return tryExtractWithCoercer(value, coerceGeneratedFlashcards, extractJson);
 };
 
 const extractFlashcardsFromResponsesBody = (body: OpenAIResponseBody) => {
-  const direct = extractJson(typeof body.output_text === 'string' ? body.output_text : '');
-  if (direct) return direct;
-  if (!Array.isArray(body.output)) return null;
-  for (const item of body.output) {
-    const content = Array.isArray(item.content) ? item.content : [];
-    for (const entry of content) {
-      const fromJson = tryExtractFromUnknown(entry.json);
-      if (fromJson) return fromJson;
-      const fromText = extractJson(entry.text || '');
-      if (fromText) return fromText;
-    }
-  }
-  return null;
-};
-
-const normalizeBoard = (value?: string): SupportedBoard | null => {
-  const cleaned = txt(value || '', 24).toLowerCase().replace(/\s+/g, '');
-  if (cleaned === 'aqa') return 'aqa';
-  if (cleaned === 'edexcel') return 'edexcel';
-  if (cleaned === 'ocr') return 'ocr';
-  return null;
-};
-
-const normalizeExamType = (value?: string): SupportedExamType | null => {
-  const cleaned = txt(value || '', 24).toLowerCase().replace(/\s+/g, '');
-  if (cleaned === 'gcse') return 'gcse';
-  if (cleaned === 'a-level' || cleaned === 'alevel') return 'a-level';
-  return null;
-};
-
-const normalizeSubject = (value?: string): SupportedSubject | null => {
-  const cleaned = txt(value || '', 120).toLowerCase();
-  return SUPPORTED_SUBJECTS.includes(cleaned as SupportedSubject) ? (cleaned as SupportedSubject) : null;
+  return extractFromResponsesBody(body, coerceGeneratedFlashcards, extractJson);
 };
 
 const normalizePayload = (raw: FlashcardPayload) => ({
@@ -243,93 +105,8 @@ const normalizePayload = (raw: FlashcardPayload) => ({
   examType: normalizeExamType(raw.examType),
   specification: txt(raw.specification || '', 280),
   prompt: txt(raw.prompt || '', 2000),
-  cardCount: typeof raw.cardCount === 'number' && Number.isFinite(raw.cardCount)
-    ? Math.min(Math.max(Math.floor(raw.cardCount), MIN_CARDS), MAX_CARDS)
-    : 12,
+  cardCount: clampCount(raw.cardCount, MIN_CARDS, MAX_CARDS, 12),
 });
-
-const normalizeBaseUrl = (value?: string) => {
-  const raw = txt(value || '', 400);
-  if (!raw) return OPENAI_DEFAULT_BASE_URL;
-  return raw.replace(/\/+$/, '');
-};
-
-const getAIConfig = () => {
-  const baseUrl = normalizeBaseUrl(process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || OPENAI_DEFAULT_BASE_URL);
-  const apiKey = txt(process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '', 300);
-  const model = txt(process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini', 120);
-  const isOpenAIHosted = /api\.openai\.com/i.test(baseUrl);
-  const isOpenRouter = /openrouter\.ai/i.test(baseUrl);
-  const openRouterSiteUrl = txt(process.env.OPENROUTER_SITE_URL || '', 200);
-  const openRouterAppName = txt(process.env.OPENROUTER_APP_NAME || '', 100);
-  return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName };
-};
-
-const normalizeMathExpression = (expression: string) => {
-  let next = expression;
-
-  // Handle fractions: (a)/(b) -> \frac{a}{b}
-  next = next.replace(/\(\s*([^()]+?)\s*\)\s*\/\s*\(\s*([^()]+?)\s*\)/g, '\\frac{$1}{$2}');
-
-  // Handle existing superscripts: x^2 -> x^{2}
-  next = next.replace(/([A-Za-z0-9)\]])\^([A-Za-z0-9+\-]+)/g, '$1^{$2}');
-
-  // Handle existing subscripts: x_2 -> x_{2}
-  next = next.replace(/([A-Za-z0-9)\]])_([A-Za-z0-9+\-]+)/g, '$1_{$2}');
-
-  // Handle implicit superscripts: x2, x3, etc. (when followed by letter or end)
-  next = next.replace(/([A-Za-z])\s*(\d+)(?=\s*[A-Za-z]|$|\s*[\+\-\*\/\=\(\)\[\]\{\}\s]|$)/g, '$1^{$2}');
-
-  // Handle coefficients with variables: 3x2 -> 3x^{2}, 2x^2 -> 2x^{2}
-  next = next.replace(/(\d+)\s*([A-Za-z])\s*(\d+)/g, '$1$2^{$3}');
-
-  // Handle square roots: sqrt(x) -> \sqrt{x}
-  next = next.replace(/sqrt\s*\(\s*([^()]+?)\s*\)/g, '\\sqrt{$1}');
-
-  // Handle pi and e constants
-  next = next.replace(/\bpi\b/g, '\\pi');
-  next = next.replace(/\be\b/g, '\\mathrm{e}');
-
-  // imaginary and complex numbers
-  next = next.replace(/\bi\b/g, '\\mathrm{i}');
-
-  // Handle infinity
-  next = next.replace(/\binf\b/g, '\\infty');
-
-  return next;
-};
-
-const normalizeMathNotation = (text: string, subject: SupportedSubject | null) => {
-  // Apply math normalization to subjects that commonly use mathematical notation
-  const mathSubjects: SupportedSubject[] = ['mathematics', 'physics', 'chemistry', 'computer science'];
-  if (!mathSubjects.includes(subject as SupportedSubject)) return text;
-
-  let hasMathDelimiters = false;
-  let next = text;
-
-  next = next.replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `\\(${normalizeMathExpression(expression)}\\)`;
-  });
-
-  next = next.replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `\\[${normalizeMathExpression(expression)}\\]`;
-  });
-
-  next = next.replace(/\$\$([\s\S]*?)\$\$/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `$$${normalizeMathExpression(expression)}$$`;
-  });
-
-  next = next.replace(/\$([^$\n]+)\$/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `$${normalizeMathExpression(expression)}$`;
-  });
-
-  if (hasMathDelimiters) return next;
-  return normalizeMathExpression(next);
-};
 
 const normalizeCard = (item: FlashcardItem, subject: SupportedSubject | null): FlashcardItem | null => {
   const front = normalizeMathNotation(safe(item.front || ''), subject);
@@ -360,9 +137,10 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     'Only use comparison when the card explicitly asks to compare two or more items, processes, concepts, or methods. Do not use comparison for a simple definition or explanation question.',
     'If it asks for reasoning, use analysis. If it asks for a diagram, use diagram.',
     'Use only the most relevant 1-3 tags per flashcard.',
-    'When writing math, use explicit MathJax/LaTeX with grouping and brackets.',
-    'Because the response is JSON, escape every LaTeX backslash as a double backslash, for example \\\\frac{1}{2}, \\\\text{det}(A), \\\\begin{pmatrix}, and \\\\end{pmatrix}.',
-    'Wrap math in $...$ and always bracket powers/subscripts: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
+    'When writing math, use explicit LaTeX with grouping and brackets.',
+    'Every math expression must be wrapped for rendering: use \\\\(...\\\\) for inline math and \\\\[...\\\\] for display math. Do not leave bare LaTeX in prose.',
+    'Because the response is JSON, escape every LaTeX backslash as a double backslash, for example \\\\(\\\\binom{7}{4}a^{3}b^{4}\\\\), \\\\(\\\\frac{1}{2}\\\\), \\\\(\\\\text{det}(A)\\\\), \\\\[A=\\\\begin{pmatrix}a & b \\\\\\\\ c & d\\\\end{pmatrix}\\\\].',
+    'Always bracket powers/subscripts inside math delimiters: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
     'Use grouped fractions: \\frac{numerator}{denominator}, e.g. \\frac{(x^{4}y^{2})}{(xy^{3})}.',
     'Never use ambiguous shorthand such as x2, xy3, x^n+1, or (x4y^2)/(xy3).',
     `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
@@ -381,16 +159,7 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     `Assign appropriate tags to each flashcard to help with organization and study.`,
   ].join('\n\n');
 
-  const commonHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (config.apiKey) {
-    commonHeaders.Authorization = `Bearer ${config.apiKey}`;
-  }
-  if (config.isOpenRouter) {
-    if (config.openRouterSiteUrl) commonHeaders['HTTP-Referer'] = config.openRouterSiteUrl;
-    if (config.openRouterAppName) commonHeaders['X-Title'] = config.openRouterAppName;
-  }
+  const commonHeaders = buildAIHeaders(config);
 
   const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
     method: 'POST',
@@ -485,8 +254,9 @@ export async function POST(request: Request) {
     }
 
     const config = getAIConfig();
-    if (config.isOpenAIHosted && !config.apiKey) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY (or AI_API_KEY) is required.' }, { status: 500 });
+    const missingKeyError = getMissingHostedKeyError(config);
+    if (missingKeyError) {
+      return NextResponse.json({ error: missingKeyError }, { status: 500 });
     }
 
     const aiResult = await aiGenerate(payload);
@@ -619,6 +389,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, deckId: deckData.id, created: cardsToInsert.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to generate flashcards.';
-    return NextResponse.json({ error: txt(message, MAX_TEXT) }, { status: 500 });
+    return NextResponse.json({ error: txt(message, MAX_AI_ERROR_TEXT) }, { status: 500 });
   }
 }

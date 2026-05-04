@@ -50,13 +50,8 @@ export default function LoginPage() {
         }
         
         if (data?.session) {
-          // the client now has a session, but our middleware protects
-          // /dashboard by checking for cookies on the server. the
-          // Supabase client in the browser does not automatically set
-          // those cookies, so we POST the tokens to an API route which
-          // calls `supabase.auth.setSession` on the server. that sets
-          // the sb-access-token / sb-refresh-token cookies used by
-          // middleware, preventing an immediate bounce back to /login.
+          // Sync the browser session to Supabase SSR cookies before the
+          // protected dashboard route runs its server-side auth guard.
           try {
             const syncResponse = await fetch('/api/auth', {
               method: 'POST',
@@ -66,19 +61,16 @@ export default function LoginPage() {
                 refresh_token: data.session.refresh_token,
               }),
             });
-            console.log('Session sync response:', syncResponse.status, syncResponse.statusText);
             if (!syncResponse.ok) {
               const errorBody = await syncResponse.json().catch(() => ({}));
               console.error('Session sync failed:', errorBody);
-            } else {
-              console.log('Session synced to server successfully');
             }
           } catch (syncErr) {
             console.error('Failed to sync session with server:', syncErr);
           }
 
-          console.log('Login successful, redirecting...');
-          router.push('/dashboard');
+          const nextPath = new URLSearchParams(window.location.search).get('next') || '/dashboard';
+          router.push(nextPath.startsWith('/') ? nextPath : '/dashboard');
         } else {
           throw new Error('No session created after login');
         }

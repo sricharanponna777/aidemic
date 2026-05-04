@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import renderMathInElement from 'katex/contrib/auto-render';
+import { normalizeLatexControlCharacters, wrapBareLatexExpressions } from '@/lib/mathText';
 
 type MathContentProps = {
   content: string;
@@ -82,6 +83,43 @@ function applyPlainTextSuperscripts(root: HTMLElement) {
   }
 }
 
+function normalizeMathTextNodes(root: HTMLElement) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const targets: Text[] = [];
+
+  let node = walker.nextNode();
+  while (node) {
+    const textNode = node as Text;
+    const parent = textNode.parentElement;
+    if (!parent) {
+      node = walker.nextNode();
+      continue;
+    }
+
+    const shouldSkip =
+      parent.closest('.katex') ||
+      parent.closest('code') ||
+      parent.closest('pre') ||
+      parent.closest('script') ||
+      parent.closest('style') ||
+      parent.closest('textarea');
+
+    if (!shouldSkip && textNode.nodeValue) {
+      targets.push(textNode);
+    }
+
+    node = walker.nextNode();
+  }
+
+  for (const textNode of targets) {
+    const current = textNode.nodeValue || '';
+    const normalized = wrapBareLatexExpressions(normalizeLatexControlCharacters(current));
+    if (normalized !== current) {
+      textNode.nodeValue = normalized;
+    }
+  }
+}
+
 export function MathContent({
   content,
   className,
@@ -102,6 +140,8 @@ export function MathContent({
 
   useBrowserLayoutEffect(() => {
     if (!ref.current) return;
+
+    normalizeMathTextNodes(ref.current);
 
     renderMathInElement(ref.current, {
       delimiters: [

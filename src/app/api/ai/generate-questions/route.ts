@@ -1,26 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { extractFromResponsesBody, extractJsonWithCoercer, tryExtractWithCoercer, type OpenAIResponseBody, type ChatCompletionsResponseBody } from '@/lib/ai/json';
+import { normalizeMathNotation } from '@/lib/ai/math';
+import { dedupe, extractFigureUrls, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
+import {
+  clampCount,
+  normalizeBoard,
+  normalizeExamType,
+  SUPPORTED_EXAM_BOARDS,
+  SUPPORTED_EXAM_TYPES,
+  SUPPORTED_SUBJECTS,
+  type SupportedSubject,
+} from '@/lib/ai/validation';
 
-type SupportedBoard = 'aqa' | 'edexcel' | 'ocr';
-type SupportedExamType = 'gcse' | 'a-level';
 type CorrectOption = 'A' | 'B' | 'C' | 'D';
-
-const SUPPORTED_BOARDS: SupportedBoard[] = ['aqa', 'edexcel', 'ocr'];
-const SUPPORTED_EXAM_TYPES: SupportedExamType[] = ['gcse', 'a-level'];
-const SUPPORTED_SUBJECTS = [
-  'biology',
-  'chemistry',
-  'physics',
-  'mathematics',
-  'english',
-  'history',
-  'geography',
-  'economics',
-  'psychology',
-  'business',
-  'computer science',
-] as const;
-type SupportedSubject = (typeof SUPPORTED_SUBJECTS)[number];
 
 interface GenerateQuestionsPayload {
   topic?: string;
@@ -48,24 +42,8 @@ type GeneratedQuiz = {
   questions: QuizQuestion[];
 };
 
-type OpenAIResponseBody = {
-  output_text?: string;
-  output?: Array<{ content?: Array<{ json?: unknown; text?: string; type?: string }> }>;
-};
-
-type ChatCompletionsResponseBody = {
-  choices?: Array<{
-    message?: {
-      content?: string | Array<{ type?: string; text?: string }>;
-      parsed?: unknown;
-    };
-  }>;
-};
-
 const MIN_QUESTIONS = 4;
 const MAX_QUESTIONS = 40;
-const MAX_TEXT = 2400;
-const OPENAI_DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
 const SCHEMA = {
   type: 'object',
@@ -93,85 +71,8 @@ const SCHEMA = {
   },
 };
 
-const txt = (s: string, len: number) => s.replace(/\r\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim().slice(0, len);
-
-const safe = (s: string) =>
-  s
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
-    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
-    .replace(/javascript:/gi, '')
-    .replace(/<[^>]*>/g, '');
-
-const dedupe = (items: string[]) => {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const item of items) {
-    const key = item.toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(item);
-  }
-  return out;
-};
-
 const clampQuestions = (n?: number) => {
-  const value = Number(n);
-  if (!Number.isFinite(value)) return 12;
-  return Math.min(Math.max(Math.floor(value), MIN_QUESTIONS), MAX_QUESTIONS);
-};
-
-const normalizeBoard = (value?: string): SupportedBoard | null => {
-  const cleaned = txt((value || '').toLowerCase(), 24).replace(/\s+/g, '');
-  if (cleaned === 'aqa') return 'aqa';
-  if (cleaned === 'edexcel') return 'edexcel';
-  if (cleaned === 'ocr') return 'ocr';
-  return null;
-};
-
-const normalizeExamType = (value?: string): SupportedExamType | null => {
-  const cleaned = txt((value || '').toLowerCase(), 24).replace(/\s+/g, '');
-  if (cleaned === 'gcse') return 'gcse';
-  if (cleaned === 'a-level' || cleaned === 'alevel') return 'a-level';
-  return null;
-};
-
-const sanitizeFigureUrl = (raw: string) => {
-  const candidate = txt(raw, 900);
-  if (!candidate) return '';
-  try {
-    const parsed = new URL(candidate);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
-    return '';
-  } catch {
-    return '';
-  }
-};
-
-const extractFigureUrls = (text: string) => {
-  const urls: string[] = [];
-  const markdownMatches = text.matchAll(/!\[[^\]]*]\((https?:\/\/[^\s)]+)\)/gi);
-  for (const match of markdownMatches) {
-    const url = sanitizeFigureUrl(match[1] || '');
-    if (url) urls.push(url);
-  }
-
-  const htmlMatches = text.matchAll(/<img[^>]+src=["'](https?:\/\/[^"']+)["'][^>]*>/gi);
-  for (const match of htmlMatches) {
-    const url = sanitizeFigureUrl(match[1] || '');
-    if (url) urls.push(url);
-  }
-
-  const bareMatches = text.matchAll(/\bhttps?:\/\/[^\s<>"')]+/gi);
-  for (const match of bareMatches) {
-    const candidate = match[0] || '';
-    if (!/\.(png|jpe?g|webp|gif|svg)(\?|#|$)/i.test(candidate)) continue;
-    const url = sanitizeFigureUrl(candidate);
-    if (url) urls.push(url);
-  }
-
-  return dedupe(urls).slice(0, 8);
+  return clampCount(n, MIN_QUESTIONS, MAX_QUESTIONS, 12);
 };
 
 const coerceGeneratedQuiz = (value: unknown): GeneratedQuiz | null => {
@@ -192,96 +93,14 @@ const coerceGeneratedQuiz = (value: unknown): GeneratedQuiz | null => {
   return null;
 };
 
-const extractFirstJsonObject = (text: string) => {
-  let start = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (ch === '\\') {
-        escaped = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (ch === '"') {
-      inString = true;
-      continue;
-    }
-    if (ch === '{') {
-      if (depth === 0) start = i;
-      depth += 1;
-      continue;
-    }
-    if (ch === '}') {
-      if (depth === 0) continue;
-      depth -= 1;
-      if (depth === 0 && start >= 0) {
-        return text.slice(start, i + 1);
-      }
-    }
-  }
-  return '';
-};
-
-const extractJson = (rawText: string): GeneratedQuiz | null => {
-  const trimmed = rawText.trim();
-  if (!trimmed) return null;
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    return coerceGeneratedQuiz(parsed);
-  } catch {
-    const fenceMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/i) || trimmed.match(/```\s*([\s\S]*?)\s*```/i);
-    if (fenceMatch?.[1]) {
-      try {
-        const parsed = JSON.parse(fenceMatch[1]) as unknown;
-        const coerced = coerceGeneratedQuiz(parsed);
-        if (coerced) return coerced;
-      } catch {
-        // continue
-      }
-    }
-
-    const candidate = extractFirstJsonObject(trimmed);
-    if (!candidate) return null;
-    try {
-      const parsed = JSON.parse(candidate) as unknown;
-      return coerceGeneratedQuiz(parsed);
-    } catch {
-      return null;
-    }
-  }
-};
+const extractJson = (rawText: string): GeneratedQuiz | null => extractJsonWithCoercer(rawText, coerceGeneratedQuiz);
 
 const tryExtractFromUnknown = (value: unknown): GeneratedQuiz | null => {
-  const coerced = coerceGeneratedQuiz(value);
-  if (coerced) return coerced;
-  if (typeof value === 'string') return extractJson(value);
-  return null;
+  return tryExtractWithCoercer(value, coerceGeneratedQuiz, extractJson);
 };
 
 const extractQuizFromResponsesBody = (body: OpenAIResponseBody): GeneratedQuiz | null => {
-  const direct = extractJson(typeof body.output_text === 'string' ? body.output_text : '');
-  if (direct) return direct;
-
-  if (!Array.isArray(body.output)) return null;
-  for (const item of body.output) {
-    const content = Array.isArray(item.content) ? item.content : [];
-    for (const entry of content) {
-      const fromJson = tryExtractFromUnknown(entry.json);
-      if (fromJson) return fromJson;
-      const fromText = extractJson(entry.text || '');
-      if (fromText) return fromText;
-    }
-  }
-  return null;
+  return extractFromResponsesBody(body, coerceGeneratedQuiz, extractJson);
 };
 
 const normalizePayload = (raw: GenerateQuestionsPayload) => ({
@@ -294,104 +113,6 @@ const normalizePayload = (raw: GenerateQuestionsPayload) => ({
   figureUrl: sanitizeFigureUrl(raw.figureUrl || ''),
   questionCount: clampQuestions(raw.questionCount),
 });
-
-const normalizeBaseUrl = (value?: string) => {
-  const raw = txt(value || '', 400);
-  if (!raw) return OPENAI_DEFAULT_BASE_URL;
-  return raw.replace(/\/+$/, '');
-};
-
-const getAIConfig = () => {
-  const baseUrl = normalizeBaseUrl(process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || OPENAI_DEFAULT_BASE_URL);
-  const apiKey = txt(process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '', 300);
-  const model = txt(process.env.AI_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini', 120);
-  const isOpenAIHosted = /api\.openai\.com/i.test(baseUrl);
-  const isOpenRouter = /openrouter\.ai/i.test(baseUrl);
-  const openRouterSiteUrl = txt(process.env.OPENROUTER_SITE_URL || '', 200);
-  const openRouterAppName = txt(process.env.OPENROUTER_APP_NAME || '', 100);
-  return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName };
-};
-
-const buildCommonHeaders = (config: ReturnType<typeof getAIConfig>) => {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (config.apiKey) {
-    headers.Authorization = `Bearer ${config.apiKey}`;
-  }
-  if (config.isOpenRouter) {
-    if (config.openRouterSiteUrl) {
-      headers['HTTP-Referer'] = config.openRouterSiteUrl;
-    }
-    if (config.openRouterAppName) {
-      headers['X-Title'] = config.openRouterAppName;
-    }
-  }
-  return headers;
-};
-
-const normalizeMathExpression = (expression: string) => {
-  let next = expression;
-
-  // Handle fractions: (a)/(b) -> \frac{a}{b}
-  next = next.replace(/\(\s*([^()]+?)\s*\)\s*\/\s*\(\s*([^()]+?)\s*\)/g, '\\frac{$1}{$2}');
-
-  // Handle existing superscripts: x^2 -> x^{2}
-  next = next.replace(/([A-Za-z0-9)\]])\^([A-Za-z0-9+\-]+)/g, '$1^{$2}');
-
-  // Handle existing subscripts: x_2 -> x_{2}
-  next = next.replace(/([A-Za-z0-9)\]])_([A-Za-z0-9+\-]+)/g, '$1_{$2}');
-
-  // Handle implicit superscripts: x2, x3, etc. (when followed by letter or end)
-  next = next.replace(/([A-Za-z])\s*(\d+)(?=\s*[A-Za-z]|$|\s*[\+\-\*\/\=\(\)\[\]\{\}\s]|$)/g, '$1^{$2}');
-
-  // Handle coefficients with variables: 3x2 -> 3x^{2}, 2x^2 -> 2x^{2}
-  next = next.replace(/(\d+)\s*([A-Za-z])\s*(\d+)/g, '$1$2^{$3}');
-
-  // Handle square roots: sqrt(x) -> \sqrt{x}
-  next = next.replace(/sqrt\s*\(\s*([^()]+?)\s*\)/g, '\\sqrt{$1}');
-
-  // Handle pi and e constants
-  next = next.replace(/\bpi\b/g, '\\pi');
-  next = next.replace(/\be\b/g, '\\mathrm{e}');
-
-  // Handle infinity
-  next = next.replace(/\binf\b/g, '\\infty');
-
-  return next;
-};
-
-const normalizeMathNotation = (text: string, subject: string) => {
-  // Apply math normalization to subjects that commonly use mathematical notation
-  const mathSubjects = ['mathematics', 'physics', 'chemistry', 'computer science'];
-  if (!mathSubjects.includes(subject)) return text;
-
-  let hasMathDelimiters = false;
-  let next = text;
-
-  next = next.replace(/\\\(([\s\S]*?)\\\)/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `\\(${normalizeMathExpression(expression)}\\)`;
-  });
-
-  next = next.replace(/\\\[([\s\S]*?)\\\]/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `\\[${normalizeMathExpression(expression)}\\]`;
-  });
-
-  next = next.replace(/\$\$([\s\S]*?)\$\$/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `$$${normalizeMathExpression(expression)}$$`;
-  });
-
-  next = next.replace(/\$([^$\n]+)\$/g, (_match, expression) => {
-    hasMathDelimiters = true;
-    return `$${normalizeMathExpression(expression)}$`;
-  });
-
-  if (hasMathDelimiters) return next;
-  return normalizeMathExpression(next);
-};
 
 const normalizeQuestion = (question: QuizQuestion, subject: string): QuizQuestion | null => {
   const questionText = normalizeMathNotation(safe((question.question || '').replace(/^question\s*[:\-]\s*/i, '')), subject);
@@ -451,9 +172,10 @@ const aiGenerate = async (
     'Always include figureUrl in each question. Use an empty string when no figure is needed.',
     'Distractors must be plausible for exam revision.',
     'Use clean GitHub-flavored Markdown inside string values where it improves readability, especially **bold** key terms in explanations. Do not use raw HTML.',
-    'When writing math, use explicit MathJax/LaTeX with grouping and brackets.',
-    'Because the response is JSON, escape every LaTeX backslash as a double backslash, for example \\\\frac{1}{2}, \\\\text{det}(A), \\\\begin{pmatrix}, and \\\\end{pmatrix}.',
-    'Wrap inline math in $...$ or \\\\(...\\\\), and display math in $$...$$ or \\\\[...\\\\]. Always bracket powers/subscripts: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
+    'When writing math, use explicit LaTeX with grouping and brackets.',
+    'Every math expression must be wrapped for rendering: use \\\\(...\\\\) for inline math and \\\\[...\\\\] for display math. Do not leave bare LaTeX in prose.',
+    'Because the response is JSON, escape every LaTeX backslash as a double backslash, for example \\\\(\\\\binom{7}{4}a^{3}b^{4}\\\\), \\\\(\\\\frac{1}{2}\\\\), \\\\(\\\\text{det}(A)\\\\), \\\\[A=\\\\begin{pmatrix}a & b \\\\\\\\ c & d\\\\end{pmatrix}\\\\].',
+    'Always bracket powers/subscripts inside math delimiters: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
     'Use grouped fractions: \\frac{numerator}{denominator}, e.g. \\frac{(x^{4}y^{2})}{(xy^{3})}.',
     'Never use ambiguous shorthand such as x2, xy3, x^n+1, or (x4y^2)/(xy3).',
     'Before finalizing each question, verify that correctOption is truly correct and explanation matches that option.',
@@ -474,7 +196,7 @@ const aiGenerate = async (
     .filter(Boolean)
     .join('\n\n');
 
-  const commonHeaders = buildCommonHeaders(config);
+  const commonHeaders = buildAIHeaders(config);
 
   const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
     method: 'POST',
@@ -570,7 +292,7 @@ const aiAuditQuestions = async (
     JSON.stringify({ questions }, null, 2),
   ].join('\n\n');
 
-  const commonHeaders = buildCommonHeaders(config);
+  const commonHeaders = buildAIHeaders(config);
 
   const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
     method: 'POST',
@@ -652,7 +374,7 @@ export async function POST(request: Request) {
     if (!payload.prompt || payload.prompt.length < 12) {
       return NextResponse.json({ error: 'Prompt details are required.' }, { status: 400 });
     }
-    if (!payload.examBoard || !SUPPORTED_BOARDS.includes(payload.examBoard)) {
+    if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
       return NextResponse.json({ error: 'Exam board must be one of: AQA, Edexcel, OCR.' }, { status: 400 });
     }
     if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
@@ -665,8 +387,9 @@ export async function POST(request: Request) {
       );
     }
     const config = getAIConfig();
-    if (config.isOpenAIHosted && !config.apiKey) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY (or AI_API_KEY) is required for OpenAI hosted API.' }, { status: 500 });
+    const missingKeyError = getMissingHostedKeyError(config);
+    if (missingKeyError) {
+      return NextResponse.json({ error: missingKeyError }, { status: 500 });
     }
 
     const figureUrls = dedupe([payload.figureUrl, ...extractFigureUrls(payload.prompt)].filter(Boolean)).slice(0, 8);
@@ -732,6 +455,6 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to generate questions.';
-    return NextResponse.json({ error: txt(message, MAX_TEXT) }, { status: 500 });
+    return NextResponse.json({ error: txt(message, MAX_AI_ERROR_TEXT) }, { status: 500 });
   }
 }

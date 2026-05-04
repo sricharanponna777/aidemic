@@ -208,7 +208,7 @@ export default function AIFlashcardsPage() {
               className={buttonStyles({ variant: 'primary' })}
             >
               <Brain className="h-4 w-4" />
-              Next: Study Sessions
+              Next: Flashcard reviews
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

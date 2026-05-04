@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
-import { Flashcard, FlashcardDeck, FlashcardTag } from '@/types';
+import { Flashcard, FlashcardDeck, FlashcardTag, FlashcardTagMapping } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { MathContent } from '@/components/MathContent';
 import { buttonStyles } from '@/components/ui/button';
@@ -41,18 +41,22 @@ export default function DeckPage() {
       supabase.from('flashcard_tags').select('*').eq('deck_id', deckId).order('name', { ascending: true }),
     ]);
 
-    setDeck(deckData || null);
-    setCards(cardsData || []);
-    setTags(tagsData || []);
+    const deckRow = (deckData || null) as FlashcardDeck | null;
+    const cardRows = (cardsData || []) as Flashcard[];
+    const tagRows = (tagsData || []) as FlashcardTag[];
 
-    if (cardsData && cardsData.length > 0) {
+    setDeck(deckRow);
+    setCards(cardRows);
+    setTags(tagRows);
+
+    if (cardRows.length > 0) {
       const { data: mappings } = await supabase
         .from('flashcard_tag_mapping')
         .select('flashcard_id, tag_id')
-        .in('flashcard_id', cardsData.map((card) => card.id));
+        .in('flashcard_id', cardRows.map((card) => card.id));
 
       const mapped: Record<string, string[]> = {};
-      (mappings || []).forEach((mapping) => {
+      ((mappings || []) as Pick<FlashcardTagMapping, 'flashcard_id' | 'tag_id'>[]).forEach((mapping) => {
         if (!mapped[mapping.flashcard_id]) mapped[mapping.flashcard_id] = [];
         mapped[mapping.flashcard_id].push(mapping.tag_id);
       });

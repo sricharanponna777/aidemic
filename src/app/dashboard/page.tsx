@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
+import { Flashcard, FlashcardDeck, StudySession } from "@/types";
 
 type RecentSession = {
   id: string;
@@ -39,6 +40,12 @@ type DashboardMetrics = {
   averageScore: number | null;
   studyStreak: number;
   recentSessions: RecentSession[];
+};
+
+type DashboardDeckRow = Pick<FlashcardDeck, "id" | "card_count">;
+type DashboardCardRow = Pick<Flashcard, "deck_id" | "next_review_date" | "times_studied" | "times_correct">;
+type DashboardSessionRow = Pick<StudySession, "id" | "started_at" | "duration_minutes" | "cards_studied" | "score_percentage"> & {
+  flashcard_decks?: { name?: string } | Array<{ name?: string }> | null;
 };
 
 const emptyMetrics: DashboardMetrics = {
@@ -100,7 +107,7 @@ export default function Dashboard() {
 
         if (deckError) throw deckError;
 
-        const deckRows = decks || [];
+        const deckRows = (decks || []) as DashboardDeckRow[];
         const deckIds = deckRows.map((deck) => deck.id);
 
         const [cardsResponse, sessionsResponse] = await Promise.all([
@@ -121,8 +128,8 @@ export default function Dashboard() {
         if (sessionsResponse.error) throw sessionsResponse.error;
 
         const now = new Date();
-        const cards = cardsResponse.data || [];
-        const sessions = (sessionsResponse.data || []).map((item) => ({
+        const cards = (cardsResponse.data || []) as DashboardCardRow[];
+        const sessions = ((sessionsResponse.data || []) as DashboardSessionRow[]).map((item) => ({
           id: item.id,
           deckName: getDeckName(item),
           startedAt: item.started_at || "",
@@ -189,7 +196,7 @@ export default function Dashboard() {
       tone: "bg-blue-600 text-white",
     },
     {
-      label: "Study sessions",
+      label: "Flashcard reviews",
       value: metrics.sessionsCompleted.toString(),
       detail: `${formatMinutes(metrics.totalStudyMinutes)} studied`,
       icon: Brain,
@@ -237,7 +244,7 @@ export default function Dashboard() {
     },
     {
       step: "3",
-      title: "Study Sessions",
+      title: "Flashcard reviews",
       href: "/dashboard/study-sessions",
       detail: "Review due cards with intervals.",
       icon: Brain,
@@ -360,7 +367,7 @@ export default function Dashboard() {
             {isLoading ? <p className="text-sm text-slate-500 dark:text-slate-400">Loading sessions...</p> : null}
             {!isLoading && metrics.recentSessions.length === 0 ? (
               <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
-                No study sessions yet.
+                No Flashcard reviews yet.
               </p>
             ) : null}
             {metrics.recentSessions.map((item) => (

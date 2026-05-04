@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AIDemic - AI-Powered Study Companion",
-  description: "Study smarter with AI-powered learning tools, flashcards, and personalized study sessions.",
+  description: "Study smarter with AI-powered learning tools, flashcards, and personalized Flashcard reviews.",
 };
 
 const themeInitializer = `

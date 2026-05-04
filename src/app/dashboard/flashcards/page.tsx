@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Bot, Plus, Sparkles, Trash2 } from 'lucide-react';
-import { FlashcardDeck } from '@/types';
+import { Flashcard, FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 import { Button, buttonStyles } from '@/components/ui/button';
 
 type Deck = Pick<FlashcardDeck, 'id' | 'name' | 'card_count' | 'ai_generated' | 'updated_at' | 'created_at' | 'description'> & {
   due_count?: number;
 };
+type DeckCardReviewRow = Pick<Flashcard, 'deck_id' | 'next_review_date'>;
 
 type StatusTone = 'success' | 'error';
 type StatusMessage = {
@@ -48,10 +49,11 @@ export default function Flashcards() {
             .in('deck_id', deckIds);
 
           if (!cardError && cardData) {
+            const cardRows = cardData as DeckCardReviewRow[];
             const now = new Date();
             const dueCounts = new Map<string, number>();
 
-            cardData.forEach((card) => {
+            cardRows.forEach((card) => {
               const nextReview = card.next_review_date ? new Date(card.next_review_date) : null;
               const isDue = !nextReview || nextReview <= now;
               if (isDue) {
@@ -168,9 +170,9 @@ export default function Flashcards() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">Step 2 of 4</p>
-            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">Study Deck Studio</h1>
+            <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">Flashcards</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-              Build recall prompts from what you learned, then review them in study sessions.
+              Build recall prompts from what you learned.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -184,7 +186,7 @@ export default function Flashcards() {
             </Link>
             <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'subtle' })}>
               <ArrowRight className="h-4 w-4" />
-              Study Sessions
+              Flashcard reviews
             </Link>
           </div>
         </div>

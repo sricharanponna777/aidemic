@@ -312,7 +312,6 @@ export default function NotesPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">Step 1 of 4</p>
             <div className="mt-2 flex items-center gap-3">
-              <BookOpen className="h-7 w-7 text-blue-600 dark:text-blue-400" />
               <h1 id="notes-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">AI Notes</h1>
             </div>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">

@@ -25,6 +25,10 @@ type Session = Pick<
 > & { deck_name: string };
 
 type DeckOption = FlashcardDeck & { due_count?: number };
+type SessionRow = StudySession & {
+  flashcard_decks?: { name?: string } | Array<{ name?: string }> | null;
+};
+type DueCardRow = Pick<Flashcard, 'deck_id' | 'next_review_date'>;
 
 type SessionResultDraft = {
   flashcard_id: string;
@@ -111,9 +115,10 @@ export default function StudySessions() {
 
       if (error) {
         console.error('Error loading sessions:', error.message);
-        setNotice({ tone: 'error', text: 'Unable to load recent study sessions.' });
+        setNotice({ tone: 'error', text: 'Unable to load recent Flashcard reviews.' });
       } else {
-        const mapped: Session[] = (data || []).map((item) => ({
+        const sessionRows = (data || []) as SessionRow[];
+        const mapped: Session[] = sessionRows.map((item) => ({
           id: item.id,
           deck_id: item.deck_id,
           deck_name: getDeckName(item),
@@ -130,7 +135,7 @@ export default function StudySessions() {
       }
     } catch (err) {
       console.error('Unexpected error loading sessions', err);
-      setNotice({ tone: 'error', text: 'Unable to load recent study sessions.' });
+      setNotice({ tone: 'error', text: 'Unable to load recent Flashcard reviews.' });
     }
   }, [userId]);
 
@@ -167,7 +172,8 @@ export default function StudySessions() {
           console.error('error loading due card counts', cardError.message);
         } else {
           const now = new Date();
-          (cards || []).forEach((card) => {
+          const cardRows = (cards || []) as DueCardRow[];
+          cardRows.forEach((card) => {
             const nextReview = parseDateTime(card.next_review_date);
             if (!nextReview || nextReview <= now) {
               dueCounts.set(card.deck_id, (dueCounts.get(card.deck_id) || 0) + 1);
@@ -275,8 +281,9 @@ export default function StudySessions() {
       return;
     }
 
+    const cardRows = (cards || []) as Flashcard[];
     const now = new Date();
-    const due = (cards || [])
+    const due = cardRows
       .filter((card) => {
         const nextReview = parseDateTime(card.next_review_date);
         return !nextReview || nextReview <= now;
@@ -432,7 +439,7 @@ export default function StudySessions() {
           <div>
             <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Step 3 of 4</p>
             <h1 id="study-sessions-title" className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
-              Focused Review
+              Flashcard Review
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
               Review your flashcards before moving into exam-style MCQs.
@@ -686,7 +693,7 @@ export default function StudySessions() {
         <div className="mt-5 space-y-3">
           {sessions.length === 0 ? (
             <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
-              No saved study sessions yet.
+              No saved Flashcard reviews yet.
             </p>
           ) : null}
 

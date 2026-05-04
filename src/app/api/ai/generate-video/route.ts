@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { LATEX_COMMAND_PATTERN, normalizeLatexControlCharacters } from '@/lib/mathText';
 
 type SlideshowPayload = {
   flashcardId?: string;
@@ -12,8 +14,6 @@ type SlideshowPayload = {
 };
 
 const SLIDES_PER_DURATION: Record<string, number> = { '30': 5, '60': 10, '120': 20 };
-const LATEX_COMMANDS =
-  '(?:text|times|begin|end|frac|det|sum|prod|left|right|cdot|sqrt|pmatrix|bmatrix|matrix|alpha|beta|gamma|theta|lambda|mu|pi|sigma|omega|Delta|Gamma|nabla|int|lim|log|ln|sin|cos|tan|vec|mathbf|mathrm|overline|underline|leq|geq|neq|infty|rightarrow|to|dots)';
 const MATRIX_ENVIRONMENT = '((?:p|b|B|v|V)?matrix)';
 
 // ── GET: fetch saved content ─────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         subject,
         style: mode === 'notes' ? 'study-notes' : 'text-slides',
         duration: parseInt(duration, 10),
-        service_used: 'openrouter',
+        service_used: 'ai-compatible',
         status: 'completed',
         video_url: JSON.stringify(slides),
         script_content: script,
@@ -114,7 +114,9 @@ async function generateSlides(
   examType?: string,
   mode: 'notes' | 'slideshow' = 'slideshow',
 ): Promise<{ script: string; slides: string[] }> {
-  if (!process.env.AI_API_KEY) throw new Error('AI_API_KEY is not configured');
+  const config = getAIConfig();
+  const missingKeyError = getMissingHostedKeyError(config);
+  if (missingKeyError) throw new Error(missingKeyError);
 
   const seconds = parseInt(duration, 10);
   const slideCount = SLIDES_PER_DURATION[duration] ?? 5;
@@ -142,8 +144,8 @@ Return ONLY valid JSON with this exact shape:
 
 Write the script as notes a student can revise from, not narration. Keep it accurate, direct, and easy to scan.
 Use Markdown only inside JSON string values. Do not use raw HTML.
-Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\\\frac{1}{2}, \\\\text{det}(A), \\\\begin{pmatrix}, and \\\\end{pmatrix}.
-Use $...$ or \\\\(...\\\\) for inline math, and $$...$$ or \\\\[...\\\\] for display math.
+Every math expression must be wrapped for rendering: use \\\\(...\\\\) for inline math and \\\\[...\\\\] for display math. Do not leave bare LaTeX in prose.
+Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\\\(\\\\binom{7}{4}a^{3}b^{4}\\\\), \\\\(\\\\frac{1}{2}\\\\), \\\\(\\\\text{det}(A)\\\\), and \\\\[A = \\\\begin{pmatrix} a & b \\\\\\\\ c & d \\\\end{pmatrix}\\\\].
 For matrices, use one clean display equation such as \\\\[ A = \\\\begin{pmatrix} a & b \\\\\\\\ c & d \\\\end{pmatrix} \\\\].
 Never add blank rows or trailing row separators inside a matrix. Write inverses as $A^{-1}$, not A-1.
 Do NOT include any text outside the JSON.`
@@ -158,20 +160,18 @@ Return ONLY valid JSON with this exact shape:
 }
 
 Structure the slides to flow logically: open with a hook, build through the core concept and key details, apply it concretely, then close with a summary.
-Each slide is a short standalone paragraph a student reads on screen. Slides may use **bold** for key terms and $...$ or \\\\(...\\\\) for math, but avoid large headings inside slides.
+Each slide is a short standalone paragraph a student reads on screen. Slides may use **bold** for key terms and \\\\(...\\\\) for inline math, but avoid large headings inside slides.
 Use Markdown only inside JSON string values. Do not use raw HTML.
-Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\\\frac{1}{2}, \\\\text{det}(A), \\\\begin{pmatrix}, and \\\\end{pmatrix}.
+Every math expression must be wrapped for rendering: use \\\\(...\\\\) for inline math and \\\\[...\\\\] for display math. Do not leave bare LaTeX in prose.
+Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\\\(\\\\binom{7}{4}a^{3}b^{4}\\\\), \\\\(\\\\frac{1}{2}\\\\), \\\\(\\\\text{det}(A)\\\\), and \\\\[A = \\\\begin{pmatrix} a & b \\\\\\\\ c & d \\\\end{pmatrix}\\\\].
 Never add blank rows or trailing row separators inside a matrix. Write inverses as $A^{-1}$, not A-1.
 Do NOT include any text outside the JSON.`;
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.AI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
+    headers: buildAIHeaders(config),
     body: JSON.stringify({
-      model: 'openai/gpt-4o-mini',
+      model: config.model,
       messages: [{
         role: 'user',
         content: instruction,
@@ -183,7 +183,7 @@ Do NOT include any text outside the JSON.`;
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error((err as { error?: { message?: string } }).error?.message ?? `OpenRouter error ${response.status}`);
+    throw new Error((err as { error?: { message?: string } }).error?.message ?? `AI provider error ${response.status}`);
   }
 
   const data = await response.json() as { choices: { message: { content: string } }[] };
@@ -208,7 +208,7 @@ function parseGeneratedContent(content: string) {
 }
 
 function escapeLooseLatexBackslashes(content: string) {
-  const pattern = new RegExp(`(^|[^\\\\])\\\\(?=${LATEX_COMMANDS}\\b)`, 'g');
+  const pattern = new RegExp(`(^|[^\\\\])\\\\(?=${LATEX_COMMAND_PATTERN}\\b)`, 'g');
   return content.replace(pattern, (_match, prefix: string) => `${prefix}\\\\`);
 }
 
@@ -217,11 +217,7 @@ function stripTags(value: string) {
 }
 
 function normalizeGeneratedText(value: string) {
-  let next = String(value || '')
-    .replace(/\u0008(?=egin\b)/g, () => '\\b')
-    .replace(/\u000c(?=rac\b)/g, () => '\\f')
-    .replace(/\t(?=(?:ext|imes|heta|au)\b)/g, () => '\\t')
-    .replace(/\r(?=(?:ight|angle|ho)\b)/g, () => '\\r')
+  let next = normalizeLatexControlCharacters(String(value || ''))
     .replace(/([A-Za-z0-9)\]])\s*<sub>([\s\S]*?)<\/sub>/gi, (_match, base: string, sub: string) => {
       const cleanSub = stripTags(sub);
       return cleanSub ? `$${base}_{${cleanSub}}$` : base;

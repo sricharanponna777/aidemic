@@ -1,183 +1,173 @@
 # AIDemic
 
-An AI-powered study platform built with Next.js. Generate flashcard decks from any topic, study with spaced repetition, get AI-generated exam questions, and chat with an AI study assistant — all in one app.
+An AI-powered study platform built with Next.js. Generate flashcard decks from a topic, review with spaced repetition, create exam-style MCQs, and chat with an AI study assistant.
 
 ## Features
 
-- **AI Flashcard Generation** — Describe a topic and the AI generates a complete deck with question/answer pairs and tags
-- **Spaced Repetition (SM-2)** — Adaptive study sessions that schedule cards based on your performance (Again / Hard / Good / Easy)
-- **Rich Content** — Cards support formatted text, code blocks, math (KaTeX), markdown, and images
-- **AI Exam Questions** — Generate practice questions from any topic or your existing decks
-- **Study Chat** — Ask an AI assistant questions while you study
-- **Study Analytics** — Track study time, accuracy, streaks, and goals
-- **Slideshow Mode** — Present deck content as a slideshow
-- **Notes** — Attach notes to decks
-- **Dark / Light Mode** — System-preference aware theme
+- AI flashcard generation with tags
+- Spaced repetition review using an SM-2 style scheduler
+- Rich flashcard content with formatted text, code blocks, Markdown, images, and KaTeX math
+- AI-generated exam questions
+- Study chat for notes and slideshow context
+- Study analytics for time, accuracy, streaks, and goals
+- Slideshow mode for generated study content
+- Dark and light themes
 
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) |
+| --- | --- |
+| Framework | Next.js 16 App Router |
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS 4 |
-| Auth & DB | Supabase (PostgreSQL + Row-Level Security) |
-| AI | OpenAI-compatible API (OpenAI, OpenRouter, vLLM, TGI, LocalAI) |
-| Rich Text | Tiptap 3, Lexical |
-| Math | KaTeX |
-| Animation | Framer Motion |
+| Auth and DB | Supabase PostgreSQL with RLS |
+| AI | OpenAI-compatible API such as OpenAI, OpenRouter, vLLM, TGI, or LocalAI |
+| Rich text | Tiptap 3, Lexical |
+| Math rendering | KaTeX |
 | Icons | Lucide React |
 
 ## Quick Start
 
-### 1. Install dependencies
+### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Set up Supabase
+### 2. Set Up Supabase
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Run `queries.sql` in the Supabase SQL editor to create all tables and RLS policies
-3. Copy your project URL and anon key
+1. Create a project at https://supabase.com.
+2. Open the Supabase SQL editor.
+3. Run [queries.sql](./queries.sql) once to create the tables, indexes, and RLS policies.
+4. Copy your project URL and anon key.
 
-### 3. Configure environment variables
+### 3. Configure Environment Variables
 
-Copy the example file and fill in your values:
+Copy the committed example file:
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-Minimum required variables:
+Minimum required values:
 
 ```bash
-# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
-# AI provider (see AI Provider Config below)
 AI_API_KEY=your-api-key
 ```
 
-### 4. Run the development server
+### 4. Run The App
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open http://localhost:3000.
 
 ## AI Provider Config
 
-The AI endpoints (`/api/ai/*`) work with any OpenAI-compatible provider. Configure via environment variables:
+The API routes under `/api/ai/*` use an OpenAI-compatible API.
 
-```bash
-# Defaults to https://api.openai.com/v1
-AI_BASE_URL=
+| Variable | Required | Description |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
+| `AI_BASE_URL` | No | AI API base URL. Defaults to `https://api.openai.com/v1` |
+| `AI_MODEL` | No | Model name. Defaults to `gpt-4.1-mini` |
+| `AI_API_KEY` | Yes* | API key. Required for OpenAI-hosted endpoints |
+| `OPENROUTER_SITE_URL` | No | Optional OpenRouter attribution URL |
+| `OPENROUTER_APP_NAME` | No | Optional OpenRouter app name |
 
-# Defaults to gpt-4.1-mini
-AI_MODEL=
+Legacy `OPENAI_BASE_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` names are supported as fallbacks.
 
-# Required for OpenAI-hosted endpoints; optional for local servers
-AI_API_KEY=
-```
+### OpenAI
 
-### Examples
-
-**OpenAI**
 ```bash
 AI_BASE_URL=https://api.openai.com/v1
 AI_MODEL=gpt-4.1-mini
-AI_API_KEY=your_key
+AI_API_KEY=your-openai-key
 ```
 
-**OpenRouter**
+### OpenRouter
+
 ```bash
 AI_BASE_URL=https://openrouter.ai/api/v1
 AI_MODEL=openai/gpt-4o-mini
-AI_API_KEY=your_openrouter_key
-
-# Optional — improves analytics and ranking on OpenRouter
+AI_API_KEY=your-openrouter-key
 OPENROUTER_SITE_URL=https://your-site.example
 OPENROUTER_APP_NAME=AIDemic
 ```
 
-**Local server (vLLM / TGI / LocalAI)**
+### Local OpenAI-Compatible Server
+
 ```bash
 AI_BASE_URL=http://localhost:8000/v1
 AI_MODEL=your-model-name
-# AI_API_KEY is optional unless your server requires auth
+AI_API_KEY=
 ```
 
-Legacy variable names (`OPENAI_BASE_URL`, `OPENAI_MODEL`, `OPENAI_API_KEY`) are also supported as fallbacks.
+## Database
 
-## Environment Variables Reference
+The schema lives in [queries.sql](./queries.sql). It matches the names used in the application code.
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key |
-| `AI_BASE_URL` | No | AI API base URL (default: OpenAI) |
-| `AI_MODEL` | No | Model name (default: `gpt-4.1-mini`) |
-| `AI_API_KEY` | Yes* | API key (*required for OpenAI-hosted endpoints) |
-| `OPENROUTER_SITE_URL` | No | Your site URL for OpenRouter analytics |
-| `OPENROUTER_APP_NAME` | No | App name shown in OpenRouter dashboard |
-| `HUGGINGFACE_API_KEY` | No | Hugging Face — experimental video generation |
-| `FAL_KEY` | No | Fal.ai — experimental video generation |
+Key tables:
+
+- `user_profiles`
+- `flashcard_decks`
+- `flashcards`
+- `flashcard_tags`
+- `flashcard_tag_mapping`
+- `study_sessions`
+- `study_session_results`
+- `user_statistics`
+- `study_goals`
+- `generated_videos`
+
+## Auth And Route Protection
+
+Protected routes are handled by [src/proxy.ts](./src/proxy.ts). The proxy creates a Supabase SSR client from request cookies and calls `supabase.auth.getUser()`; it does not depend on a hard-coded `sb-access-token` cookie name.
 
 ## Project Structure
 
-```
+```text
 src/
-├── app/
-│   ├── page.tsx                  # Landing page
-│   ├── login/                    # Auth page
-│   ├── auth/callback/            # OAuth callback
-│   ├── dashboard/
-│   │   ├── flashcards/           # Deck list & individual deck view
-│   │   │   └── ai/               # AI deck generation UI
-│   │   ├── study-sessions/       # Study interface (spaced repetition)
-│   │   ├── ai-questions/         # AI exam question generator
-│   │   ├── slideshow/            # Presentation mode
-│   │   ├── notes/                # Notes
-│   │   └── settings/             # User settings
-│   └── api/
-│       └── ai/
-│           ├── generate-flashcards/
-│           ├── generate-questions/
-│           ├── generate-video/
-│           └── study-chat/
-├── components/
-│   ├── RichTextEditor.tsx        # Tiptap editor
-│   ├── MarkdownContent.tsx
-│   ├── MathContent.tsx           # KaTeX rendering
-│   ├── SlideshowGenerator.tsx
-│   ├── ThemeToggle.tsx
-│   └── ui/                       # Base UI components
-├── hooks/
-│   ├── useAuth.ts
-│   └── useTheme.ts
-├── lib/
-│   ├── spacedRepetition.ts       # SM-2 algorithm
-│   ├── supabase-client.ts
-│   └── supabase-server.ts
-├── types.ts                      # TypeScript interfaces (matches DB schema)
-└── middleware.ts                 # Session validation, route protection
+  app/
+    api/
+      ai/
+        generate-flashcards/
+        generate-questions/
+        generate-video/
+        study-chat/
+    dashboard/
+      ai-questions/
+      flashcards/
+      notes/
+      settings/
+      slideshow/
+      study-sessions/
+    login/
+  components/
+  hooks/
+  lib/
+    ai/
+      config.ts
+      json.ts
+      math.ts
+      text.ts
+      validation.ts
+    spacedRepetition.ts
+    supabase-client.ts
+    supabase-server.ts
+  proxy.ts
+  types.ts
 ```
 
 ## Scripts
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm start        # Run production server
-npm run lint     # Run ESLint
+npm run dev
+npm run build
+npm run start
+npm run lint
 ```
-
-## Database
-
-The full schema (tables, indexes, RLS policies) is in `queries.sql`. Run it once in your Supabase SQL editor to set everything up.
-
-Key tables: `users`, `decks`, `cards`, `tags`, `study_sessions`, `study_statistics`, `study_goals`, `video_generation_history`.

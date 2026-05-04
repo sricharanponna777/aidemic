@@ -209,7 +209,7 @@ export default function AIQuestionsPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">Step 4 of 4</p>
             <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">MCQ Exam Practice</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-              Finish the flow with exam-board MCQs after notes, flashcards, and study sessions.
+              Finish the flow with exam-board MCQs after notes, flashcards, and Flashcard reviews.
             </p>
           </div>
           <Link

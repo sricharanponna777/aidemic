@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { MathContent } from '@/components/MathContent';
+import { normalizeLatexControlCharacters, wrapBareLatexExpressions } from '@/lib/mathText';
 
 type MarkdownContentProps = {
   content: string;
@@ -29,11 +30,7 @@ function stripTags(value: string): string {
 }
 
 function normalizeEducationalMarkup(value: string): string {
-  let next = value
-    .replace(/\u0008(?=egin\b)/g, () => '\\b')
-    .replace(/\u000c(?=rac\b)/g, () => '\\f')
-    .replace(/\t(?=(?:ext|imes|heta|au)\b)/g, () => '\\t')
-    .replace(/\r(?=(?:ight|angle|ho)\b)/g, () => '\\r')
+  let next = normalizeLatexControlCharacters(value)
     .replace(/([A-Za-z0-9)\]])\s*<sub>([\s\S]*?)<\/sub>/gi, (_match, base: string, sub: string) => {
       const cleanSub = stripTags(sub);
       return cleanSub ? `$${base}_{${cleanSub}}$` : base;
@@ -49,6 +46,7 @@ function normalizeEducationalMarkup(value: string): string {
   next = normalizeLatexMatrices(next);
   next = wrapBareMatrixFormulaLines(next);
   next = normalizeTextInverseNotation(next);
+  next = wrapBareLatexExpressions(next);
   return next;
 }
 

@@ -55,7 +55,7 @@ export default function Settings() {
       <div className="rounded-lg bg-white p-8 shadow dark:bg-gray-800">
         <div className="mb-6">
           <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Appearance</h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Pick the mode that feels best for your study sessions.</p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Pick the mode that feels best for your Flashcard reviews.</p>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <button
