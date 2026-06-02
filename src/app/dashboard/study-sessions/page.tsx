@@ -442,7 +442,7 @@ export default function StudySessions() {
               Flashcard Review
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-              Review your flashcards before moving into exam-style MCQs.
+              Review your flashcards before moving into exam-style practice.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -458,7 +458,7 @@ export default function StudySessions() {
               className={buttonStyles({ variant: 'secondary' })}
             >
               <Sparkles className="h-4 w-4" />
-              Next: MCQs
+              Next: Exam practice
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

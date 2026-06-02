@@ -252,9 +252,9 @@ export default function Dashboard() {
     },
     {
       step: "4",
-      title: "MCQs",
+      title: "Exam practice",
       href: "/dashboard/ai-questions",
-      detail: "Test exam-style application.",
+      detail: "Answer and mark exam practice.",
       icon: Sparkles,
       tone: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
     },
@@ -318,7 +318,7 @@ export default function Dashboard() {
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Learning flow</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                Learn from notes or a slideshow, convert it into recall, review it, then finish with exam-style MCQs.
+                Learn from notes or a slideshow, convert it into recall, review it, then finish with exam-style practice.
               </p>
             </div>
           </div>

@@ -36,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/dashboard/notes", label: "Notes", icon: BookOpen },
     { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
     { href: "/dashboard/study-sessions", label: "Flashcard reviews", icon: Brain },
-    { href: "/dashboard/ai-questions", label: "MCQs", icon: Sparkles },
+    { href: "/dashboard/ai-questions", label: "Exam practice", icon: Sparkles },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];
 

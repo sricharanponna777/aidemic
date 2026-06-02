@@ -1,6 +1,6 @@
 # AIDemic
 
-An AI-powered study platform built with Next.js. Generate flashcard decks from a topic, review with spaced repetition, create exam-style MCQs, and chat with an AI study assistant.
+An AI-powered study platform built with Next.js. Generate flashcard decks from a topic, review with spaced repetition, create mixed exam-style practice, and chat with an AI study assistant.
 
 ## Features
 
