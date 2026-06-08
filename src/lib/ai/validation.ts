@@ -5,6 +5,8 @@ export const SUPPORTED_SUBJECTS = [
   'chemistry',
   'physics',
   'mathematics',
+  'english language',
+  'english literature',
   'english',
   'history',
   'geography',

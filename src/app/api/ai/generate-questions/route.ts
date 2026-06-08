@@ -8,8 +8,10 @@ import {
   type ChatCompletionsResponseBody,
   type OpenAIResponseBody,
 } from '@/lib/ai/json';
+import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { normalizeMathNotation } from '@/lib/ai/math';
 import { cleanText, dedupe, extractFigureUrls, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
+import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import {
   clampCount,
   normalizeBoard,
@@ -60,24 +62,29 @@ type SourceReference = {
 
 type GeneratedExamQuestions = {
   questions: ExamQuestion[];
+  sourceMaterial?: string;
 };
 
 type AIQuestionResult = {
   generated: GeneratedExamQuestions;
   usedOnlineResources: boolean;
   onlineLookupFailed: boolean;
+  onlineLookupReason: string;
 };
 
 const MIN_QUESTIONS = 1;
 const MAX_QUESTIONS = 20;
 const MIN_MARK_VALUE = 1;
-const MAX_MARK_VALUE = 30;
+const MAX_MARK_VALUE = 40;
+const GENERATION_MAX_OUTPUT_TOKENS = 6000;
+const MAX_AI_RESPONSE_LOG_TEXT = 12000;
 
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['questions'],
+  required: ['questions', 'sourceMaterial'],
   properties: {
+    sourceMaterial: { type: 'string' },
     questions: {
       type: 'array',
       items: {
@@ -130,25 +137,56 @@ const SCHEMA = {
 const clampQuestions = (n?: number) => clampCount(n, MIN_QUESTIONS, MAX_QUESTIONS, 6);
 
 const parseMarkValue = (value: unknown) => {
-  const numberValue = Number(value);
+  const numberValue =
+    typeof value === 'string'
+      ? Number(value.match(/\d+/)?.[0] || Number.NaN)
+      : Number(value);
   if (!Number.isFinite(numberValue)) return null;
   const integerValue = Math.floor(numberValue);
   if (integerValue < MIN_MARK_VALUE || integerValue > MAX_MARK_VALUE) return null;
   return integerValue;
 };
 
+const readString = (record: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return '';
+};
+
+const readUnknown = (record: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    if (record[key] !== undefined && record[key] !== null) return record[key];
+  }
+  return undefined;
+};
+
 const coerceGeneratedQuestions = (value: unknown): GeneratedExamQuestions | null => {
   if (!value || typeof value !== 'object') return null;
+  if (Array.isArray(value)) {
+    return { questions: value as ExamQuestion[] };
+  }
   const direct = value as { questions?: unknown };
+  const sourceMaterial = typeof (value as { sourceMaterial?: unknown }).sourceMaterial === 'string'
+    ? (value as { sourceMaterial: string }).sourceMaterial
+    : '';
   if (Array.isArray(direct.questions)) {
-    return { questions: direct.questions as ExamQuestion[] };
+    return { questions: direct.questions as ExamQuestion[], sourceMaterial };
   }
   const nestedCandidates = Object.values(value as Record<string, unknown>);
   for (const candidate of nestedCandidates) {
     if (candidate && typeof candidate === 'object') {
-      const nested = candidate as { questions?: unknown };
+      if (Array.isArray(candidate)) {
+        return { questions: candidate as ExamQuestion[] };
+      }
+      const nested = candidate as { questions?: unknown; sourceMaterial?: unknown };
       if (Array.isArray(nested.questions)) {
-        return { questions: nested.questions as ExamQuestion[] };
+        return {
+          questions: nested.questions as ExamQuestion[],
+          sourceMaterial: typeof nested.sourceMaterial === 'string' ? nested.sourceMaterial : sourceMaterial,
+        };
       }
     }
   }
@@ -166,6 +204,20 @@ const extractQuestionsFromResponsesBody = (body: OpenAIResponseBody): GeneratedE
   return extractFromResponsesBody(body, coerceGeneratedQuestions, extractJson);
 };
 
+const truncateForLog = (value: string) =>
+  value.length > MAX_AI_RESPONSE_LOG_TEXT
+    ? `${value.slice(0, MAX_AI_RESPONSE_LOG_TEXT)}... [truncated ${value.length - MAX_AI_RESPONSE_LOG_TEXT} chars]`
+    : value;
+
+const logInvalidQuestionJson = (source: string, payload: unknown) => {
+  try {
+    const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+    console.error(`[generate-questions] AI response was not valid question JSON (${source})`, truncateForLog(serialized || ''));
+  } catch (err) {
+    console.error(`[generate-questions] AI response was not valid question JSON (${source})`, payload, err);
+  }
+};
+
 const normalizePayload = (raw: GenerateQuestionsPayload) => ({
   topic: txt(raw.topic || '', 200),
   subject: txt((raw.subject || '').toLowerCase(), 60),
@@ -180,55 +232,185 @@ const normalizePayload = (raw: GenerateQuestionsPayload) => ({
   useOnlineResources: raw.useOnlineResources !== false,
 });
 
+const textFromUnknown = (value: unknown) => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (!value || typeof value !== 'object') return '';
+
+  const record = value as Record<string, unknown>;
+  return readString(record, [
+    'text',
+    'content',
+    'point',
+    'criterion',
+    'description',
+    'answer',
+    'option',
+    'value',
+    'label',
+    'title',
+  ]);
+};
+
 const normalizeStringList = (value: unknown, subject: string, maxItems: number, maxLength: number) => {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => normalizeMathNotation(safe(String(item || '')), subject))
+  const values =
+    Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(/\n+|(?:^|\s)(?=\d+\.\s)/).filter(Boolean)
+        : value && typeof value === 'object'
+          ? Object.values(value as Record<string, unknown>)
+        : [];
+
+  return values
+    .map((item) => normalizeMathNotation(safe(textFromUnknown(item)), subject))
     .map((item) => txt(item, maxLength))
     .filter(Boolean)
     .slice(0, maxItems);
 };
 
-const normalizeOptions = (value: unknown, subject: string) => {
-  if (!Array.isArray(value)) return [];
-  const options = value
-    .map((item) => txt(normalizeMathNotation(safe(String(item || '')), subject), 260))
+const normalizeOptions = (value: unknown, subject: string, record?: Record<string, unknown>) => {
+  const optionRecordValues = record
+    ? ['optionA', 'optionB', 'optionC', 'optionD', 'A', 'B', 'C', 'D'].map((key) => record[key]).filter((item) => item !== undefined)
+    : [];
+  const values = Array.isArray(value)
+    ? value
+    : value && typeof value === 'object'
+      ? Object.values(value as Record<string, unknown>)
+      : optionRecordValues;
+  if (!Array.isArray(values)) return [];
+
+  const options = values
+    .map((item) => txt(normalizeMathNotation(safe(textFromUnknown(item)), subject), 260))
+    .map((item) => item.replace(/^[A-D][).\s:-]+/i, '').trim())
     .filter(Boolean)
     .slice(0, 4);
   const unique = new Set(options.map((option) => option.toLowerCase()));
   return unique.size === options.length ? options : [];
 };
 
+const inferCommandWord = (question: string, fallback: string) => {
+  if (fallback) return fallback;
+  const firstWord = question.match(/[A-Za-z]+/)?.[0] || '';
+  return firstWord || 'Answer';
+};
+
+const normalizeQuestionType = (value: unknown, allowMcq: boolean, options: string[], answerLike: unknown): QuestionType => {
+  const cleaned = String(value || '').toLowerCase();
+  if (allowMcq && /\b(mcq|multiple[-\s]?choice|multiple_choice|choice)\b/.test(cleaned)) return 'mcq';
+  if (allowMcq && options.length >= 3 && options.length <= 4 && normalizeCorrectOption(answerLike, options)) return 'mcq';
+  return 'open';
+};
+
+const normalizeCorrectOption = (value: unknown, options: string[] = []) => {
+  const text = String(value || '').trim().toUpperCase();
+  const direct = text.match(/^[A-D]$/)?.[0];
+  if (direct) return direct as CorrectOption;
+  const embedded = text.match(/\b([A-D])\b/)?.[1];
+  if (embedded) return embedded as CorrectOption;
+
+  const normalizedText = text.toLowerCase();
+  const optionIndex = options.findIndex((option) => option.toLowerCase() === normalizedText);
+  return (optionIndex >= 0 ? ['A', 'B', 'C', 'D'][optionIndex] : '') as CorrectOption;
+};
+
+const inferMarks = (record: Record<string, unknown>, questionText: string, questionType: QuestionType) => {
+  const parsed = parseMarkValue(readUnknown(record, ['marks', 'mark', 'markValue', 'mark_value', 'maxMarks', 'max_marks', 'totalMarks', 'total_marks', 'points', 'score']));
+  if (parsed !== null) return parsed;
+  if (questionType === 'mcq') return 1;
+
+  const text = `${questionText} ${readString(record, ['commandWord', 'command_word', 'command'])}`.toLowerCase();
+  if (/\b(evaluate|assess|justify|discuss|to what extent|recommend)\b/.test(text)) return 9;
+  if (/\b(analyse|analyze|explain why|compare)\b/.test(text)) return 6;
+  if (/\b(explain|describe)\b/.test(text)) return 4;
+  if (/\b(state|identify|give|name|define|list)\b/.test(text)) return 2;
+  return 4;
+};
+
+const getQuestionFingerprint = (question: ExamQuestion) => `${question.marks}:${question.question.toLowerCase()}`;
+
+const getSourceMaterialFromRawItem = (value: unknown, payload: ReturnType<typeof normalizePayload>) => {
+  if (payload.subject !== 'english language' || !value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  const sourceText = readString(record, [
+    'sourceMaterial',
+    'source_material',
+    'source',
+    'extract',
+    'sourceA',
+    'source_a',
+    'sourceB',
+    'source_b',
+    'text',
+    'content',
+  ]);
+  if (!sourceText || !/\bSource\s+[AB]\b/i.test(sourceText)) return '';
+
+  const hasQuestionShape =
+    readString(record, ['question', 'questionText', 'question_text', 'prompt']).trim().length > 0 ||
+    readUnknown(record, ['marks', 'mark', 'maxMarks', 'questionType', 'question_type']) !== undefined;
+
+  return hasQuestionShape ? '' : txt(normalizeMathNotation(safe(sourceText), payload.subject), 12000);
+};
+
 const normalizeQuestion = (
   question: ExamQuestion,
   payload: ReturnType<typeof normalizePayload>
 ): ExamQuestion | null => {
-  const marks = parseMarkValue(question.marks);
-  if (marks === null) return null;
-
-  const questionType: QuestionType = question.questionType === 'mcq' && payload.allowMcq ? 'mcq' : 'open';
-  const questionText = normalizeMathNotation(safe((question.question || '').replace(/^question\s*[:\-]\s*/i, '')), payload.subject);
-  const modelAnswer = normalizeMathNotation(safe(question.modelAnswer || ''), payload.subject);
-  const markScheme = normalizeStringList(question.markScheme, payload.subject, 10, 320);
-  const skillsAssessed = normalizeStringList(question.skillsAssessed, payload.subject, 6, 80);
-  const options = questionType === 'mcq' ? normalizeOptions(question.options, payload.subject) : [];
-  const correctOption = txt((question.correctOption || '').toUpperCase(), 1) as CorrectOption;
-  const isCalculation = Boolean(question.isCalculation) && payload.allowCalculation;
+  if (!question || typeof question !== 'object') return null;
+  const record = question as unknown as Record<string, unknown>;
+  const rawQuestion = readString(record, ['question', 'questionText', 'question_text', 'prompt', 'text']);
+  const questionText = normalizeMathNotation(safe(rawQuestion.replace(/^question\s*[:\-]\s*/i, '')), payload.subject);
+  const rawAnswer = readString(record, ['modelAnswer', 'model_answer', 'answer', 'correctAnswer', 'correct_answer', 'explanation', 'rationale']);
+  const tentativeOptions = normalizeOptions(readUnknown(record, ['options', 'choices', 'answers']), payload.subject, record);
+  const answerLike = readUnknown(record, ['correctOption', 'correct_option', 'answer', 'correctAnswer', 'correct_answer']);
+  const questionType = normalizeQuestionType(readUnknown(record, ['questionType', 'question_type', 'type', 'format']), payload.allowMcq, tentativeOptions, answerLike);
+  const marks = inferMarks(record, questionText, questionType);
+  const markScheme = normalizeStringList(
+    readUnknown(record, ['markScheme', 'mark_scheme', 'markingPoints', 'marking_points', 'markSchemePoints', 'mark_scheme_points']),
+    payload.subject,
+    10,
+    320
+  );
+  const skillsAssessed = normalizeStringList(
+    readUnknown(record, ['skillsAssessed', 'skills_assessed', 'skills', 'assessmentObjectives', 'assessment_objectives']),
+    payload.subject,
+    6,
+    80
+  );
+  const options = questionType === 'mcq' ? tentativeOptions : [];
+  const correctOption = normalizeCorrectOption(answerLike, options);
+  const correctOptionIndex = ['A', 'B', 'C', 'D'].indexOf(correctOption);
+  const correctOptionText = correctOptionIndex >= 0 ? options[correctOptionIndex] : '';
+  const answerFromMarkScheme = markScheme.length > 0 ? `A strong answer should include: ${markScheme.join(' ')}` : '';
+  const modelAnswer = normalizeMathNotation(
+    safe(rawAnswer || (correctOptionText ? `Correct answer: ${correctOption} - ${correctOptionText}` : answerFromMarkScheme)),
+    payload.subject
+  );
+  const isCalculation = Boolean(readUnknown(record, ['isCalculation', 'is_calculation', 'calculation'])) && payload.allowCalculation;
+  const repairedMarkScheme =
+    markScheme.length > 0
+      ? markScheme
+      : modelAnswer
+        ? questionType === 'mcq'
+          ? [`Award ${marks} mark(s) for selecting the correct option.`, modelAnswer]
+          : [modelAnswer]
+        : [];
 
   const normalized: ExamQuestion = {
     questionType,
-    question: txt(questionText, 900),
+    question: txt(questionText, payload.subject === 'english language' ? 9000 : 2600),
     marks,
-    commandWord: txt(safe(question.commandWord || ''), 80),
+    commandWord: txt(safe(inferCommandWord(questionText, readString(record, ['commandWord', 'command_word', 'command']))), 80),
     isCalculation,
     options,
     correctOption: questionType === 'mcq' ? correctOption : '',
-    markScheme,
+    markScheme: repairedMarkScheme,
     modelAnswer: txt(modelAnswer, 1400),
-    skillsAssessed,
-    figureUrl: sanitizeFigureUrl(question.figureUrl || ''),
-    sourceTitle: cleanText(question.sourceTitle || '', 160),
-    sourceUrl: sanitizeFigureUrl(question.sourceUrl || ''),
+    skillsAssessed: skillsAssessed.length > 0 ? skillsAssessed : ['Exam technique'],
+    figureUrl: sanitizeFigureUrl(readString(record, ['figureUrl', 'figure_url', 'imageUrl', 'image_url'])),
+    sourceTitle: cleanText(readString(record, ['sourceTitle', 'source_title', 'source', 'citationTitle', 'citation_title']), 160),
+    sourceUrl: sanitizeFigureUrl(readString(record, ['sourceUrl', 'source_url', 'url', 'citationUrl', 'citation_url'])),
   };
 
   if (!normalized.question || !normalized.commandWord || normalized.markScheme.length === 0 || !normalized.modelAnswer) {
@@ -236,7 +418,20 @@ const normalizeQuestion = (
   }
 
   if (normalized.questionType === 'mcq') {
-    if (normalized.options.length !== 4 || !['A', 'B', 'C', 'D'].includes(normalized.correctOption)) return null;
+    const validCorrectOptions = ['A', 'B', 'C', 'D'].slice(0, normalized.options.length);
+    if (normalized.options.length < 3 || normalized.options.length > 4 || !validCorrectOptions.includes(normalized.correctOption)) {
+      const optionText = normalized.options.length > 0
+        ? `\n\nOptions referenced by the source question: ${normalized.options.map((option, index) => `${['A', 'B', 'C', 'D'][index]}. ${option}`).join(' ')}`
+        : '';
+      return {
+        ...normalized,
+        questionType: 'open',
+        question: txt(`${normalized.question}${optionText}`, payload.subject === 'english language' ? 9000 : 900),
+        options: [],
+        correctOption: '',
+        markScheme: normalized.markScheme.length > 0 ? normalized.markScheme : [normalized.modelAnswer],
+      };
+    }
   }
 
   return normalized;
@@ -258,54 +453,84 @@ const applyFigureReferences = (questions: ExamQuestion[], figureUrls: string[]) 
   return { questions: next, missingFigureReference: false };
 };
 
+const getEnglishLanguagePaper = (payload: ReturnType<typeof normalizePayload>) => {
+  if (payload.subject !== 'english language') return null;
+  const combined = `${payload.topic} ${payload.prompt} ${payload.specification}`.toLowerCase();
+  if (/\bpaper\s*2\b/.test(combined)) return 'paper2';
+  return 'paper1';
+};
+
+const getEnglishLanguageInstructions = (payload: ReturnType<typeof normalizePayload>) => {
+  const paper = getEnglishLanguagePaper(payload);
+  if (!paper) return null;
+
+  if (paper === 'paper1') {
+    return [
+      'AQA GCSE English Language Paper 1 only. Generate exactly 8 questions; ignore requested count.',
+      'Create one original fiction extract of 550-750 words. Put the full extract only in top-level sourceMaterial under "Source A". Do not include the extract inside any question. Do not use copyrighted text.',
+      'Questions 1-4: each is questionType="mcq", 1 mark, exactly 3 options A-C, based only on the first paragraph of Source A.',
+      'Question 5: open, 8 marks, analyse how language devices in the second paragraph create one named effect.',
+      'Question 6: open, 8 marks, analyse how structural devices across the whole extract create one named effect.',
+      'Question 7: open, 20 marks, evaluate a two-part student statement about the extract. The statement must invite agreement/disagreement about both language and structure.',
+      'Question 8: open, 40 marks, creative writing. Ask the student to write a story whose prompt is vaguely similar to Source A, not a continuation. Mark scheme must split 24 content/organisation and 16 technical accuracy.',
+      'For each open reading question, include concise markScheme points and a full-mark modelAnswer. For the writing task, modelAnswer should be a planning outline plus success criteria, not a full story.',
+      'Set sourceTitle="AI-created AQA Paper 1 fiction extract" and sourceUrl="".',
+    ].join(' ');
+  }
+
+  return [
+    'AQA GCSE English Language Paper 2 only. Generate exactly 5 questions; ignore requested count.',
+    'Create two original linked unseen sources of 350-500 words each: one non-fiction and one literary non-fiction with contrasting viewpoints on the same issue. Put both full sources only in top-level sourceMaterial under "Source A" and "Source B". Do not include the sources inside any question. Do not use copyrighted text.',
+    'Question 1: open, 4 marks, short retrieval/inference about Source A.',
+    'Question 2: open, 8 marks, write a summary comparing differences between Source A and Source B.',
+    'Question 3: open, 12 marks, analyse how the writer uses language in a named section of one source.',
+    'Question 4: open, 16 marks, compare how the writers convey different viewpoints and perspectives across both sources.',
+    'Question 5: open, 40 marks, write to present a viewpoint in a specified non-fiction form such as article, letter, speech or blog. Mark scheme must split 24 content/organisation and 16 technical accuracy.',
+    'For each question, include concise markScheme points and a full-mark modelAnswer. For the writing task, modelAnswer should be a planning outline plus success criteria, not a full article.',
+    'Set sourceTitle="AI-created AQA Paper 2 linked sources" and sourceUrl="".',
+  ].join(' ');
+};
+
 const buildPrompt = (
   payload: ReturnType<typeof normalizePayload>,
   figureUrls: string[],
   useWebSearch: boolean
 ) => {
-  const formatInstruction = payload.allowMcq
-    ? 'You may include a small number of MCQs where that matches exam-board style. Most questions should still be written-response unless online resources show MCQs are common for this topic.'
-    : 'Generate only written-response questions. Do not generate MCQs.';
-  const calculationInstruction = payload.allowCalculation
-    ? 'Calculation questions are allowed where the exam-board resources or topic make them realistic.'
-    : 'Do not require calculation. Set isCalculation false for every question.';
+  const englishLanguageInstructions = getEnglishLanguageInstructions(payload);
   const resourceInstruction = useWebSearch
-    ? [
-        'Use online search before choosing question marks.',
-        'Look for current or recent official exam-board/specification/assessment-guide/sample-assessment/question-paper/mark-scheme resources for this subject, exam board, exam type, and topic.',
-        'Choose each question mark value from the kinds of marks those resources use. Do not rely on a fixed default list.',
-        'For each question, include the most relevant sourceTitle and sourceUrl you used. If a source is unavailable for one question, use empty strings.',
-      ].join('\n')
-    : [
-        'Choose realistic mark values for each question from the subject, board, exam type, and topic.',
-        'If online resources are unavailable, use conservative exam-board-style marks from your knowledge and leave sourceTitle/sourceUrl empty.',
-      ].join('\n');
+    ? 'Search for official exam-board resources (spec/sample papers/mark schemes) to pick realistic mark values. Set sourceTitle+sourceUrl per question (empty strings if unavailable).'
+    : 'Use knowledge to pick realistic mark values. Leave sourceTitle/sourceUrl empty.';
+  const formatInstruction = payload.allowMcq
+    ? 'Mostly written-response; include MCQs only where exam-board style supports them.'
+    : 'Written-response only. No MCQs.';
+  const calcInstruction = payload.allowCalculation
+    ? 'Calculation questions allowed where realistic.'
+    : 'No calculations. isCalculation=false on every question.';
 
   const system = [
-    'You generate mixed exam-board practice questions as strict JSON.',
-    'Do not generate flashcards or deck metadata.',
+    `Generate ${englishLanguageInstructions ? 'the required fixed-paper set' : payload.questionCount} exam practice questions as strict JSON. Board:${payload.examBoard} Type:${payload.examType} Subject:${payload.subject}.`,
+    payload.specification ? `Spec: ${payload.specification}` : '',
+    englishLanguageInstructions,
     resourceInstruction,
     formatInstruction,
-    calculationInstruction,
-    'For MCQs, set questionType to "mcq", provide exactly four options in A-D order without option letters inside the text, set correctOption to A/B/C/D, and make modelAnswer explain the correct option.',
-    'For written questions, set questionType to "open", use options as an empty array, and correctOption as an empty string.',
-    'Respect the command word, mark value, and response style expected for the subject, board, and exam type.',
-    'Longer answers should require the depth expected for the chosen mark value, such as application, linked reasoning, evaluation, or judgement where the subject and exam board expect them.',
-    'Each markScheme must be clear enough for another AI pass to mark a student response fairly.',
-    'Always include figureUrl in each question. Use an empty string when no figure is needed.',
-    'Use clean GitHub-flavored Markdown inside string values where it improves readability. Do not use raw HTML.',
-    'When writing math, use explicit LaTeX with grouping and brackets.',
-    'Every math expression must be wrapped for rendering: use \\\\(...\\\\) for inline math and \\\\[...\\\\] for display math. Do not leave bare LaTeX in prose.',
-    'Because the response is JSON, escape every LaTeX backslash as a double backslash.',
-    'Always bracket powers/subscripts inside math delimiters: x^{2}, a_{n+1}, (ab)^{2}, x_{(i+1)}.',
-    `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
-    payload.specification ? `Specification focus: ${payload.specification}` : '',
-    figureUrls.length > 0 ? 'Use provided figure URLs when a question references a figure.' : 'Do not invent figure URLs.',
-    `Generate exactly ${payload.questionCount} questions.`,
-    'Return JSON only and match the provided schema.',
+    calcInstruction,
+    'MCQ: questionType="mcq", 3 or 4 options (no letters in text), correctOption=A/B/C/D as applicable, modelAnswer explains correct option.',
+    'Open: questionType="open", options=[], correctOption="".',
+    'commandWord: the exact exam command word (e.g. Calculate/Explain/Evaluate/State). Never empty.',
+    'isCalculation: true only if numeric calculation required.',
+    'modelAnswer: full response earning full marks. Never empty.',
+    'skillsAssessed: ≥1 item, e.g. "AO1 Knowledge", "AO2 Application".',
+    'markScheme: string array, ≥1 item, one mark point per element. Clear enough for AI marking.',
+    'figureUrl: use provided URLs where relevant, else "".',
+    figureUrls.length > 0 ? '' : 'Do not invent figureUrls.',
+    'Use GFM Markdown in strings. No raw HTML.',
+    'Math: inline \\\\(...\\\\), display \\\\[...\\\\]. Double-escape backslashes in JSON. Always group: x^{2} not x^2.',
+    'sourceMaterial: use only for separate extracts/sources needed to answer the questions. Empty string for ordinary practice.',
+    'Keep all text fields concise: question≤2 sentences, markScheme items≤15 words each, modelAnswer≤40 words, skillsAssessed≤1 item.',
+    'Return JSON only. Match schema exactly.',
   ]
     .filter(Boolean)
-    .join('\n');
+    .join(' ');
 
   const user = [
     `Topic: ${payload.topic}`,
@@ -326,7 +551,7 @@ const buildResponsesBody = (
 ) => {
   const body: Record<string, unknown> = {
     model: config.model,
-    temperature: 0.25,
+    temperature: 0.7,
     input: [
       { role: 'system', content: [{ type: 'input_text', text: system }] },
       { role: 'user', content: [{ type: 'input_text', text: user }] },
@@ -334,15 +559,34 @@ const buildResponsesBody = (
     text: { format: { type: 'json_schema', name: 'mixed_exam_questions', schema: SCHEMA, strict: true } },
   };
 
+  body.max_output_tokens = GENERATION_MAX_OUTPUT_TOKENS;
+  if (config.isOpenRouter && config.isGemini) {
+    body.thinking = { type: 'disabled' };
+  }
+
   if (useWebSearch) {
-    body.tools = [
-      {
-        type: 'web_search',
-        user_location: { type: 'approximate', country: 'GB', timezone: 'Europe/London' },
-      },
-    ];
+    body.tools = config.isOpenRouter
+      ? [
+          {
+            type: 'openrouter:web_search',
+            parameters: {
+              max_results: 2,
+              max_total_results: 2,
+              search_context_size: 'low',
+              user_location: { type: 'approximate', country: 'GB', timezone: 'Europe/London' },
+            },
+          },
+        ]
+      : [
+          {
+            type: 'web_search',
+            user_location: { type: 'approximate', country: 'GB', timezone: 'Europe/London' },
+          },
+        ];
     body.tool_choice = 'auto';
-    body.include = ['web_search_call.action.sources'];
+    if (!config.isOpenRouter) {
+      body.include = ['web_search_call.action.sources'];
+    }
   }
 
   return body;
@@ -367,7 +611,10 @@ const requestResponses = async (
 
   const body = (await response.json()) as OpenAIResponseBody;
   const parsed = extractQuestionsFromResponsesBody(body);
-  if (!parsed) throw new Error('AI response was not valid question JSON.');
+  if (!parsed) {
+    logInvalidQuestionJson('/responses', body);
+    throw new Error('AI response was not valid question JSON.');
+  }
   return { parsed, errorText: '' };
 };
 
@@ -375,27 +622,40 @@ const requestChatFallback = async (
   config: ReturnType<typeof getAIConfig>,
   system: string,
   user: string,
-  responsesErrorText: string
+  responsesErrorText: string,
+  useWebSearch: boolean
 ) => {
   const commonHeaders = buildAIHeaders(config);
+  const tools =
+    useWebSearch && config.isOpenRouter
+      ? [
+          {
+            type: 'openrouter:web_search',
+            parameters: {
+              max_results: 2,
+              max_total_results: 2,
+              search_context_size: 'low',
+              user_location: { type: 'approximate', country: 'GB', timezone: 'Europe/London' },
+            },
+          },
+        ]
+      : undefined;
+
   const chatResponse = await fetch(`${config.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: commonHeaders,
     body: JSON.stringify({
       model: config.model,
-      temperature: 0.25,
+      temperature: 0.7,
+      max_tokens: GENERATION_MAX_OUTPUT_TOKENS,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'mixed_exam_questions',
-          schema: SCHEMA,
-          strict: true,
-        },
-      },
+      ...(tools ? { tools, tool_choice: 'auto' } : {}),
+      ...(config.supportsJsonSchema
+        ? { response_format: { type: 'json_schema', json_schema: { name: 'mixed_exam_questions', schema: SCHEMA, strict: true } } }
+        : { response_format: { type: 'json_object' } }),
     }),
   });
 
@@ -419,7 +679,14 @@ const requestChatFallback = async (
             .join('\n')
         : '';
   const parsed = extractJson(textContent);
-  if (!parsed) throw new Error('AI chat/completions response was not valid question JSON.');
+  if (!parsed) {
+    logInvalidQuestionJson('/chat/completions', {
+      parsed: firstMessage?.parsed,
+      content: textContent,
+      rawMessage: firstMessage,
+    });
+    throw new Error('AI chat/completions response was not valid question JSON.');
+  }
   return parsed;
 };
 
@@ -428,32 +695,106 @@ const aiGenerate = async (
   figureUrls: string[]
 ): Promise<AIQuestionResult> => {
   const config = getAIConfig();
-  const canUseWebSearch = payload.useOnlineResources && config.isOpenAIHosted && config.baseUrl === OPENAI_DEFAULT_BASE_URL;
+  const canUseWebSearch =
+    payload.useOnlineResources &&
+    ((config.isOpenAIHosted && config.baseUrl === OPENAI_DEFAULT_BASE_URL) || config.isOpenRouter);
   const { system, user } = buildPrompt(payload, figureUrls, canUseWebSearch);
+
+  // OpenRouter: skip /responses (unsupported) and go straight to chat
+  if (config.isOpenRouter) {
+    if (canUseWebSearch) {
+      try {
+        const generated = await requestChatFallback(config, system, user, '', true);
+        return { generated, usedOnlineResources: true, onlineLookupFailed: false, onlineLookupReason: '' };
+      } catch {
+        const fallbackPrompt = buildPrompt(payload, figureUrls, false);
+        const generated = await requestChatFallback(config, fallbackPrompt.system, fallbackPrompt.user, '', false);
+        return { generated, usedOnlineResources: false, onlineLookupFailed: true, onlineLookupReason: 'Web search failed.' };
+      }
+    }
+    const generated = await requestChatFallback(config, system, user, '', false);
+    return { generated, usedOnlineResources: false, onlineLookupFailed: false, onlineLookupReason: '' };
+  }
 
   if (canUseWebSearch) {
     const webResponse = await requestResponses(config, system, user, true);
     if (webResponse.parsed) {
-      return { generated: webResponse.parsed, usedOnlineResources: true, onlineLookupFailed: false };
+      return { generated: webResponse.parsed, usedOnlineResources: true, onlineLookupFailed: false, onlineLookupReason: '' };
     }
-
     const fallbackPrompt = buildPrompt(payload, figureUrls, false);
     const fallbackResponse = await requestResponses(config, fallbackPrompt.system, fallbackPrompt.user, false);
     if (fallbackResponse.parsed) {
-      return { generated: fallbackResponse.parsed, usedOnlineResources: false, onlineLookupFailed: true };
+      return { generated: fallbackResponse.parsed, usedOnlineResources: false, onlineLookupFailed: true, onlineLookupReason: txt(webResponse.errorText || 'Provider rejected web search.', 300) };
     }
-
-    const chatGenerated = await requestChatFallback(config, fallbackPrompt.system, fallbackPrompt.user, fallbackResponse.errorText || webResponse.errorText);
-    return { generated: chatGenerated, usedOnlineResources: false, onlineLookupFailed: true };
+    const chatGenerated = await requestChatFallback(config, fallbackPrompt.system, fallbackPrompt.user, fallbackResponse.errorText || webResponse.errorText, false);
+    return { generated: chatGenerated, usedOnlineResources: false, onlineLookupFailed: true, onlineLookupReason: txt(webResponse.errorText || 'Provider rejected web search.', 300) };
   }
 
   const response = await requestResponses(config, system, user, false);
   if (response.parsed) {
-    return { generated: response.parsed, usedOnlineResources: false, onlineLookupFailed: payload.useOnlineResources };
+    return { generated: response.parsed, usedOnlineResources: false, onlineLookupFailed: false, onlineLookupReason: '' };
+  }
+  const chatGenerated = await requestChatFallback(config, system, user, response.errorText, false);
+  return { generated: chatGenerated, usedOnlineResources: false, onlineLookupFailed: false, onlineLookupReason: '' };
+};
+
+const aiBackfillQuestions = async (
+  payload: ReturnType<typeof normalizePayload>,
+  figureUrls: string[],
+  existingQuestions: ExamQuestion[],
+  missingCount: number
+) => {
+  const config = getAIConfig();
+  const backfillPayload = { ...payload, questionCount: missingCount, useOnlineResources: false };
+  const { system, user } = buildPrompt(backfillPayload, figureUrls, false);
+  const avoidList = existingQuestions.map((question, index) => ({
+    index: index + 1,
+    question: txt(question.question, 220),
+    marks: question.marks,
+    questionType: question.questionType,
+  }));
+  const backfillUser = [
+    user,
+    'Existing usable questions to avoid repeating:',
+    JSON.stringify(avoidList),
+    `Generate exactly ${missingCount} additional usable question(s). Each item must include usable question text, marks, markScheme, modelAnswer, and MCQ option data when questionType is "mcq".`,
+  ].join('\n\n');
+
+  const responsesResult = await requestResponses(config, system, backfillUser, false);
+  if (responsesResult.parsed) return responsesResult.parsed;
+  return requestChatFallback(config, system, backfillUser, responsesResult.errorText, false);
+};
+
+const appendUniqueQuestions = (
+  target: ExamQuestion[],
+  seen: Set<string>,
+  rawQuestions: ExamQuestion[],
+  payload: ReturnType<typeof normalizePayload>,
+  sourceMaterialItems: string[]
+) => {
+  let malformedCount = 0;
+
+  for (const rawQuestion of rawQuestions) {
+    if (target.length >= payload.questionCount) break;
+    const sourceMaterial = getSourceMaterialFromRawItem(rawQuestion, payload);
+    if (sourceMaterial) {
+      sourceMaterialItems.push(sourceMaterial);
+      continue;
+    }
+
+    const question = normalizeQuestion(rawQuestion, payload);
+    if (!question) {
+      malformedCount += 1;
+      continue;
+    }
+
+    const key = getQuestionFingerprint(question);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    target.push(question);
   }
 
-  const chatGenerated = await requestChatFallback(config, system, user, response.errorText);
-  return { generated: chatGenerated, usedOnlineResources: false, onlineLookupFailed: payload.useOnlineResources };
+  return malformedCount;
 };
 
 const getSources = (questions: ExamQuestion[]): SourceReference[] => {
@@ -471,6 +812,58 @@ const getSources = (questions: ExamQuestion[]): SourceReference[] => {
 
   return sources.slice(0, 8);
 };
+
+async function validateTopicWithAI(
+  payload: ReturnType<typeof normalizePayload>,
+  config: ReturnType<typeof getAIConfig>
+): Promise<{ valid: boolean; reason: string }> {
+  const { topic, subject, examBoard, examType, specification } = payload;
+
+  const specLine = specification ? `Specification / option: ${specification}.\n` : '';
+  const prompt =
+    `UK exam board expert. Decide whether the student's topic is genuinely assessable in this qualification.\n\n` +
+    `Subject: ${subject}\nExam board: ${examBoard}\nLevel: ${examType}\n${specLine}` +
+    `Student topic: "${topic}"\n\n` +
+    `Rules:\n` +
+    `- ACCEPT topics that directly appear in, or are a clear sub-topic of, this specification.\n` +
+    `- ACCEPT borderline or ambiguous topics (give benefit of the doubt).\n` +
+    `- REJECT only when the topic clearly belongs to a different subject, a different exam level, or is not assessable by this board.\n\n` +
+    `Reply with JSON only, no prose: {"valid": true, "reason": ""} or {"valid": false, "reason": "<one concise sentence>"}`;
+
+  try {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: buildAIHeaders(config),
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        max_tokens: 80,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!response.ok) return { valid: true, reason: '' }; // fail open
+
+    const data = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content ?? '';
+    if (!content) return { valid: true, reason: '' };
+
+    const parsed = JSON.parse(content) as { valid?: boolean; reason?: string };
+    const isValid = parsed.valid !== false;
+
+    if (isValid) return { valid: true, reason: '' };
+
+    const aiReason = typeof parsed.reason === 'string' && parsed.reason.trim() ? parsed.reason.trim() : '';
+    const fallbackReason =
+      `"${topic}" doesn't appear to be part of ${examBoard.toUpperCase()} ${examType} ${subject}. ` +
+      `Check your qualification settings or try a topic from your specification.`;
+
+    return { valid: false, reason: aiReason || fallbackReason };
+  } catch {
+    return { valid: true, reason: '' }; // fail open on any error
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -494,6 +887,37 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (payload.subject === 'english language' && payload.examBoard !== 'aqa') {
+      return NextResponse.json({ error: 'English Language practice currently supports AQA only.' }, { status: 400 });
+    }
+    const englishLanguagePaper = getEnglishLanguagePaper(payload);
+    if (!englishLanguagePaper) {
+      const allowedTopics = getMajorTopicsForQualification({
+        subject: payload.subject,
+        examBoard: payload.examBoard,
+        examType: payload.examType,
+        specification: payload.specification,
+      });
+      const topicError = getQualificationTopicError(payload.topic, allowedTopics);
+      if (topicError) {
+        return NextResponse.json({ error: topicError }, { status: 400 });
+      }
+      const relevanceError = getTopicRelevanceError({
+        topic: payload.topic,
+        subject: payload.subject,
+        examBoard: payload.examBoard,
+        examType: payload.examType,
+        specification: payload.specification,
+      });
+      if (relevanceError) {
+        return NextResponse.json({ error: relevanceError }, { status: 400 });
+      }
+    }
+    if (englishLanguagePaper) {
+      payload.questionCount = englishLanguagePaper === 'paper1' ? 8 : 5;
+      payload.allowMcq = englishLanguagePaper === 'paper1';
+      payload.allowCalculation = false;
+    }
 
     const config = getAIConfig();
     const missingKeyError = getMissingHostedKeyError(config);
@@ -501,30 +925,56 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: missingKeyError }, { status: 500 });
     }
 
+    // AI spec validation — skip for English Language (fixed paper formats have their own logic)
+    if (!englishLanguagePaper) {
+      const specCheck = await validateTopicWithAI(payload, config);
+      if (!specCheck.valid) {
+        return NextResponse.json({ error: specCheck.reason }, { status: 400 });
+      }
+    }
+
     const figureUrls = dedupe([payload.figureUrl, ...extractFigureUrls(payload.prompt)].filter(Boolean)).slice(0, 8);
     const warnings: string[] = [];
 
     const aiResult = await aiGenerate(payload, figureUrls);
     if (aiResult.onlineLookupFailed) {
-      warnings.push('Online resource lookup was unavailable, so marks were chosen without live source lookup.');
+      warnings.push(
+        `Online resource lookup was unavailable, so marks were chosen without live source lookup.${aiResult.onlineLookupReason ? ` ${aiResult.onlineLookupReason}` : ''}`
+      );
     }
-
-    const normalizedQuestions = (Array.isArray(aiResult.generated.questions) ? aiResult.generated.questions : [])
-      .map((question) => normalizeQuestion(question, payload))
-      .filter((question): question is ExamQuestion => question !== null);
 
     const uniqueQuestions: ExamQuestion[] = [];
     const seen = new Set<string>();
-    for (const question of normalizedQuestions) {
-      if (uniqueQuestions.length >= payload.questionCount) break;
-      const key = `${question.marks}:${question.question.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      uniqueQuestions.push(question);
+    const rawQuestions = Array.isArray(aiResult.generated.questions) ? aiResult.generated.questions : [];
+    const sourceMaterialItems: string[] = [];
+    let malformedCount = appendUniqueQuestions(uniqueQuestions, seen, rawQuestions, payload, sourceMaterialItems);
+    let totalRawQuestions = rawQuestions.length;
+
+    if (uniqueQuestions.length < payload.questionCount) {
+      try {
+        const missingCount = payload.questionCount - uniqueQuestions.length;
+        const backfillRaw = await aiBackfillQuestions(payload, figureUrls, uniqueQuestions, missingCount);
+        const backfillQuestions = Array.isArray(backfillRaw.questions) ? backfillRaw.questions : [];
+        totalRawQuestions += backfillQuestions.length;
+        malformedCount += appendUniqueQuestions(uniqueQuestions, seen, backfillQuestions, payload, sourceMaterialItems);
+      } catch {
+        warnings.push('Replacement question generation could not complete.');
+      }
     }
 
     if (uniqueQuestions.length === 0) {
-      return NextResponse.json({ error: 'AI did not return valid exam-practice questions.' }, { status: 502 });
+      return NextResponse.json(
+        {
+          error:
+            totalRawQuestions === 0
+              ? 'AI did not return any exam-practice questions.'
+              : `AI returned ${totalRawQuestions} question(s), but none included enough usable question text, marks, answer guidance, and MCQ option data.`,
+        },
+        { status: 502 }
+      );
+    }
+    if (malformedCount > 0) {
+      warnings.push(`Repaired the question set and discarded ${malformedCount} malformed item(s).`);
     }
     if (uniqueQuestions.length < payload.questionCount) {
       warnings.push(`Generated ${uniqueQuestions.length} unique questions out of requested ${payload.questionCount}.`);
@@ -535,11 +985,28 @@ export async function POST(request: Request) {
     if (missingFigureReference && figureUrls.length === 0) {
       warnings.push('Some questions reference a figure, but no figure URL was provided.');
     }
+    const sourceMaterial = txt(
+      normalizeMathNotation(safe(aiResult.generated.sourceMaterial || sourceMaterialItems[0] || ''), payload.subject),
+      12000
+    );
+
+    console.info('[generate-questions] Produced question set', {
+      subject: payload.subject,
+      examBoard: payload.examBoard,
+      examType: payload.examType,
+      specification: payload.specification,
+      requestedQuestionCount: payload.questionCount,
+      producedQuestionCount: withFigures.length,
+      sourceMaterial,
+      questions: withFigures,
+      warnings,
+    });
 
     return NextResponse.json({
       success: true,
       questionCount: withFigures.length,
       questions: withFigures,
+      sourceMaterial,
       sources: getSources(withFigures),
       usedOnlineResources: aiResult.usedOnlineResources,
       warnings,

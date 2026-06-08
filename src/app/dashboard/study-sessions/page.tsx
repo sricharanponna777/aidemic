@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, BarChart3, Brain, Clock3, Layers, Play, RotateCcw, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, Brain, Clock3, Layers, Play, Rocket, RotateCcw, ShieldPlus } from 'lucide-react';
 import { StudySession, FlashcardDeck, Flashcard } from '@/types';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase-client';
@@ -78,7 +78,7 @@ const formatMinutes = (minutes?: number) => {
 };
 
 const scoreTone = (score?: number | null) => {
-  if (typeof score !== 'number') return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  if (typeof score !== 'number') return 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200';
   if (score >= 80) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/45 dark:text-emerald-200';
   if (score >= 50) return 'bg-amber-100 text-amber-800 dark:bg-amber-950/45 dark:text-amber-200';
   return 'bg-red-100 text-red-800 dark:bg-red-950/45 dark:text-red-200';
@@ -433,19 +433,27 @@ export default function StudySessions() {
     : '';
 
   return (
-    <main className="space-y-7" aria-labelledby="study-sessions-title">
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <main className="space-y-6" aria-labelledby="study-sessions-title">
+      <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Step 3 of 4</p>
-            <h1 id="study-sessions-title" className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">
-              Flashcard Review
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-              Review your flashcards before moving into exam-style practice.
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 4 of 5</p>
+            <div className="mt-2 flex items-center gap-3">
+              <ShieldPlus className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+              <h1 id="study-sessions-title" className="text-3xl font-bold text-slate-900 dark:text-white">Flashcard Revision</h1>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+              Review your flashcards with spaced repetition.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/dashboard/flashcards"
+              className={buttonStyles({ variant: 'secondary' })}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to flashcards
+            </Link>
             <button
               className={buttonStyles({ variant: 'primary' })}
               onClick={() => setPhase('choosing')}
@@ -457,8 +465,8 @@ export default function StudySessions() {
               href="/dashboard/ai-questions"
               className={buttonStyles({ variant: 'secondary' })}
             >
-              <Sparkles className="h-4 w-4" />
-              Next: Exam practice
+              <Rocket className="h-4 w-4" />
+              Next: Smart Practice
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -466,7 +474,7 @@ export default function StudySessions() {
       </section>
 
       <section aria-label="Study overview" className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <article className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-5 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Sessions completed</p>
             <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -474,7 +482,7 @@ export default function StudySessions() {
           <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{sessionSummary.completed}</p>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{formatMinutes(sessionSummary.totalMinutes)} total study time</p>
         </article>
-        <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <article className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-5 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Cards studied</p>
             <Layers className="h-5 w-5 text-teal-600 dark:text-teal-400" />
@@ -482,7 +490,7 @@ export default function StudySessions() {
           <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{sessionSummary.totalCards}</p>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">from saved sessions</p>
         </article>
-        <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <article className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-5 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Average score</p>
             <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -500,9 +508,9 @@ export default function StudySessions() {
 
       {phase === 'idle' && (
         <section className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">
-          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
             <div className="flex items-start gap-4">
-              <div className="rounded-lg bg-blue-100 p-3 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+              <div className="rounded-xl bg-indigo-100 dark:bg-indigo-500/15 p-3 text-indigo-600 dark:text-indigo-400">
                 <RotateCcw className="h-6 w-6" />
               </div>
               <div>
@@ -528,19 +536,19 @@ export default function StudySessions() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
             <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Deck order</h2>
             <div className="mt-4 space-y-2">
               {orderedDeckList.slice(0, 4).map((deck) => (
-                <div key={deck.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
+                <div key={deck.id} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-white/6 px-3 py-2">
                   <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{deck.name}</span>
-                  <span className="ml-3 shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  <span className="ml-3 shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-200">
                     {deck.due_count || 0} due
                   </span>
                 </div>
               ))}
               {orderedDeckList.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
+                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
                   No decks yet.
                 </p>
               ) : null}
@@ -550,7 +558,7 @@ export default function StudySessions() {
       )}
 
       {phase === 'choosing' && (
-        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
           <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Select a deck</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Decks with due cards are listed first.</p>
           <label htmlFor="deck-select" className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -559,7 +567,7 @@ export default function StudySessions() {
           <select
             id="deck-select"
             aria-label="Choose the deck to review"
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-slate-900 outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
             value={selectedDeckId}
             onChange={(event) => setSelectedDeckId(event.target.value)}
           >
@@ -572,7 +580,7 @@ export default function StudySessions() {
           </select>
 
           {selectedDeck ? (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/70">
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/6 dark:bg-white/3">
               <p className="font-semibold text-slate-900 dark:text-slate-100">{selectedDeck.name}</p>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                 {selectedDeck.due_count || 0} cards due from {selectedDeck.card_count || 0} total cards.
@@ -600,10 +608,10 @@ export default function StudySessions() {
       )}
 
       {phase === 'reviewing' && currentCard && (
-        <section className="space-y-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section className="space-y-5 rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Now reviewing</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-600 dark:text-indigo-400">Now reviewing</p>
               <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
                 {selectedDeck?.name || 'Selected deck'}
               </h2>
@@ -611,17 +619,17 @@ export default function StudySessions() {
                 Card {currentCardIndex + 1} of {cardsToReview.length}
               </p>
             </div>
-            <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
+            <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/6">
               <span className="font-semibold text-slate-900 dark:text-slate-100">{cardsCorrect}</span>
               <span className="text-slate-500 dark:text-slate-400"> correct / {cardsStudied} answered</span>
             </div>
           </div>
 
-          <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-            <div className="h-full bg-blue-600 transition-all" style={{ width: `${progressPercentage}%` }} />
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+            <div className="h-full bg-linear-to-r from-indigo-600 to-purple-600 transition-all" style={{ width: `${progressPercentage}%` }} />
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-950/70" aria-labelledby="current-card-heading">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/6 dark:bg-white/3" aria-labelledby="current-card-heading">
             <p id="current-card-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Front
             </p>
@@ -681,7 +689,7 @@ export default function StudySessions() {
         </section>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Session history</h2>
@@ -692,13 +700,13 @@ export default function StudySessions() {
 
         <div className="mt-5 space-y-3">
           {sessions.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-300">
+            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
               No saved Flashcard reviews yet.
             </p>
           ) : null}
 
           {sessions.map((item) => (
-            <article key={item.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+            <article key={item.id} className="rounded-xl border border-slate-200 dark:border-white/6 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">

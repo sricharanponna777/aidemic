@@ -1,0 +1,798 @@
+{
+  "aqa": {
+    "gcse": {
+      "biology": [
+        {
+          "name": "AQA GCSE Biology",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "AQA GCSE Chemistry",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "physics": [
+        {
+          "name": "AQA GCSE Physics",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "AQA GCSE Mathematics",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "english": [
+        {
+          "name": "AQA GCSE English Language"
+        },
+        {
+          "name": "AQA GCSE English Literature",
+          "options": [
+            "Macbeth",
+            "Romeo and Juliet",
+            "The Tempest",
+            "Much Ado About Nothing",
+            "A Christmas Carol",
+            "Dr Jekyll and Mr Hyde",
+            "Frankenstein",
+            "Pride and Prejudice",
+            "An Inspector Calls",
+            "Blood Brothers",
+            "DNA",
+            "Lord of the Flies",
+            "Animal Farm",
+            "Power and Conflict poetry",
+            "Love and Relationships poetry",
+            "Unseen poetry"
+          ]
+        }
+      ],
+      "history": [
+        {
+          "name": "AQA GCSE History",
+          "options": [
+            "Germany, 1890–1945: Democracy and dictatorship",
+            "Russia, 1894–1945: Tsardom and communism",
+            "America, 1840–1895: Expansion and consolidation",
+            "America, 1920–1973: Opportunity and inequality",
+            "Conflict and Tension: The First World War, 1894–1918",
+            "Conflict and Tension: The Inter-war Years, 1918–1939",
+            "Conflict and Tension Between East and West, 1945–1972",
+            "Conflict and Tension in Asia, 1950–1975",
+            "Britain: Health and the People c1000–present",
+            "Britain: Power and the People c1170–present",
+            "Britain: Migration, Empires and the People",
+            "Norman England, c1066–c1100",
+            "Medieval England: The Reign of Edward I, 1272–1307"
+          ]
+        }
+      ],
+      "geography": [
+        {
+          "name": "AQA GCSE Geography"
+        }
+      ],
+      "economics": [
+        {
+          "name": "AQA GCSE Economics"
+        }
+      ],
+      "psychology": [
+        {
+          "name": "AQA GCSE Psychology"
+        }
+      ],
+      "business": [
+        {
+          "name": "AQA GCSE Business"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "AQA GCSE Computer Science"
+        }
+      ],
+      "english language": [
+        {
+          "name": "AQA GCSE English Language"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "AQA GCSE English Literature",
+          "options": [
+            "Macbeth",
+            "Romeo and Juliet",
+            "The Tempest",
+            "Much Ado About Nothing",
+            "A Christmas Carol",
+            "Dr Jekyll and Mr Hyde",
+            "Frankenstein",
+            "Pride and Prejudice",
+            "An Inspector Calls",
+            "Blood Brothers",
+            "DNA",
+            "Lord of the Flies",
+            "Animal Farm",
+            "Power and Conflict poetry",
+            "Love and Relationships poetry",
+            "Unseen poetry"
+          ]
+        }
+      ]
+    },
+    "a-level": {
+      "biology": [
+        {
+          "name": "AQA A-Level Biology"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "AQA A-Level Chemistry"
+        }
+      ],
+      "physics": [
+        {
+          "name": "AQA A-Level Physics"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "AQA A-Level Mathematics"
+        }
+      ],
+      "english": [
+        {
+          "name": "AQA A-Level English Language"
+        },
+        {
+          "name": "AQA A-Level English Literature A",
+          "options": [
+            "Othello",
+            "The Great Gatsby",
+            "A Streetcar Named Desire",
+            "The Handmaid's Tale",
+            "Skirrid Hill",
+            "Songs of Innocence and Experience",
+            "Feminine Gospels",
+            "Modern Times anthology"
+          ]
+        },
+        {
+          "name": "AQA A-Level English Literature B",
+          "options": [
+            "King Lear",
+            "Hamlet",
+            "Macbeth",
+            "The Murder of Roger Ackroyd",
+            "Atonement",
+            "The Kite Runner",
+            "The Handmaid's Tale",
+            "Poetry anthology"
+          ]
+        }
+      ],
+      "history": [
+        {
+          "name": "AQA A-Level History",
+          "options": [
+            "1C – The Tudors: England, 1485–1603",
+            "1D – Stuart Britain and the Crisis of Monarchy, 1603–1702",
+            "1F – Industrialisation and the People: Britain, c1783–1885",
+            "1G – Challenge and Transformation: Britain, c1851–1964",
+            "1H – Tsarist and Communist Russia, 1855–1964",
+            "1J – The British Empire, c1857–1967",
+            "1K – The Making of a Superpower: USA, 1865–1975",
+            "1L – The Quest for Political Stability: Germany, 1871–1991",
+            "2K – International Relations and Global Conflict, c1890–1941",
+            "2M – Wars and Welfare: Britain in Transition, 1906–1957",
+            "2N – Revolution and Dictatorship: Russia, 1917–1953",
+            "2O – Democracy and Nazism: Germany, 1918–1945",
+            "2Q – The American Dream: Reality and Illusion, 1945–1980",
+            "2R – The Cold War, c1945–1991",
+            "2S – The Making of Modern Britain, 1951–2007"
+          ]
+        }
+      ],
+      "geography": [
+        {
+          "name": "AQA A-Level Geography"
+        }
+      ],
+      "economics": [
+        {
+          "name": "AQA A-Level Economics"
+        }
+      ],
+      "psychology": [
+        {
+          "name": "AQA A-Level Psychology"
+        }
+      ],
+      "business": [
+        {
+          "name": "AQA A-Level Business"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "AQA A-Level Computer Science"
+        }
+      ],
+      "english language": [
+        {
+          "name": "AQA A-Level English Language"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "AQA A-Level English Literature A",
+          "options": [
+            "Othello",
+            "The Great Gatsby",
+            "A Streetcar Named Desire",
+            "The Handmaid's Tale",
+            "Skirrid Hill",
+            "Songs of Innocence and Experience",
+            "Feminine Gospels",
+            "Modern Times anthology"
+          ]
+        },
+        {
+          "name": "AQA A-Level English Literature B",
+          "options": [
+            "King Lear",
+            "Hamlet",
+            "Macbeth",
+            "The Murder of Roger Ackroyd",
+            "Atonement",
+            "The Kite Runner",
+            "The Handmaid's Tale",
+            "Poetry anthology"
+          ]
+        }
+      ]
+    }
+  },
+  "edexcel": {
+    "gcse": {
+      "biology": [
+        {
+          "name": "Edexcel GCSE Biology",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "Edexcel GCSE Chemistry",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "physics": [
+        {
+          "name": "Edexcel GCSE Physics",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "Edexcel GCSE Mathematics",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "english": [
+        {
+          "name": "Edexcel GCSE English Language"
+        },
+        {
+          "name": "Edexcel GCSE English Literature",
+          "options": [
+            "Macbeth",
+            "Romeo and Juliet",
+            "The Merchant of Venice",
+            "A Christmas Carol",
+            "Dr Jekyll and Mr Hyde",
+            "Frankenstein",
+            "Pride and Prejudice",
+            "Great Expectations",
+            "An Inspector Calls",
+            "Blood Brothers",
+            "Journey's End",
+            "Animal Farm",
+            "Conflict poetry anthology",
+            "Relationships poetry anthology",
+            "Unseen poetry"
+          ]
+        }
+      ],
+      "history": [
+        {
+          "name": "Edexcel GCSE History",
+          "options": [
+            "Weimar and Nazi Germany, 1918–39",
+            "Russia and the Soviet Union, 1917–41",
+            "Mao's China, 1945–76",
+            "The USA, 1954–75: Conflict at Home and Abroad",
+            "Anglo-Saxon and Norman England, c1060–88",
+            "The Reigns of King Richard I and King John, 1189–1216",
+            "Henry VIII and His Ministers, 1509–40",
+            "Early Elizabethan England, 1558–88",
+            "The American West, c1835–c1895",
+            "Superpower Relations and the Cold War, 1941–91",
+            "Conflict in the Middle East, 1945–95",
+            "Crime and Punishment in Britain, c1000–present",
+            "Medicine in Britain, c1250–present",
+            "Warfare and British Society, c1250–present",
+            "Migrants in Britain, c800–present"
+          ]
+        }
+      ],
+      "geography": [
+        {
+          "name": "Edexcel GCSE Geography A"
+        },
+        {
+          "name": "Edexcel GCSE Geography B"
+        }
+      ],
+      "economics": [
+        {
+          "name": "Edexcel GCSE Economics"
+        }
+      ],
+      "psychology": [
+        {
+          "name": "Edexcel GCSE Psychology"
+        }
+      ],
+      "business": [
+        {
+          "name": "Edexcel GCSE Business"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "Edexcel GCSE Computer Science"
+        }
+      ],
+      "english language": [
+        {
+          "name": "Edexcel GCSE English Language"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "Edexcel GCSE English Literature",
+          "options": [
+            "Macbeth",
+            "Romeo and Juliet",
+            "The Merchant of Venice",
+            "A Christmas Carol",
+            "Dr Jekyll and Mr Hyde",
+            "Frankenstein",
+            "Pride and Prejudice",
+            "Great Expectations",
+            "An Inspector Calls",
+            "Blood Brothers",
+            "Journey's End",
+            "Animal Farm",
+            "Conflict poetry anthology",
+            "Relationships poetry anthology",
+            "Unseen poetry"
+          ]
+        }
+      ]
+    },
+    "a-level": {
+      "biology": [
+        {
+          "name": "Edexcel A-Level Biology A"
+        },
+        {
+          "name": "Edexcel A-Level Biology B"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "Edexcel A-Level Chemistry"
+        }
+      ],
+      "physics": [
+        {
+          "name": "Edexcel A-Level Physics"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "Edexcel A-Level Mathematics"
+        }
+      ],
+      "english": [
+        {
+          "name": "Edexcel A-Level English Language"
+        },
+        {
+          "name": "Edexcel A-Level English Language and Literature"
+        },
+        {
+          "name": "Edexcel A-Level English Literature",
+          "options": [
+            "Othello",
+            "Hamlet",
+            "A Streetcar Named Desire",
+            "The Great Gatsby",
+            "Beloved",
+            "Frankenstein",
+            "The Handmaid's Tale",
+            "Poems of the Decade",
+            "Selected poetry"
+          ]
+        }
+      ],
+      "history": [
+        {
+          "name": "Edexcel A-Level History",
+          "options": [
+            "1B – England 1509–1603: Authority, Nation and Religion",
+            "1C – Britain, 1625–1701: Conflict, Revolution and Settlement",
+            "1D – Britain, c1785–c1870: Democracy, Protest and Reform",
+            "1E – Russia, 1917–1991: From Lenin to Yeltsin",
+            "1F – In Search of the American Dream: The USA, c1917–1996",
+            "1G – Germany and West Germany, 1918–1989",
+            "1H – Britain Transformed, 1918–1997"
+          ]
+        }
+      ],
+      "geography": [
+        {
+          "name": "Edexcel A-Level Geography"
+        }
+      ],
+      "economics": [
+        {
+          "name": "Edexcel A-Level Economics A"
+        },
+        {
+          "name": "Edexcel A-Level Economics B"
+        }
+      ],
+      "psychology": [
+        {
+          "name": "Edexcel A-Level Psychology"
+        }
+      ],
+      "business": [
+        {
+          "name": "Edexcel A-Level Business"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "Edexcel A-Level Computer Science"
+        }
+      ],
+      "english language": [
+        {
+          "name": "Edexcel A-Level English Language"
+        },
+        {
+          "name": "Edexcel A-Level English Language and Literature"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "Edexcel A-Level English Literature",
+          "options": [
+            "Othello",
+            "Hamlet",
+            "A Streetcar Named Desire",
+            "The Great Gatsby",
+            "Beloved",
+            "Frankenstein",
+            "The Handmaid's Tale",
+            "Poems of the Decade",
+            "Selected poetry"
+          ]
+        }
+      ]
+    }
+  },
+  "ocr": {
+    "gcse": {
+      "biology": [
+        {
+          "name": "OCR GCSE Biology A (Gateway Science)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        },
+        {
+          "name": "OCR GCSE Biology B (Twenty First Century Science)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "OCR GCSE Chemistry A (Gateway Science)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        },
+        {
+          "name": "OCR GCSE Chemistry B (Twenty First Century Science)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "physics": [
+        {
+          "name": "OCR GCSE Physics A (Gateway Science)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        },
+        {
+          "name": "OCR GCSE Physics B (Twenty First Century Science)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "OCR GCSE Mathematics",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ]
+        }
+      ],
+      "english": [
+        {
+          "name": "OCR GCSE English Language"
+        },
+        {
+          "name": "OCR GCSE English Literature",
+          "options": [
+            "Macbeth",
+            "Romeo and Juliet",
+            "The Tempest",
+            "A Christmas Carol",
+            "Dr Jekyll and Mr Hyde",
+            "Pride and Prejudice",
+            "Great Expectations",
+            "An Inspector Calls",
+            "Journey's End",
+            "Anita and Me",
+            "Never Let Me Go",
+            "Conflict poetry anthology",
+            "Love and Relationships poetry",
+            "Unseen poetry"
+          ]
+        }
+      ],
+      "history": [
+        {
+          "name": "OCR GCSE History A (Explaining the Modern World)",
+          "options": [
+            "International Relations: The Changing International Order, 1918–c2001",
+            "Depth: China, 1950–1981: The People and the State",
+            "Depth: South Africa, 1960–1994: The People and the State",
+            "Depth: The USA, 1919–1948: The People and the State",
+            "Thematic: Migration to Britain, c1000–c2010",
+            "Thematic: Power – Monarchy and Democracy in Britain, c1000–2014",
+            "Thematic: War and British Society, c790–c2010"
+          ]
+        },
+        {
+          "name": "OCR GCSE History B (Schools History Project)",
+          "options": [
+            "Thematic: The People's Health, c1250–present",
+            "Thematic: Crime and Punishment, c1250–present",
+            "Depth: The Norman Conquest, 1065–1087",
+            "Depth: The Elizabethans, 1580–1603",
+            "Depth: Britain in Peace and War, 1900–1918"
+          ]
+        }
+      ],
+      "geography": [
+        {
+          "name": "OCR GCSE Geography A"
+        },
+        {
+          "name": "OCR GCSE Geography B"
+        }
+      ],
+      "economics": [],
+      "psychology": [
+        {
+          "name": "OCR GCSE Psychology"
+        }
+      ],
+      "business": [
+        {
+          "name": "OCR GCSE Business"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "OCR GCSE Computer Science"
+        }
+      ],
+      "english language": [
+        {
+          "name": "OCR GCSE English Language"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "OCR GCSE English Literature",
+          "options": [
+            "Macbeth",
+            "Romeo and Juliet",
+            "The Tempest",
+            "A Christmas Carol",
+            "Dr Jekyll and Mr Hyde",
+            "Pride and Prejudice",
+            "Great Expectations",
+            "An Inspector Calls",
+            "Journey's End",
+            "Anita and Me",
+            "Never Let Me Go",
+            "Conflict poetry anthology",
+            "Love and Relationships poetry",
+            "Unseen poetry"
+          ]
+        }
+      ]
+    },
+    "a-level": {
+      "biology": [
+        {
+          "name": "OCR A-Level Biology A"
+        },
+        {
+          "name": "OCR A-Level Biology B (Advancing Biology)"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "OCR A-Level Chemistry A"
+        },
+        {
+          "name": "OCR A-Level Chemistry B (Salters)"
+        }
+      ],
+      "physics": [
+        {
+          "name": "OCR A-Level Physics A"
+        },
+        {
+          "name": "OCR A-Level Physics B (Advancing Physics)"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "OCR A-Level Mathematics A"
+        },
+        {
+          "name": "OCR A-Level Mathematics B (MEI)"
+        }
+      ],
+      "english": [
+        {
+          "name": "OCR A-Level English Language"
+        },
+        {
+          "name": "OCR A-Level English Literature",
+          "options": [
+            "Hamlet",
+            "The Tempest",
+            "The Duchess of Malfi",
+            "A Doll's House",
+            "The Great Gatsby",
+            "The Handmaid's Tale",
+            "Christina Rossetti poetry",
+            "The Bloody Chamber"
+          ]
+        }
+      ],
+      "history": [
+        {
+          "name": "OCR A-Level History",
+          "options": [
+            "Y101 – Alfred and the Making of England, 871–1016",
+            "Y105 – England 1455–1509: Lancastrians, Yorkists and Henry VII",
+            "Y106 – England 1485–1558: The Early Tudors",
+            "Y107 – England 1547–1603: The Later Tudors",
+            "Y112 – Britain 1900–1951",
+            "Y113 – Britain c1930–1997"
+          ]
+        }
+      ],
+      "geography": [
+        {
+          "name": "OCR A-Level Geography"
+        }
+      ],
+      "economics": [
+        {
+          "name": "OCR A-Level Economics"
+        }
+      ],
+      "psychology": [
+        {
+          "name": "OCR A-Level Psychology"
+        }
+      ],
+      "business": [
+        {
+          "name": "OCR A-Level Business"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "OCR A-Level Computer Science"
+        }
+      ],
+      "english language": [
+        {
+          "name": "OCR A-Level English Language"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "OCR A-Level English Literature",
+          "options": [
+            "Hamlet",
+            "The Tempest",
+            "The Duchess of Malfi",
+            "A Doll's House",
+            "The Great Gatsby",
+            "The Handmaid's Tale",
+            "Christina Rossetti poetry",
+            "The Bloody Chamber"
+          ]
+        }
+      ]
+    }
+  }
+}

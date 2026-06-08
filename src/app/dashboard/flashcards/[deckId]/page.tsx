@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag, FlashcardTagMapping } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -23,6 +24,7 @@ export default function DeckPage() {
   const [newBack, setNewBack] = useState('');
   const [newTag, setNewTag] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showAddCard, setShowAddCard] = useState(false);
   const [activeFilterTagId, setActiveFilterTagId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [status, setStatus] = useState('');
@@ -124,6 +126,7 @@ export default function DeckPage() {
     setNewBack('');
     setSelectedTags([]);
     setStatus('Card added.');
+    setShowAddCard(false);
     const nextCount = (deck?.card_count || 0) + 1;
     setDeck((prev) => (prev ? { ...prev, card_count: nextCount } : prev));
     await supabase.from('flashcard_decks').update({ card_count: nextCount }).eq('id', deckId);
@@ -245,18 +248,26 @@ export default function DeckPage() {
 
   return (
     <main className="space-y-7" aria-labelledby="deck-page-title">
-      <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
-        <h1 id="deck-page-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
-        {deck.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{deck.description}</p> : null}
+      <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-white/6 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 id="deck-page-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
+            {deck.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{deck.description}</p> : null}
+          </div>
+          <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'secondary' })}>
+            <ArrowLeft className="h-4 w-4" />
+            Back to decks
+          </Link>
+        </div>
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">{deck.card_count || cards.length} cards</span>
-          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">{dueCards} due now</span>
-          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-slate-900 dark:text-slate-200">{tags.length} tags</span>
+          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-[#131B2E] dark:text-slate-200">{deck.card_count || cards.length} cards</span>
+          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-[#131B2E] dark:text-slate-200">{dueCards} due now</span>
+          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-[#131B2E] dark:text-slate-200">{tags.length} tags</span>
           {deck.ai_generated ? <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-900/45 dark:text-blue-200">AI deck</span> : null}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Tags</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
@@ -266,7 +277,7 @@ export default function DeckPage() {
               className: `${
                 !activeFilterTagId
                   ? 'bg-slate-900 text-white dark:bg-blue-600'
-                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
+                  : 'bg-slate-100 text-slate-700 dark:bg-white/8 dark:text-slate-200'
               }`,
             })}
             onClick={() => setActiveFilterTagId('')}
@@ -299,7 +310,7 @@ export default function DeckPage() {
             onChange={(event) => setNewTag(event.target.value)}
             placeholder="Create a new tag"
             aria-label="New tag name"
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
           />
           <button onClick={handleAddTag} className={buttonStyles({ variant: 'primary' })}>
             <Tag className="h-4 w-4" />
@@ -308,88 +319,43 @@ export default function DeckPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Add Card (Anki-style editor)</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Use formatting shortcuts, cloze syntax, and preview before saving.</p>
-
-        <div className="mt-4 space-y-4">
-          <RichTextEditor
-            value={newFront}
-            onChange={setNewFront}
-            label="Front"
-            placeholder="Question, prompt, or cue..."
-            minHeightClassName="min-h-[140px]"
-          />
-          <RichTextEditor
-            value={newBack}
-            onChange={setNewBack}
-            label="Back"
-            placeholder="Answer, explanation, or mnemonic..."
-            minHeightClassName="min-h-[180px]"
-          />
-
-          <div>
-            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Attach tags</p>
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => {
-                const selected = selectedTags.includes(tag.id);
-                return (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedTags((prev) => (selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]))
-                    }
-                    className={buttonStyles({
-                      variant: 'plain',
-                      size: 'chip',
-                      className: 'border',
-                    })}
-                    style={{
-                      borderColor: tag.color || '#2563eb',
-                      color: selected ? '#ffffff' : tag.color || '#2563eb',
-                      backgroundColor: selected ? tag.color || '#2563eb' : 'transparent',
-                    }}
-                  >
-                    {selected ? <X className="mr-1 inline h-3 w-3" /> : <Plus className="mr-1 inline h-3 w-3" />}
-                    {tag.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button onClick={handleAddCard} className={buttonStyles({ variant: 'primary' })}>
-            <Plus className="h-4 w-4" />
-            Add card
-          </button>
-          {status ? (
-            <p role="status" aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">
-              {status}
-            </p>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Cards ({filteredCards.length})</h2>
-          <div className="relative w-full max-w-sm">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search card text..."
-              aria-label="Search cards"
-              className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-            />
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setStatus('');
+                setShowAddCard(true);
+              }}
+              className={buttonStyles({ variant: 'primary' })}
+            >
+              <Plus className="h-4 w-4" />
+              Add card
+            </button>
+            <div className="relative min-w-56 flex-1 sm:w-72 sm:flex-none">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search card text..."
+                aria-label="Search cards"
+                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+              />
+            </div>
           </div>
         </div>
+        {status ? (
+          <p role="status" aria-live="polite" className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+            {status}
+          </p>
+        ) : null}
 
         {filteredCards.length > 0 ? (
           <div className="mt-5 grid gap-3">
             {filteredCards.map((card) => (
-              <article key={card.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/70">
+              <article key={card.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/6 dark:bg-[#0A0F1E]/70">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Front</p>
@@ -449,6 +415,118 @@ export default function DeckPage() {
         )}
       </section>
 
+      {showAddCard ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+          <style>{`
+            @keyframes deck-modal-backdrop-in {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes deck-modal-panel-in {
+              from { opacity: 0; transform: scale(0.94) translateY(10px); }
+              to { opacity: 1; transform: scale(1) translateY(0); }
+            }
+          `}</style>
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setShowAddCard(false)}
+            style={{ animation: 'deck-modal-backdrop-in 160ms ease-out both' }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-card-heading"
+            className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/6 dark:bg-[#131B2E]"
+            style={{ animation: 'deck-modal-panel-in 190ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="add-card-heading" className="text-xl font-semibold text-slate-900 dark:text-slate-100">Add Card</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Use formatting shortcuts, cloze syntax, and preview before saving.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddCard(false)}
+                className={buttonStyles({ variant: 'ghost', size: 'icon' })}
+                aria-label="Close add card dialog"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <RichTextEditor
+                value={newFront}
+                onChange={setNewFront}
+                label="Front"
+                placeholder="Question, prompt, or cue..."
+                minHeightClassName="min-h-[140px]"
+              />
+              <RichTextEditor
+                value={newBack}
+                onChange={setNewBack}
+                label="Back"
+                placeholder="Answer, explanation, or mnemonic..."
+                minHeightClassName="min-h-[180px]"
+              />
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Attach tags</p>
+                <div className="flex flex-wrap gap-2">
+                  {tags.length > 0 ? tags.map((tag) => {
+                    const selected = selectedTags.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedTags((prev) => (selected ? prev.filter((id) => id !== tag.id) : [...prev, tag.id]))
+                        }
+                        className={buttonStyles({
+                          variant: 'plain',
+                          size: 'chip',
+                          className: 'border',
+                        })}
+                        style={{
+                          borderColor: tag.color || '#2563eb',
+                          color: selected ? '#ffffff' : tag.color || '#2563eb',
+                          backgroundColor: selected ? tag.color || '#2563eb' : 'transparent',
+                        }}
+                      >
+                        {selected ? <X className="mr-1 inline h-3 w-3" /> : <Plus className="mr-1 inline h-3 w-3" />}
+                        {tag.name}
+                      </button>
+                    );
+                  }) : (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No tags yet.</p>
+                  )}
+                </div>
+              </div>
+
+              {status ? (
+                <p role="status" aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">
+                  {status}
+                </p>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCard(false)}
+                  className={buttonStyles({ variant: 'secondary' })}
+                >
+                  Cancel
+                </button>
+                <button type="button" onClick={handleAddCard} className={buttonStyles({ variant: 'primary' })}>
+                  <Plus className="h-4 w-4" />
+                  Add card
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {editingCard ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50" onClick={handleCancelEdit} />
@@ -456,7 +534,7 @@ export default function DeckPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-card-heading"
-            className="relative z-10 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            className="relative z-10 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/6 dark:bg-[#131B2E]"
           >
             <h2 id="edit-card-heading" className="text-xl font-semibold text-slate-900 dark:text-slate-100">Edit Card</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Update the card content and tags.</p>

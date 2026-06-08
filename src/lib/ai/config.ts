@@ -17,8 +17,11 @@ export const getAIConfig = () => {
   const isOpenRouter = /openrouter\.ai/i.test(baseUrl);
   const openRouterSiteUrl = txt(process.env.OPENROUTER_SITE_URL || '', 200);
   const openRouterAppName = txt(process.env.OPENROUTER_APP_NAME || '', 100);
+  const isGemini = /gemini/i.test(model);
+  // Models known to support strict json_schema response_format
+  const supportsJsonSchema = isOpenAIHosted || isGemini;
 
-  return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName };
+  return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName, isGemini, supportsJsonSchema };
 };
 
 export const buildAIHeaders = (config: AIConfig) => {

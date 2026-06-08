@@ -27,17 +27,34 @@ export default function LoginPage() {
       const supabase = createClient();
 
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
+            emailRedirectTo: `${origin}/auth/callback?next=/onboarding`,
           },
         });
         if (error) {
           throw new Error(error.message);
         }
         setError('✅ Check your email to confirm your account');
+        if (data.session) {
+          try {
+            await fetch('/api/auth', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token,
+              }),
+            });
+          } catch (syncErr) {
+            console.error('Failed to sync new signup session:', syncErr);
+          }
+          router.push('/onboarding');
+          return;
+        }
         setEmail('');
         setPassword('');
       } else {

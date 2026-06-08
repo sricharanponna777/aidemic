@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -14,44 +14,35 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
+import { SearchSelect } from '@/components/SearchSelect';
+import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
+import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
+import { useUserSubjects } from '@/hooks/useUserSubjects';
+import {
+  buildLiteratureCreationOption,
+  getPoetryClusterPoems,
+  getQualificationTopicError,
+  getMajorTopicsForSubject,
+  isAllowedQualificationTopic,
+  isPoetryCluster,
+} from '@/lib/ai/majorTopics';
+import {
+  getCreationOptionChoices,
+  getCreationOptionLabel,
+  getExamBoardLabel,
+  getExamTypeLabel,
+  getSubjectLabel,
+  isSubjectSpecComplete,
+} from '@/lib/ai/subjectConfig';
+import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 
 const MIN_CARDS = 6;
 const MAX_CARDS = 40;
 
-const SUPPORTED_SUBJECTS = [
-  'biology',
-  'chemistry',
-  'physics',
-  'mathematics',
-  'english',
-  'history',
-  'geography',
-  'economics',
-  'psychology',
-  'business',
-  'computer science',
-] as const;
-
-type SupportedSubject = (typeof SUPPORTED_SUBJECTS)[number];
-type ExamBoard = 'aqa' | 'edexcel' | 'ocr';
-type ExamType = 'gcse' | 'a-level';
 type StatusTone = 'success' | 'error' | 'info';
 type CardStyle = 'balanced' | 'definitions' | 'exam' | 'mistakes';
 
-const SUBJECT_LABELS: Record<SupportedSubject, string> = {
-  biology: 'Biology',
-  chemistry: 'Chemistry',
-  physics: 'Physics',
-  mathematics: 'Mathematics',
-  english: 'English',
-  history: 'History',
-  geography: 'Geography',
-  economics: 'Economics',
-  psychology: 'Psychology',
-  business: 'Business',
-  'computer science': 'Computer Science',
-};
 
 const CARD_STYLES: Array<{ id: CardStyle; label: string; description: string; prompt: string }> = [
   {
@@ -99,31 +90,47 @@ export default function AIFlashcardsPage() {
   const [deckName, setDeckName] = useState('');
   const [topic, setTopic] = useState('');
   const [description, setDescription] = useState('');
-  const [subject, setSubject] = useState<SupportedSubject>('biology');
-  const [examBoard, setExamBoard] = useState<ExamBoard>('aqa');
-  const [examType, setExamType] = useState<ExamType>('gcse');
-  const [specification, setSpecification] = useState('');
+  const [specOption, setSpecOption] = useState('');
+  const [poemOne, setPoemOne] = useState('');
+  const [poemTwo, setPoemTwo] = useState('');
   const [cardStyle, setCardStyle] = useState<CardStyle>('balanced');
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [cardCount, setCardCount] = useState(12);
   const [status, setStatus] = useState<{ tone: StatusTone; text: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const { subjects: userSubjects, isLoading: subjectsLoading, error: subjectsError } = useUserSubjects();
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+
+  const effectiveSubjectId = selectedSubjectId || userSubjects[0]?.id || '';
+  const selectedSubject = userSubjects.find((item) => item.id === effectiveSubjectId) ?? null;
+  const creationOptions = getCreationOptionChoices(selectedSubject);
+  const creationOptionLabel = getCreationOptionLabel(selectedSubject);
+  const poetryPoems = getPoetryClusterPoems(specOption);
+  const isSelectedPoetryCluster = isPoetryCluster(specOption);
+  const effectiveCreationOption = buildLiteratureCreationOption(specOption, poemOne, poemTwo);
+  const topicSuggestions = getMajorTopicsForSubject(selectedSubject, specOption, poemOne, poemTwo);
+  const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
 
   const safeCardCount = clampCardCount(cardCount);
   const topicIsReady = topic.trim().length >= 3;
-  const canGenerate = topicIsReady && !isGenerating;
+  const topicIsAllowed = !topic.trim() || isAllowedQualificationTopic(topic, topicSuggestions);
+  const poetrySelectionComplete = !isSelectedPoetryCluster || !!poemOne;
+  const canGenerate = topicIsReady && topicIsAllowed && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
+  const validationMessage = subjectsError
+    || (!selectedSubject ? 'Choose one of your saved subjects to generate.' : '')
+    || (!subjectSpecComplete ? 'Update this subject on the Subjects page with its specification and tier.' : '')
+    || (!poetrySelectionComplete ? 'Choose the first poem for this poetry cluster.' : '')
+    || (!topicIsReady ? 'Add a topic to generate.' : '')
+    || (!topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
 
-  const summaryRows = useMemo(
-    () => [
-      { label: 'Deck', value: deckName.trim() || 'AI-generated name' },
-      { label: 'Topic', value: topic.trim() || 'Add a topic' },
-      { label: 'Subject', value: SUBJECT_LABELS[subject] },
-      { label: 'Level', value: `${examBoard.toUpperCase()} ${examType === 'gcse' ? 'GCSE' : 'A-Level'}` },
-      { label: 'Cards', value: `${safeCardCount}` },
-      { label: 'Style', value: CARD_STYLES.find((style) => style.id === cardStyle)?.label || 'Balanced deck' },
-    ],
-    [cardStyle, deckName, examBoard, examType, safeCardCount, subject, topic]
-  );
+  const summaryRows = [
+    { label: 'Deck', value: deckName.trim() || 'AI-generated name' },
+    { label: 'Topic', value: topic.trim() || 'Add a topic' },
+    { label: 'Subject', value: selectedSubject ? getSubjectLabel(selectedSubject.subject) : 'Choose subject' },
+    { label: 'Level', value: selectedSubject ? `${getExamBoardLabel(selectedSubject.exam_board)} ${getExamTypeLabel(selectedSubject.exam_type)}` : '--' },
+    { label: 'Cards', value: `${safeCardCount}` },
+    { label: 'Style', value: CARD_STYLES.find((style) => style.id === cardStyle)?.label || 'Balanced deck' },
+  ];
 
   const applyCardStyle = (styleId: CardStyle) => {
     const style = CARD_STYLES.find((item) => item.id === styleId);
@@ -139,6 +146,35 @@ export default function AIFlashcardsPage() {
       setStatus({ tone: 'error', text: 'Add a topic with at least 3 characters.' });
       return;
     }
+    if (!selectedSubject) {
+      setStatus({ tone: 'error', text: 'Choose one of your saved subjects before generating flashcards.' });
+      return;
+    }
+    if (!subjectSpecComplete) {
+      setStatus({ tone: 'error', text: 'Update this subject on the Subjects page with its specification and tier before generating flashcards.' });
+      return;
+    }
+    if (!poetrySelectionComplete) {
+      setStatus(null);
+      return;
+    }
+    const topicError = getQualificationTopicError(topic.trim(), topicSuggestions);
+    if (topicError) {
+      setStatus(null);
+      return;
+    }
+    const specification = getSelectedSpecLabel(selectedSubject, effectiveCreationOption);
+    const relevanceError = getTopicRelevanceError({
+      topic: topic.trim(),
+      subject: selectedSubject.subject,
+      examBoard: selectedSubject.exam_board,
+      examType: selectedSubject.exam_type,
+      specification,
+    });
+    if (relevanceError) {
+      setStatus({ tone: 'error', text: relevanceError });
+      return;
+    }
     setIsGenerating(true);
     setStatus({ tone: 'info', text: 'Generating the deck...' });
 
@@ -150,10 +186,10 @@ export default function AIFlashcardsPage() {
           name: deckName.trim() || undefined,
           description: description.trim(),
           topic: topic.trim(),
-          subject,
-          examBoard,
-          examType,
-          specification: specification.trim(),
+          subject: selectedSubject.subject,
+          examBoard: selectedSubject.exam_board,
+          examType: selectedSubject.exam_type,
+          specification,
           prompt: prompt.trim(),
           cardCount: safeCardCount,
         }),
@@ -181,14 +217,14 @@ export default function AIFlashcardsPage() {
 
   return (
     <main className="space-y-7" aria-labelledby="ai-flashcards-title">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-700 dark:text-blue-300">Step 2 of 4</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 3 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <Sparkles className="h-7 w-7 text-blue-600 dark:text-blue-400" />
-              <h1 id="ai-flashcards-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                AI Flashcard Builder
+              <Sparkles className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+              <h1 id="ai-flashcards-title" className="text-3xl font-bold text-slate-900 dark:text-white">
+                Flashcards
               </h1>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
@@ -196,6 +232,13 @@ export default function AIFlashcardsPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/dashboard"
+              className={buttonStyles({ variant: 'ghost' })}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Dashboard
+            </Link>
             <Link
               href="/dashboard/flashcards"
               className={buttonStyles({ variant: 'secondary' })}
@@ -208,20 +251,20 @@ export default function AIFlashcardsPage() {
               className={buttonStyles({ variant: 'primary' })}
             >
               <Brain className="h-4 w-4" />
-              Next: Flashcard reviews
+              Next: Flashcard Revision
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
       </section>
 
-      {status ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassNames[status.tone]}`}>{status.text}</div> : null}
+      {status && !validationMessage ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassNames[status.tone]}`}>{status.text}</div> : null}
 
       <form onSubmit={handleGenerate} className="grid gap-5 xl:grid-cols-[1fr_0.58fr]">
-        <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section className="space-y-5 rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
           <div>
             <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <Layers className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Deck setup</h2>
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -231,86 +274,111 @@ export default function AIFlashcardsPage() {
                   value={deckName}
                   onChange={(event) => setDeckName(event.target.value)}
                   placeholder="e.g. Cell Biology Recall"
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
                 />
               </label>
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Topic
-                <input
-                  value={topic}
-                  onChange={(event) => setTopic(event.target.value)}
-                  placeholder="e.g. Plant respiration"
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-                />
-              </label>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 lg:col-span-2">
                 Deck focus <span className="font-normal text-slate-400">(optional)</span>
                 <input
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="e.g. Core definitions and calculation traps"
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
                 />
               </label>
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-5 dark:border-slate-700">
+          <div className="border-t border-slate-200 pt-5 dark:border-white/6">
             <div className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Exam focus</h2>
             </div>
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Subject
-                <select
-                  value={subject}
-                  onChange={(event) => setSubject(event.target.value as SupportedSubject)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-                >
-                  {SUPPORTED_SUBJECTS.map((item) => (
-                    <option key={item} value={item}>
-                      {SUBJECT_LABELS[item]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Exam board
-                <select
-                  value={examBoard}
-                  onChange={(event) => setExamBoard(event.target.value as ExamBoard)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-                >
-                  <option value="aqa">AQA</option>
-                  <option value="edexcel">Edexcel</option>
-                  <option value="ocr">OCR</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Level
-                <select
-                  value={examType}
-                  onChange={(event) => setExamType(event.target.value as ExamType)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-                >
-                  <option value="gcse">GCSE</option>
-                  <option value="a-level">A-Level</option>
-                </select>
-              </label>
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 lg:col-span-3">
-                Specification focus <span className="font-normal text-slate-400">(optional)</span>
-                <input
-                  value={specification}
-                  onChange={(event) => setSpecification(event.target.value)}
-                  placeholder="e.g. AQA Combined Science Trilogy, Paper 1"
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+            <div className="mt-4">
+              <SubjectSpecSelector
+                subjects={userSubjects}
+                isLoading={subjectsLoading}
+                selectedSubjectId={effectiveSubjectId}
+                onSubjectChange={(id) => {
+                  setSelectedSubjectId(id);
+                  setSpecOption('');
+                  setPoemOne('');
+                  setPoemTwo('');
+                  setTopic('');
+                }}
+              />
+              {creationOptions.length > 0 ? (
+                <SearchSelect
+                  label={creationOptionLabel}
+                  value={specOption}
+                  onChange={(value) => {
+                      setSpecOption(value);
+                      setPoemOne('');
+                      setPoemTwo('');
+                      setTopic('');
+                  }}
+                  options={[
+                    { value: '', label: `Any ${creationOptionLabel.toLowerCase()}` },
+                    ...creationOptions.map((option) => ({ value: option, label: option })),
+                  ]}
+                  placeholder={`Search ${creationOptionLabel.toLowerCase()}...`}
+                  className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300"
                 />
-              </label>
+              ) : null}
+              {isSelectedPoetryCluster ? (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    First poem
+                    <select
+                      value={poemOne}
+                      onChange={(event) => {
+                        setPoemOne(event.target.value);
+                        setTopic('');
+                        if (event.target.value === poemTwo) setPoemTwo('');
+                      }}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                    >
+                      <option value="">Select first poem</option>
+                      {poetryPoems.map((poem) => (
+                        <option key={poem} value={poem}>{poem}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Second poem <span className="font-normal text-slate-400">(optional)</span>
+                    <select
+                      value={poemTwo}
+                      onChange={(event) => {
+                        setPoemTwo(event.target.value);
+                        setTopic('');
+                      }}
+                      disabled={!poemOne}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100 dark:disabled:bg-white/5"
+                    >
+                      <option value="">No comparison poem</option>
+                      {poetryPoems.filter((poem) => poem !== poemOne).map((poem) => (
+                        <option key={poem} value={poem}>{poem}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+              <TopicInput
+                label="Topic"
+                value={topic}
+                onChange={(value) => {
+                  setTopic(value);
+                  setStatus(null);
+                }}
+                suggestions={topicSuggestions}
+                isValidSelection={topicIsAllowed}
+                placeholder="Start typing a topic from this qualification"
+                className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              />
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-5 dark:border-slate-700">
+          <div className="border-t border-slate-200 pt-5 dark:border-white/6">
             <div className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5 text-violet-600 dark:text-violet-400" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Card style</h2>
@@ -328,8 +396,8 @@ export default function AIFlashcardsPage() {
                       size: 'none',
                       className: `justify-start rounded-lg border p-4 text-left ${
                         selected
-                          ? 'border-blue-500 bg-blue-50 text-blue-950 dark:bg-blue-950/45 dark:text-blue-100'
-                          : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800'
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-500/10 dark:text-indigo-100'
+                          : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10'
                       }`,
                     })}
                   >
@@ -344,7 +412,7 @@ export default function AIFlashcardsPage() {
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-5 dark:border-slate-700">
+          <div className="border-t border-slate-200 pt-5 dark:border-white/6">
             <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Flashcard count
@@ -364,16 +432,16 @@ export default function AIFlashcardsPage() {
                 max={MAX_CARDS}
                 value={safeCardCount}
                 onChange={(event) => setCardCount(Number(event.target.value))}
-                className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
               />
             </div>
           </div>
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <Sparkles className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <h2 className="font-semibold text-slate-900 dark:text-slate-100">Generation summary</h2>
             </div>
             <dl className="mt-4 space-y-3">
@@ -392,8 +460,10 @@ export default function AIFlashcardsPage() {
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {isGenerating ? 'Generating deck...' : 'Generate deck'}
             </button>
-            {!topicIsReady ? (
-              <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">Add a topic to generate.</p>
+            {validationMessage ? (
+              <p className={`mt-3 text-xs ${subjectsError ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'}`}>
+                {validationMessage}
+              </p>
             ) : null}
           </section>
         </aside>

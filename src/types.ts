@@ -89,6 +89,25 @@ export interface StudySessionResult {
   created_at?: string;
 }
 
+export interface ExamPracticeAttempt {
+  id: string;
+  user_id: string;
+  subject: string;
+  exam_board: string;
+  exam_type: 'gcse' | 'a-level' | string;
+  topic: string;
+  total_marks_awarded: number;
+  total_available_marks: number;
+  percentage: number;
+  predicted_grade: string;
+  weakness_tags: string[];
+  weakness_analysis: string[];
+  questions_payload?: unknown[];
+  answers_payload?: string[];
+  marking_report?: unknown;
+  created_at?: string;
+}
+
 export interface UserStatistics {
   id: string;
   user_id: string;

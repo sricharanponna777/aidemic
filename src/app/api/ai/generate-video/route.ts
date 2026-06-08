@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
+import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { LATEX_COMMAND_PATTERN, normalizeLatexControlCharacters } from '@/lib/mathText';
 
-type SlideshowPayload = {
+type NotesPayload = {
   flashcardId?: string;
   concept: string;
   subject: string;
   duration?: '30' | '60' | '120';
   examBoard?: string;
   examType?: string;
-  mode?: 'notes' | 'slideshow';
+  specification?: string;
+  mode?: 'notes';
 };
 
 const SLIDES_PER_DURATION: Record<string, number> = { '30': 5, '60': 10, '120': 20 };
@@ -53,11 +56,30 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body: SlideshowPayload = await request.json();
-    const { concept, subject, duration = '60', flashcardId, examBoard, examType, mode = 'slideshow' } = body;
+    const body: NotesPayload = await request.json();
+    const { concept, subject, duration = '120', flashcardId, examBoard, examType, specification, mode = 'notes' } = body;
+
+    if (mode !== 'notes') {
+      return NextResponse.json({ error: 'Only study notes generation is supported.' }, { status: 400 });
+    }
 
     if (!concept || !subject) {
       return NextResponse.json({ error: 'Concept and subject are required' }, { status: 400 });
+    }
+    const allowedTopics = getMajorTopicsForQualification({ subject, examBoard, examType, specification });
+    const topicError = getQualificationTopicError(concept, allowedTopics);
+    if (topicError) {
+      return NextResponse.json({ error: topicError }, { status: 400 });
+    }
+    const relevanceError = getTopicRelevanceError({
+      topic: concept,
+      subject,
+      examBoard,
+      examType,
+      specification,
+    });
+    if (relevanceError) {
+      return NextResponse.json({ error: relevanceError }, { status: 400 });
     }
 
     const supabase = await createClient();
@@ -66,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { script, slides } = await generateSlides(concept, subject, duration, examBoard, examType, mode);
+    const { script, slides } = await generateNotes(concept, subject, duration, examBoard, examType, specification);
 
     const { data, error } = await supabase
       .from('generated_videos')
@@ -75,7 +97,7 @@ export async function POST(request: Request) {
         flashcard_id: flashcardId ?? null,
         concept,
         subject,
-        style: mode === 'notes' ? 'study-notes' : 'text-slides',
+        style: 'study-notes',
         duration: parseInt(duration, 10),
         service_used: 'ai-compatible',
         status: 'completed',
@@ -106,13 +128,13 @@ export async function POST(request: Request) {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-async function generateSlides(
+async function generateNotes(
   concept: string,
   subject: string,
   duration: string,
   examBoard?: string,
   examType?: string,
-  mode: 'notes' | 'slideshow' = 'slideshow',
+  specification?: string,
 ): Promise<{ script: string; slides: string[] }> {
   const config = getAIConfig();
   const missingKeyError = getMissingHostedKeyError(config);
@@ -129,11 +151,17 @@ async function generateSlides(
     ? `Level: ${examType}.`
     : '';
   const examContext = [boardContext, levelContext].filter(Boolean).join(' ');
+  const specContext = specification ? `Specification: ${specification}.` : '';
+  const courseContext = [examContext, specContext].filter(Boolean).join(' ');
 
-  const instruction =
-    mode === 'notes'
-      ? `Create study notes about "${concept}" in ${subject}.
-Depth: ${complexity}. Target reading time: ~${seconds} seconds total.${examContext ? `\n${examContext} Tailor the depth, terminology, and examples to match what students at this level need for this exam board.` : ''}
+  const instruction = `Create study notes about "${concept}" in ${subject}.
+Depth: ${complexity}. Target reading time: ~${seconds} seconds total.${courseContext ? `\n${courseContext}` : ''}
+
+Before writing, internally identify the exact qualification/specification being studied and check whether "${concept}" belongs on that specification.
+Use the selected exam board, qualification level, specification, tier, option, text, or topic focus as hard constraints.
+Only include content that is assessable for that course. Do not import topics from another board, another qualification level, or a different option route.
+For example, do not treat a topic as universal just because it appears in another exam board's course.
+Align terminology, examples, case studies, set texts, and required depth with the selected specification.
 
 Return ONLY valid JSON with this exact shape:
 {
@@ -144,26 +172,9 @@ Return ONLY valid JSON with this exact shape:
 
 Write the script as notes a student can revise from, not narration. Keep it accurate, direct, and easy to scan.
 Use Markdown only inside JSON string values. Do not use raw HTML.
-Every math expression must be wrapped for rendering: use \\\\(...\\\\) for inline math and \\\\[...\\\\] for display math. Do not leave bare LaTeX in prose.
-Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\\\(\\\\binom{7}{4}a^{3}b^{4}\\\\), \\\\(\\\\frac{1}{2}\\\\), \\\\(\\\\text{det}(A)\\\\), and \\\\[A = \\\\begin{pmatrix} a & b \\\\\\\\ c & d \\\\end{pmatrix}\\\\].
-For matrices, use one clean display equation such as \\\\[ A = \\\\begin{pmatrix} a & b \\\\\\\\ c & d \\\\end{pmatrix} \\\\].
-Never add blank rows or trailing row separators inside a matrix. Write inverses as $A^{-1}$, not A-1.
-Do NOT include any text outside the JSON.`
-      : `Create a ${slideCount}-slide educational slideshow about "${concept}" in ${subject}.
-Complexity: ${complexity}. Target reading time: ~${seconds} seconds total.${examContext ? `\n${examContext} Tailor the depth, terminology, and examples to match what students at this level need for this exam board.` : ''}
-
-Return ONLY valid JSON with this exact shape:
-{
-  "script": "<GitHub-flavored Markdown narration notes, conversational and vivid, ~${seconds} seconds when read aloud>",
-  "slides": [${Array.from({ length: slideCount }, (_, i) => `\n    "<slide ${i + 1} text: 2-3 sentences>"`).join(',')}
-  ]
-}
-
-Structure the slides to flow logically: open with a hook, build through the core concept and key details, apply it concretely, then close with a summary.
-Each slide is a short standalone paragraph a student reads on screen. Slides may use **bold** for key terms and \\\\(...\\\\) for inline math, but avoid large headings inside slides.
-Use Markdown only inside JSON string values. Do not use raw HTML.
-Every math expression must be wrapped for rendering: use \\\\(...\\\\) for inline math and \\\\[...\\\\] for display math. Do not leave bare LaTeX in prose.
-Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\\\(\\\\binom{7}{4}a^{3}b^{4}\\\\), \\\\(\\\\frac{1}{2}\\\\), \\\\(\\\\text{det}(A)\\\\), and \\\\[A = \\\\begin{pmatrix} a & b \\\\\\\\ c & d \\\\end{pmatrix}\\\\].
+Every math expression must be wrapped for rendering: use \\(...\\) for inline math and \\[...\\] for display math. Do not leave bare LaTeX in prose.
+Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\(\\binom{7}{4}a^{3}b^{4}\\), \\(\\frac{1}{2}\\), \\(\\text{det}(A)\\), and \\[A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\\].
+For matrices, use one clean display equation such as \\[ A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\].
 Never add blank rows or trailing row separators inside a matrix. Write inverses as $A^{-1}$, not A-1.
 Do NOT include any text outside the JSON.`;
 
@@ -187,7 +198,9 @@ Do NOT include any text outside the JSON.`;
   }
 
   const data = await response.json() as { choices: { message: { content: string } }[] };
-  const parsed = parseGeneratedContent(data.choices[0].message.content) as {
+  const rawContent = data.choices[0].message.content;
+  console.info('[generate-notes] Raw AI output', rawContent);
+  const parsed = parseGeneratedContent(rawContent) as {
     script: string;
     slides: string[];
   };
@@ -202,7 +215,7 @@ function parseGeneratedContent(content: string) {
   try {
     return JSON.parse(content) as unknown;
   } catch {
-    const escapedLatex = escapeLooseLatexBackslashes(content);
+    const escapedLatex = escapeInvalidJsonBackslashes(escapeLooseLatexBackslashes(content));
     return JSON.parse(escapedLatex) as unknown;
   }
 }
@@ -210,6 +223,34 @@ function parseGeneratedContent(content: string) {
 function escapeLooseLatexBackslashes(content: string) {
   const pattern = new RegExp(`(^|[^\\\\])\\\\(?=${LATEX_COMMAND_PATTERN}\\b)`, 'g');
   return content.replace(pattern, (_match, prefix: string) => `${prefix}\\\\`);
+}
+
+function escapeInvalidJsonBackslashes(content: string): string {
+  let result = '';
+  let i = 0;
+  while (i < content.length) {
+    if (content[i] !== '\\') {
+      result += content[i++];
+      continue;
+    }
+    const next = content[i + 1] ?? '';
+    if (next === '"' || next === '\\' || next === '/' ||
+        next === 'b' || next === 'f' || next === 'n' ||
+        next === 'r' || next === 't') {
+      // Valid 2-char JSON escape — copy both and advance past them
+      result += content[i] + next;
+      i += 2;
+    } else if (next === 'u' && /^[0-9a-fA-F]{4}/.test(content.slice(i + 2, i + 6))) {
+      // Valid unicode escape \uXXXX — copy all 6 chars
+      result += content.slice(i, i + 6);
+      i += 6;
+    } else {
+      // Invalid escape — double the backslash, don't consume the next char
+      result += '\\\\';
+      i++;
+    }
+  }
+  return result;
 }
 
 function stripTags(value: string) {

@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { extractFromResponsesBody, extractJsonWithCoercer, tryExtractWithCoercer, type OpenAIResponseBody, type ChatCompletionsResponseBody } from '@/lib/ai/json';
+import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { normalizeMathNotation } from '@/lib/ai/math';
 import { MAX_AI_ERROR_TEXT, safe, txt } from '@/lib/ai/text';
+import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import {
   clampCount,
   normalizeBoard,
@@ -146,6 +148,10 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
     payload.specification ? `Specification focus: ${payload.specification}` : '',
     `Topic: ${payload.topic}.`,
+    'Before generating cards, internally identify the exact qualification/specification being studied and verify that the topic belongs to it.',
+    'Treat board, qualification level, specification, tier, option, text, and topic focus as hard constraints.',
+    'Only write cards for content that is assessable on the selected course. Do not import topics, case studies, set texts, terminology, or depth from another exam board, another qualification level, or a different option route.',
+    'For example, if one GCSE Geography board includes tectonics but the selected board/specification does not, do not generate tectonics cards for that selected course.',
     `Generate ${payload.cardCount} flashcards using the prompt requirements below.`,
   ]
     .filter(Boolean)
@@ -155,7 +161,7 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     `Prompt: ${payload.prompt}`,
     `Deck name: ${payload.name}`,
     `If no deck name is provided, generate a concise descriptive deck title based on topic, exam board, and subject.`,
-    `Use the selected exam board and syllabus when writing each card.`,
+    `Use the selected exam board and syllabus when writing each card. Prefer specification-accurate wording over generic subject coverage.`,
     `Assign appropriate tags to each flashcard to help with organization and study.`,
   ].join('\n\n');
 
@@ -248,6 +254,26 @@ export async function POST(request: Request) {
     }
     if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
       return NextResponse.json({ error: 'Exam type must be GCSE or A-Level.' }, { status: 400 });
+    }
+    const allowedTopics = getMajorTopicsForQualification({
+      subject: payload.subject,
+      examBoard: payload.examBoard,
+      examType: payload.examType,
+      specification: payload.specification,
+    });
+    const topicError = getQualificationTopicError(payload.topic, allowedTopics);
+    if (topicError) {
+      return NextResponse.json({ error: topicError }, { status: 400 });
+    }
+    const relevanceError = getTopicRelevanceError({
+      topic: payload.topic,
+      subject: payload.subject,
+      examBoard: payload.examBoard,
+      examType: payload.examType,
+      specification: payload.specification,
+    });
+    if (relevanceError) {
+      return NextResponse.json({ error: relevanceError }, { status: 400 });
     }
     if (!payload.prompt || payload.prompt.length < 20) {
       return NextResponse.json({ error: 'A detailed prompt is required.' }, { status: 400 });

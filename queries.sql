@@ -17,6 +17,8 @@ DROP TABLE IF EXISTS study_goals CASCADE;
 DROP TABLE IF EXISTS user_statistics CASCADE;
 DROP TABLE IF EXISTS user_profiles CASCADE;
 DROP TABLE IF EXISTS generated_videos CASCADE;
+DROP TABLE IF EXISTS exam_practice_attempts CASCADE;
+DROP TABLE IF EXISTS user_subjects CASCADE;
 
 -- ============================================================================
 -- CREATE TABLES
@@ -166,6 +168,38 @@ CREATE TABLE generated_videos (
   completed_at TIMESTAMP WITH TIME ZONE
 );
 
+-- USER SUBJECTS
+CREATE TABLE user_subjects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  exam_board TEXT NOT NULL,
+  exam_type TEXT NOT NULL,
+  spec_name TEXT,
+  spec_tier TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- EXAM PRACTICE ATTEMPTS
+CREATE TABLE exam_practice_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  exam_board TEXT NOT NULL,
+  exam_type TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  total_marks_awarded INT NOT NULL DEFAULT 0,
+  total_available_marks INT NOT NULL DEFAULT 0,
+  percentage INT NOT NULL DEFAULT 0,
+  predicted_grade TEXT NOT NULL,
+  weakness_tags TEXT[] NOT NULL DEFAULT '{}',
+  weakness_analysis TEXT[] NOT NULL DEFAULT '{}',
+  questions_payload JSONB NOT NULL DEFAULT '[]',
+  answers_payload JSONB NOT NULL DEFAULT '[]',
+  marking_report JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ============================================================================
 -- INDEXES (recreate)
 -- ============================================================================
@@ -179,6 +213,17 @@ CREATE INDEX idx_study_sessions_deck_id ON study_sessions(deck_id);
 CREATE INDEX idx_study_session_results_session_id ON study_session_results(session_id);
 CREATE INDEX idx_study_goals_user_id ON study_goals(user_id);
 CREATE INDEX idx_generated_videos_user_id ON generated_videos(user_id);
+CREATE INDEX idx_exam_practice_attempts_user_id ON exam_practice_attempts(user_id);
+CREATE INDEX idx_exam_practice_attempts_created_at ON exam_practice_attempts(created_at DESC);
+CREATE INDEX idx_user_subjects_user_id ON user_subjects(user_id);
+CREATE UNIQUE INDEX user_subjects_unique_profile ON user_subjects (
+  user_id,
+  subject,
+  exam_board,
+  exam_type,
+  COALESCE(spec_name, ''),
+  COALESCE(spec_tier, '')
+);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (enable & policies)
@@ -193,6 +238,8 @@ ALTER TABLE study_session_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_statistics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE study_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE generated_videos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exam_practice_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_subjects ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see their own data
 CREATE POLICY "Users can view their own profile"
@@ -202,6 +249,18 @@ CREATE POLICY "Users can view their own profile"
 CREATE POLICY "Users can update their own profile"
   ON user_profiles FOR UPDATE
   USING (auth.uid() = id);
+
+CREATE POLICY "Users can view their own subjects"
+  ON user_subjects FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create their own subjects"
+  ON user_subjects FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own subjects"
+  ON user_subjects FOR DELETE
+  USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can view their own decks"
   ON flashcard_decks FOR SELECT
@@ -338,6 +397,18 @@ CREATE POLICY "Users can update their own videos"
 
 CREATE POLICY "Users can delete their own videos"
   ON generated_videos FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view their own exam practice attempts"
+  ON exam_practice_attempts FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create exam practice attempts"
+  ON exam_practice_attempts FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own exam practice attempts"
+  ON exam_practice_attempts FOR DELETE
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can update tags in their decks"

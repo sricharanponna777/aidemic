@@ -1,15 +1,15 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { getOptionalSupabaseEnv } from './lib/supabase-env';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   let response = NextResponse.next({ request });
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseEnv = getOptionalSupabaseEnv();
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  if (!supabaseEnv) {
     if (pathname.startsWith('/dashboard')) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
@@ -17,7 +17,7 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient(supabaseEnv.supabaseUrl, supabaseEnv.supabaseAnonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();

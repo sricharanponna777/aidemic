@@ -1,18 +1,45 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import { createClient } from "@/lib/supabase-client";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, LayoutDashboard, Settings, LogOut, Brain, Layers, Sparkles } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { buttonStyles } from "@/components/ui/button";
+import {
+  BookOpen,
+  Brain,
+  GraduationCap,
+  Layers,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  Settings,
+  Sun,
+  Target,
+  Zap,
+} from "lucide-react";
+
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
+  { href: "/dashboard/notes", label: "Learn", icon: BookOpen },
+  { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
+  { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
+  { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+];
+
+function isActiveRoute(item: (typeof navItems)[number], pathname: string) {
+  if (item.exact) return pathname === item.href;
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
+  const { theme, toggleTheme } = useTheme();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -21,80 +48,133 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-slate-950">
-        <p className="text-gray-600 dark:text-slate-300">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#0A0F1E]">
+        <div className="flex items-center gap-1.5">
+          <div className="h-2 w-2 rounded-full bg-indigo-500 animate-bounce" />
+          <div className="h-2 w-2 rounded-full bg-purple-500 animate-bounce [animation-delay:0.15s]" />
+          <div className="h-2 w-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.3s]" />
+        </div>
       </div>
     );
   }
 
-  if (!session) {
-    return null;
-  }
+  if (!session) return null;
 
-  const navItems = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/notes", label: "Notes", icon: BookOpen },
-    { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
-    { href: "/dashboard/study-sessions", label: "Flashcard reviews", icon: Brain },
-    { href: "/dashboard/ai-questions", label: "Exam practice", icon: Sparkles },
-    { href: "/dashboard/settings", label: "Settings", icon: Settings },
-  ];
+  const displayName = session.user.email?.split("@")[0] || "?";
 
   return (
-    <div className="min-h-screen">
-      <nav className="border-b border-slate-200 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link href="/dashboard" className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-slate-100">
-            <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            AIDemic
+    <div className="min-h-screen bg-[#eef2fb] dark:bg-[#0A0F1E]">
+
+      {/* Fixed sidebar — desktop */}
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col max-lg:hidden bg-white dark:bg-[#0D1324] border-r border-slate-200 dark:border-white/6 shadow-[2px_0_16px_-4px_rgba(99,102,241,0.08)] dark:shadow-none">
+
+        {/* Brand */}
+        <div className="border-b border-slate-200 dark:border-white/6 px-5 py-5">
+          <Link href="/dashboard" className="flex items-center gap-3 group">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 transition-shadow">
+              <Zap className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-[17px] font-bold leading-none text-slate-900 dark:text-white">AIDemic</p>
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-400">
+                AI Revision Coach
+              </p>
+            </div>
           </Link>
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <span className="text-sm text-slate-600 dark:text-slate-300">{session.user.email}</span>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActiveRoute(item, pathname);
+            return (
+              <Link
+                key={item.href + item.label}
+                href={item.href}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group ${
+                  active
+                    ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                <Icon
+                  className={`h-[17px] w-[17px] shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                    active ? "text-white" : "text-slate-500 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white"
+                  }`}
+                />
+                {item.label}
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/70" />}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* User footer */}
+        <div className="border-t border-slate-200 dark:border-white/6 p-4">
+          <div className="mb-3 flex min-w-0 items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-xs font-bold uppercase text-white">
+              {displayName[0]}
+            </div>
+            <p className="truncate text-xs text-slate-600 dark:text-slate-400">{session.user.email}</p>
+          </div>
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleSignOut}
-              className={buttonStyles({ variant: "danger-ghost", size: "sm" })}
+              type="button"
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 hover:text-slate-700 dark:hover:text-white transition-all"
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
-              <LogOut className="h-4 w-4" />
-              Sign Out
+              {theme === "dark" ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5 text-indigo-500" />}
+              {theme === "dark" ? "Light" : "Dark"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-all"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Sign out
             </button>
           </div>
         </div>
-      </nav>
+      </aside>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex gap-8">
-          {/* Sidebar */}
-          <div className="w-64 shrink-0 max-lg:hidden">
-            <nav className="sticky top-8 space-y-2">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)) ||
-                  (item.href === "/dashboard/notes" && pathname.startsWith("/dashboard/slideshow"));
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
-                      isActive
-                        ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-blue-600 dark:shadow-blue-900/35"
-                        : "bg-white text-slate-700 hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
+      {/* Mobile top bar */}
+      <div className="lg:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-slate-200 dark:border-white/6 bg-white/90 dark:bg-[#0D1324]/90 backdrop-blur-xl px-4 py-3">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-indigo-500 to-purple-600">
+            <Zap className="h-4 w-4 text-white" />
           </div>
-
-          {/* Main Content */}
-          <div className="flex-1">{children}</div>
+          <span className="text-base font-bold text-slate-900 dark:text-white">AIDemic</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex items-center justify-center rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 transition-colors"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-indigo-500" />}
+          </button>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="flex items-center justify-center rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            aria-label="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
+
+      {/* Main content */}
+      <div className="lg:pl-64">
+        <main className="mx-auto max-w-6xl px-4 pt-16 pb-10 sm:px-6 lg:pt-8">
+          {children}
+        </main>
+      </div>
+
     </div>
   );
 }

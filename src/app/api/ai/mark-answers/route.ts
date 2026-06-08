@@ -61,12 +61,29 @@ interface MarkAnswersPayload {
   examBoard?: string;
   examType?: string;
   specification?: string;
+  sourceMaterial?: string;
   questions?: unknown;
   answers?: unknown;
 }
 
 const MAX_QUESTIONS = 20;
-const MAX_MARK_VALUE = 30;
+const MAX_MARK_VALUE = 40;
+const MARKING_MAX_OUTPUT_TOKENS = 2000;
+const MAX_AI_RESPONSE_LOG_TEXT = 12000;
+
+const truncateForLog = (value: string) =>
+  value.length > MAX_AI_RESPONSE_LOG_TEXT
+    ? `${value.slice(0, MAX_AI_RESPONSE_LOG_TEXT)}... [truncated ${value.length - MAX_AI_RESPONSE_LOG_TEXT} chars]`
+    : value;
+
+const logInvalidMarkingJson = (source: string, payload: unknown) => {
+  try {
+    const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+    console.error(`[mark-answers] AI response was not valid marking JSON (${source})`, truncateForLog(serialized || ''));
+  } catch (err) {
+    console.error(`[mark-answers] AI response was not valid marking JSON (${source})`, payload, err);
+  }
+};
 
 const SCHEMA = {
   type: 'object',
@@ -209,7 +226,8 @@ const normalizeQuestion = (value: unknown, subject: string): MarkingQuestion | n
 
   if (!normalized.question || normalized.markScheme.length === 0 || !normalized.modelAnswer) return null;
   if (normalized.questionType === 'mcq') {
-    if (normalized.options.length !== 4 || !['A', 'B', 'C', 'D'].includes(normalized.correctOption)) return null;
+    const validCorrectOptions = ['A', 'B', 'C', 'D'].slice(0, normalized.options.length);
+    if (normalized.options.length < 3 || normalized.options.length > 4 || !validCorrectOptions.includes(normalized.correctOption)) return null;
   }
   return normalized;
 };
@@ -230,12 +248,27 @@ const normalizePayload = (raw: MarkAnswersPayload) => {
     examBoard: normalizeBoard(raw.examBoard),
     examType: normalizeExamType(raw.examType),
     specification: txt(raw.specification || '', 280),
+    sourceMaterial: txt(raw.sourceMaterial || '', 12000),
     questions,
     answers,
   };
 };
 
-const estimateGrade = (percentage: number, examType: 'gcse' | 'a-level', board: 'aqa' | 'edexcel' | 'ocr' | null) => {
+type GcseTier = 'foundation' | 'higher' | null;
+
+const getGcseTier = (specification: string): GcseTier => {
+  const normalized = specification.toLowerCase();
+  if (/\bfoundation\b/.test(normalized)) return 'foundation';
+  if (/\bhigher\b/.test(normalized)) return 'higher';
+  return null;
+};
+
+const estimateGrade = (
+  percentage: number,
+  examType: 'gcse' | 'a-level',
+  board: 'aqa' | 'edexcel' | 'ocr' | null,
+  gcseTier: GcseTier
+) => {
   const adjustment = board === 'edexcel' ? -2 : board === 'ocr' ? -1 : 0;
   const boundaries =
     examType === 'a-level'
@@ -246,6 +279,24 @@ const estimateGrade = (percentage: number, examType: 'gcse' | 'a-level', board: 
           ['C', 55],
           ['D', 45],
           ['E', 35],
+        ]
+      : gcseTier === 'foundation'
+      ? [
+          ['5', 70],
+          ['4', 55],
+          ['3', 40],
+          ['2', 25],
+          ['1', 10],
+        ]
+      : gcseTier === 'higher'
+      ? [
+          ['9', 85],
+          ['8', 78],
+          ['7', 70],
+          ['6', 60],
+          ['5', 50],
+          ['4', 40],
+          ['3', 30],
         ]
       : [
           ['9', 85],
@@ -265,11 +316,37 @@ const estimateGrade = (percentage: number, examType: 'gcse' | 'a-level', board: 
   return 'U';
 };
 
-const getNextGrade = (grade: string, examType: 'gcse' | 'a-level') => {
-  const order = examType === 'a-level' ? ['U', 'E', 'D', 'C', 'B', 'A', 'A*'] : ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const getNextGrade = (grade: string, examType: 'gcse' | 'a-level', gcseTier: GcseTier) => {
+  const order =
+    examType === 'a-level'
+      ? ['U', 'E', 'D', 'C', 'B', 'A', 'A*']
+      : gcseTier === 'foundation'
+      ? ['U', '1', '2', '3', '4', '5']
+      : gcseTier === 'higher'
+      ? ['U', '3', '4', '5', '6', '7', '8', '9']
+      : ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
   const index = order.indexOf(grade);
   if (index < 0 || index >= order.length - 1) return null;
   return order[index + 1];
+};
+
+const getTopGrade = (examType: 'gcse' | 'a-level', gcseTier: GcseTier) => {
+  if (examType === 'a-level') return 'A*';
+  if (gcseTier === 'foundation') return '5';
+  return '9';
+};
+
+const getGradeBoundaryNote = (examType: 'gcse' | 'a-level', gcseTier: GcseTier) => {
+  if (examType === 'a-level') {
+    return 'Predicted from this practice set using approximate A-Level boundaries. Real grade boundaries vary by paper and exam series.';
+  }
+  if (gcseTier === 'foundation') {
+    return 'Predicted from this practice set using approximate GCSE Foundation tier boundaries. Foundation tier is capped at grade 5.';
+  }
+  if (gcseTier === 'higher') {
+    return 'Predicted from this practice set using approximate GCSE Higher tier boundaries. Higher tier awards grades 9-3; below grade 3 is U.';
+  }
+  return 'Predicted from this practice set using approximate GCSE 9-1 boundaries. Real grade boundaries vary by paper and exam series.';
 };
 
 const getBand = (marksAwarded: number, maxMarks: number) => {
@@ -312,19 +389,24 @@ const normalizeMarkedAnswers = (aiReport: AIMarkingReport | null, questions: Mar
     const marksAwarded = answers[index]?.trim()
       ? clampAwardedMarks(aiAnswer?.marksAwarded, question.marks)
       : 0;
+    const isFullMarks = marksAwarded >= question.marks;
 
     return {
       questionIndex: index,
       marksAwarded,
       maxMarks: question.marks,
-      band: txt(safe(aiAnswer?.band || getBand(marksAwarded, question.marks)), 80),
+      band: txt(safe(isFullMarks ? 'Full marks' : aiAnswer?.band || getBand(marksAwarded, question.marks)), 80),
       feedback: txt(
-        safe(aiAnswer?.feedback || (answers[index]?.trim() ? 'Response marked against the generated mark scheme.' : 'No answer was entered.')),
+        safe(
+          isFullMarks
+            ? aiAnswer?.feedback || 'Full marks. This answer met the mark scheme.'
+            : aiAnswer?.feedback || (answers[index]?.trim() ? 'Response marked against the generated mark scheme.' : 'No answer was entered.')
+        ),
         900
       ),
       strengths: normalizeStringList(aiAnswer?.strengths, '', 4, 180),
-      improvements: normalizeStringList(aiAnswer?.improvements, '', 4, 220),
-      weaknessTags: normalizeStringList(aiAnswer?.weaknessTags, '', 5, 80),
+      improvements: isFullMarks ? [] : normalizeStringList(aiAnswer?.improvements, '', 4, 220),
+      weaknessTags: isFullMarks ? [] : normalizeStringList(aiAnswer?.weaknessTags, '', 5, 80),
       exemplarAnswer: txt(
         normalizeMathNotation(safe(aiAnswer?.exemplarAnswer || question.modelAnswer), ''),
         1600
@@ -342,17 +424,24 @@ const buildFinalReport = (
   const totalAvailableMarks = payload.questions.reduce((sum, item) => sum + item.marks, 0);
   const percentage = totalAvailableMarks > 0 ? Math.round((totalMarksAwarded / totalAvailableMarks) * 100) : 0;
   const examType = payload.examType || 'gcse';
-  const predictedGrade = estimateGrade(percentage, examType, payload.examBoard);
-  const targetGrade = getNextGrade(predictedGrade, examType);
-  const topGrade = examType === 'a-level' ? 'A*' : '9';
+  const gcseTier = examType === 'gcse' ? getGcseTier(payload.specification) : null;
+  const predictedGrade = estimateGrade(percentage, examType, payload.examBoard, gcseTier);
+  const targetGrade = getNextGrade(predictedGrade, examType, gcseTier);
+  const topGrade = getTopGrade(examType, gcseTier);
+  const fullMarksAttempt = totalAvailableMarks > 0 && totalMarksAwarded >= totalAvailableMarks;
 
-  const weaknessAnalysis = normalizeStringList(aiReport?.weaknessAnalysis, payload.subject, 6, 260);
-  if (weaknessAnalysis.length === 0) {
-    const tags = markedAnswers.flatMap((item) => item.weaknessTags).filter(Boolean);
+  const nonFullWeaknessTags = markedAnswers
+    .filter((item) => item.marksAwarded < item.maxMarks)
+    .flatMap((item) => item.weaknessTags)
+    .filter(Boolean);
+  const weaknessAnalysis = fullMarksAttempt
+    ? []
+    : nonFullWeaknessTags.length > 0
+      ? [`Main pattern to fix: ${nonFullWeaknessTags[0]}.`]
+      : normalizeStringList(aiReport?.weaknessAnalysis, payload.subject, 6, 260);
+  if (!fullMarksAttempt && weaknessAnalysis.length === 0) {
     weaknessAnalysis.push(
-      tags[0]
-        ? `Main pattern to fix: ${tags[0]}.`
-        : 'Use more precise exam wording and make every mark visible in the answer.'
+      'Use more precise exam wording and make every mark visible in the answer.'
     );
   }
 
@@ -383,10 +472,7 @@ const buildFinalReport = (
     ),
     weaknessAnalysis,
     gradeBoostAdvice,
-    gradeBoundaryNote:
-      examType === 'a-level'
-        ? 'Predicted from this practice set using approximate A-Level boundaries. Real grade boundaries vary by paper and exam series.'
-        : 'Predicted from this practice set using approximate GCSE 9-1 boundaries. Real grade boundaries vary by paper and exam series.',
+    gradeBoundaryNote: getGradeBoundaryNote(examType, gcseTier),
   };
 };
 
@@ -394,23 +480,22 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
   const config = getAIConfig();
 
   const system = [
-    'You mark exam answers as strict JSON.',
-    'Use the provided question, mark value, mark scheme, model answer, and subject context.',
-    'Award integer marks from 0 up to maxMarks. Never exceed maxMarks.',
-    'If the student answer is blank or irrelevant, award 0.',
-    'MCQs are marked deterministically by the server, but you may still use them when writing the overall summary, weaknessAnalysis, and gradeBoostAdvice.',
-    'For calculation questions, credit correct method, working, answer, and units where relevant. Do not require perfect wording if the method and answer are clear.',
-    'For longer open-response questions, reward accurate knowledge, application to context, linked analysis, evaluation, and judgement where the mark value expects them.',
-    'Return exactly one markedAnswers item per question, in the same order, using zero-based questionIndex values.',
-    'Feedback should be specific to the student answer and should identify where marks were won or lost.',
-    'weaknessAnalysis should aggregate repeated weaknesses across the whole attempt.',
-    'gradeBoostAdvice should tell the student what to do next to raise the predicted grade by at least one level when they are not already at the top grade.',
-    `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
-    payload.specification ? `Specification focus: ${payload.specification}` : '',
-    'Return JSON only and match the provided schema.',
+    `Mark exam answers as strict JSON. Board:${payload.examBoard} Type:${payload.examType} Subject:${payload.subject}.`,
+    payload.specification ? `Spec:${payload.specification}` : '',
+    'Award integer marks 0–maxMarks per question. Blank/irrelevant=0.',
+    'MCQs marked by server; include in summary/weaknessAnalysis/gradeBoostAdvice only.',
+    'If a question earns full marks, leave its improvements and weaknessTags empty.',
+    'Calculations: credit correct method+working+answer+units; wording not required.',
+    'Open: reward knowledge, application, analysis, evaluation per mark value.',
+    'One markedAnswers entry per question, same order, zero-based questionIndex.',
+    'feedback: specific to student answer, where marks won/lost.',
+    'weaknessAnalysis: aggregate repeated weaknesses across attempt.',
+    'gradeBoostAdvice: concrete next steps to raise grade by ≥1 level.',
+    'Keep all text concise: feedback≤30 words, strengths/improvements≤1 item each, exemplarAnswer≤40 words, summary≤20 words.',
+    'Return JSON only. Match schema.',
   ]
     .filter(Boolean)
-    .join('\n');
+    .join(' ');
 
   const attempt = payload.questions.map((question, index) => ({
     questionIndex: index,
@@ -429,34 +514,42 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
 
   const user = [
     `Topic: ${payload.topic}`,
+    payload.sourceMaterial ? `Source material:\n${payload.sourceMaterial}` : '',
     'Mark this attempt:',
     JSON.stringify({ attempt }, null, 2),
-  ].join('\n\n');
+  ].filter(Boolean).join('\n\n');
 
   const commonHeaders = buildAIHeaders(config);
 
-  const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
-    method: 'POST',
-    headers: commonHeaders,
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0,
-      input: [
-        { role: 'system', content: [{ type: 'input_text', text: system }] },
-        { role: 'user', content: [{ type: 'input_text', text: user }] },
-      ],
-      text: { format: { type: 'json_schema', name: 'exam_answer_marking', schema: SCHEMA, strict: true } },
-    }),
-  });
+  // OpenRouter: skip /responses (unsupported) and go straight to chat
+  if (!config.isOpenRouter) {
+    const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
+      method: 'POST',
+      headers: commonHeaders,
+      body: JSON.stringify({
+        model: config.model,
+        temperature: 0,
+        max_output_tokens: MARKING_MAX_OUTPUT_TOKENS,
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: system }] },
+          { role: 'user', content: [{ type: 'input_text', text: user }] },
+        ],
+        text: { format: { type: 'json_schema', name: 'exam_answer_marking', schema: SCHEMA, strict: true } },
+      }),
+    });
 
-  if (responsesResponse.ok) {
-    const body = (await responsesResponse.json()) as OpenAIResponseBody;
-    const parsed = extractReportFromResponsesBody(body);
-    if (!parsed) throw new Error('AI response was not valid marking JSON.');
-    return parsed;
+    if (responsesResponse.ok) {
+      const body = (await responsesResponse.json()) as OpenAIResponseBody;
+      const parsed = extractReportFromResponsesBody(body);
+      if (!parsed) {
+        logInvalidMarkingJson('/responses', body);
+        throw new Error('AI response was not valid marking JSON.');
+      }
+      return parsed;
+    }
   }
 
-  const responsesErrorText = await responsesResponse.text();
+  const responsesErrorText = '';
 
   const chatResponse = await fetch(`${config.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -464,18 +557,14 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
     body: JSON.stringify({
       model: config.model,
       temperature: 0,
+      max_tokens: MARKING_MAX_OUTPUT_TOKENS,
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'exam_answer_marking',
-          schema: SCHEMA,
-          strict: true,
-        },
-      },
+      ...(config.supportsJsonSchema
+        ? { response_format: { type: 'json_schema', json_schema: { name: 'exam_answer_marking', schema: SCHEMA, strict: true } } }
+        : { response_format: { type: 'json_object' } }),
     }),
   });
 
@@ -488,8 +577,17 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
   const parsedField = tryExtractWithCoercer(chatBody.choices?.[0]?.message?.parsed, coerceMarkingReport, extractJson);
   if (parsedField) return parsedField;
 
-  const parsed = extractJson(extractChatMessageText(chatBody));
-  if (!parsed) throw new Error('AI chat/completions response was not valid marking JSON.');
+  const chatMessage = chatBody.choices?.[0]?.message;
+  const chatText = extractChatMessageText(chatBody);
+  const parsed = extractJson(chatText);
+  if (!parsed) {
+    logInvalidMarkingJson('/chat/completions', {
+      parsed: chatMessage?.parsed,
+      content: chatText,
+      rawMessage: chatMessage,
+    });
+    throw new Error('AI chat/completions response was not valid marking JSON.');
+  }
   return parsed;
 };
 
@@ -537,3 +635,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: txt(message, MAX_AI_ERROR_TEXT) }, { status: 500 });
   }
 }
+

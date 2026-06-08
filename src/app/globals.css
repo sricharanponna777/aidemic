@@ -2,27 +2,27 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f4f6fb;
+  --background: #eef2fb;
   --foreground: #0f172a;
   --muted: #64748b;
   --surface: #ffffff;
-  --border: #d9e2ec;
+  --border: #dde4f0;
 }
 
 :root.light {
-  --background: #f4f6fb;
+  --background: #eef2fb;
   --foreground: #0f172a;
   --muted: #64748b;
   --surface: #ffffff;
-  --border: #d9e2ec;
+  --border: #dde4f0;
 }
 
 :root.dark {
-  --background: #020617;
-  --foreground: #e2e8f0;
-  --muted: #94a3b8;
-  --surface: #0f172a;
-  --border: #1f2937;
+  --background: #0A0F1E;
+  --foreground: #F8FAFC;
+  --muted: #94A3B8;
+  --surface: #131B2E;
+  --border: #1e2a42;
 }
 
 @theme inline {
@@ -34,12 +34,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
-    --background: #020617;
-    --foreground: #e2e8f0;
-    --muted: #94a3b8;
-    --surface: #0f172a;
-    --border: #1f2937;
+    --background: #0A0F1E;
+    --foreground: #F8FAFC;
+    --muted: #94A3B8;
+    --surface: #131B2E;
+    --border: #1e2a42;
   }
+}
+
+/* Premium light-mode card shadow scale */
+:root.light .card-elevated,
+:root:not(.dark) .card-elevated {
+  box-shadow: 0 1px 3px 0 rgba(99, 102, 241, 0.06), 0 1px 2px -1px rgba(99, 102, 241, 0.04);
 }
 
 * {
@@ -51,10 +57,39 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
   min-height: 100vh;
+  /* Light-mode ambient glow — visible on the pale #f4f6fb base */
   background-image:
-    radial-gradient(1200px 600px at 0% -20%, rgba(37, 99, 235, 0.14), transparent 45%),
-    radial-gradient(900px 500px at 100% 0%, rgba(15, 118, 110, 0.09), transparent 40%);
+    radial-gradient(1000px 600px at 5% -15%, rgba(99, 102, 241, 0.13), transparent 50%),
+    radial-gradient(800px 500px at 95% 5%, rgba(139, 92, 246, 0.09), transparent 45%);
   background-attachment: fixed;
+}
+
+/* Stronger glow for the deep-navy dark base */
+.dark body {
+  background-image:
+    radial-gradient(900px 600px at 10% -10%, rgba(99, 102, 241, 0.16), transparent 50%),
+    radial-gradient(700px 500px at 90% 10%, rgba(139, 92, 246, 0.10), transparent 50%);
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.06) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
 }
 
 h1,

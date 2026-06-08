@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { getSupabaseEnv } from '@/lib/supabase-env';
 
 export async function POST(request: Request) {
   try {
@@ -11,12 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing tokens in request body' }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
-    }
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
 
     const cookieStore = await cookies();
     const response = NextResponse.json({ success: true });

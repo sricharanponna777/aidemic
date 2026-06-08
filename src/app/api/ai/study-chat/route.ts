@@ -16,7 +16,7 @@ type StudyChatPayload = {
   subject?: string;
   examBoard?: string;
   examType?: string;
-  mode?: 'notes' | 'slideshow';
+  mode?: 'notes';
   messages?: StudyChatMessage[];
 };
 
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       subject: txt(rawBody.subject || 'General', 80),
       examBoard: txt(rawBody.examBoard || 'general', 40),
       examType: txt(rawBody.examType || 'general', 40),
-      mode: rawBody.mode === 'slideshow' ? 'slideshow' : 'notes',
+      mode: 'notes',
       messages: normalizeMessages(rawBody.messages),
     };
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       `Subject: ${payload.subject}`,
       payload.examBoard !== 'general' ? `Exam board: ${payload.examBoard.toUpperCase()}` : '',
       payload.examType !== 'general' ? `Level: ${payload.examType}` : '',
-      `Current study mode: ${payload.mode === 'notes' ? 'study notes' : 'slideshow'}`,
+      'Current study mode: study notes',
     ]
       .filter(Boolean)
       .join('\n');
