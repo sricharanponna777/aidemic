@@ -57,7 +57,7 @@ export function useAuth() {
           setProfile(null);
         }
         if (!session) {
-          router.push('/login');
+          router.push('/');
         }
       }
     );

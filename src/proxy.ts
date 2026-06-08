@@ -11,7 +11,7 @@ export async function proxy(request: NextRequest) {
 
   if (!supabaseEnv) {
     if (pathname.startsWith('/dashboard')) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      return NextResponse.redirect(new URL('/', request.url));
     }
 
     return response;
@@ -37,7 +37,7 @@ export async function proxy(request: NextRequest) {
 
   if (pathname.startsWith('/dashboard')) {
     if (!isAuthenticated) {
-      const redirectUrl = new URL('/login', request.url);
+      const redirectUrl = new URL('/', request.url);
       redirectUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(redirectUrl);
     }
