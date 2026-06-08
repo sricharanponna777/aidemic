@@ -2,7 +2,7 @@
 
 import { buttonStyles } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase-client";
-import { ArrowRight, BookOpen, Brain, Layers, Sparkles, Target, Zap } from "lucide-react";
+import { BookOpen, Brain, Layers, Sparkles, Target, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
