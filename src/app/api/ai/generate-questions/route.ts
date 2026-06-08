@@ -855,8 +855,10 @@ async function validateTopicWithAI(
     if (isValid) return { valid: true, reason: '' };
 
     const aiReason = typeof parsed.reason === 'string' && parsed.reason.trim() ? parsed.reason.trim() : '';
+    const examBoardLabel = examBoard ? examBoard.toUpperCase() : 'this exam board';
+    const examTypeLabel = examType || 'this level';
     const fallbackReason =
-      `"${topic}" doesn't appear to be part of ${examBoard.toUpperCase()} ${examType} ${subject}. ` +
+      `"${topic}" doesn't appear to be part of ${examBoardLabel} ${examTypeLabel} ${subject}. ` +
       `Check your qualification settings or try a topic from your specification.`;
 
     return { valid: false, reason: aiReason || fallbackReason };
