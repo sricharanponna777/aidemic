@@ -150,6 +150,17 @@ const SS_QUESTIONS = 'exam-questions';
 const SS_ANSWERS = 'exam-answers';
 const SS_SOURCE = 'exam-source-material';
 const SS_REPORT = 'exam-report';
+const SS_SUBJECT_ID = 'exam-subject-id';
+const SS_FORM = 'exam-form';
+const SS_SESSION_META = 'exam-session-meta';
+
+type SessionMeta = {
+  topic: string;
+  subject: string;
+  examBoard: string;
+  examType: string;
+  specification: string;
+};
 
 function ssRead<T>(key: string, fallback: T): T {
   try {
@@ -285,7 +296,7 @@ export default function AIQuestionsPage() {
   const { session } = useAuth();
   const supabase = createClient();
 
-  const [form, setForm] = useState<AIGenerateForm>(defaultForm);
+  const [form, setForm] = useState<AIGenerateForm>(() => ssRead<AIGenerateForm>(SS_FORM, defaultForm));
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMarking, setIsMarking] = useState(false);
@@ -294,12 +305,16 @@ export default function AIQuestionsPage() {
   const [sourceMaterial, setSourceMaterial] = useState(() => ssRead(SS_SOURCE, ''));
   const [report, setReport] = useState<MarkingReport | null>(() => ssRead<MarkingReport | null>(SS_REPORT, null));
   const { subjects: userSubjects, isLoading: subjectsLoading, error: subjectsError } = useUserSubjects();
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState(() => ssRead(SS_SUBJECT_ID, ''));
+  const [sessionMeta, setSessionMeta] = useState<SessionMeta | null>(() => ssRead<SessionMeta | null>(SS_SESSION_META, null));
 
   useEffect(() => { ssWrite(SS_QUESTIONS, questions); }, [questions]);
   useEffect(() => { ssWrite(SS_ANSWERS, answers); }, [answers]);
   useEffect(() => { ssWrite(SS_SOURCE, sourceMaterial); }, [sourceMaterial]);
   useEffect(() => { ssWrite(SS_REPORT, report); }, [report]);
+  useEffect(() => { ssWrite(SS_SUBJECT_ID, selectedSubjectId); }, [selectedSubjectId]);
+  useEffect(() => { ssWrite(SS_FORM, form); }, [form]);
+  useEffect(() => { ssWrite(SS_SESSION_META, sessionMeta); }, [sessionMeta]);
 
   const effectiveSubjectId = selectedSubjectId || userSubjects[0]?.id || '';
   const selectedSubject = userSubjects.find((subject) => subject.id === effectiveSubjectId) ?? null;
@@ -421,6 +436,13 @@ export default function AIQuestionsPage() {
       const warnings: string[] = Array.isArray(body.warnings)
         ? body.warnings.filter((item: unknown): item is string => typeof item === 'string')
         : [];
+      setSessionMeta({
+        topic: payload.topic,
+        subject: selectedSubject.subject,
+        examBoard: selectedSubject.exam_board,
+        examType: selectedSubject.exam_type,
+        specification,
+      });
       setSourceMaterial(nextSourceMaterial);
       setQuestions(cleanQuestions);
       setAnswers(Array.from({ length: cleanQuestions.length }, () => ''));
@@ -454,22 +476,28 @@ export default function AIQuestionsPage() {
     setIsMarking(true);
     setReport(null);
     setStatus({ tone: 'info', text: 'Marking responses...' });
-    const attemptTopic = isEnglishLanguagePractice
-      ? `AQA English Language ${getEnglishLanguagePaperLabel(form.englishLanguagePaper)}`
-      : form.topic.trim();
+    const meta = sessionMeta ?? {
+      topic: isEnglishLanguagePractice
+        ? `AQA English Language ${getEnglishLanguagePaperLabel(form.englishLanguagePaper)}`
+        : form.topic.trim(),
+      subject: selectedSubject?.subject ?? '',
+      examBoard: selectedSubject?.exam_board ?? '',
+      examType: selectedSubject?.exam_type ?? '',
+      specification: isEnglishLanguagePractice
+        ? `${getSelectedSpecLabel(selectedSubject, effectiveCreationOption)} - ${getEnglishLanguagePaperLabel(form.englishLanguagePaper)}`
+        : getSelectedSpecLabel(selectedSubject, effectiveCreationOption),
+    };
 
     try {
       const response = await fetch('/api/ai/mark-answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic: attemptTopic,
-          subject: selectedSubject?.subject ?? form.subject,
-          examBoard: selectedSubject?.exam_board ?? form.examBoard,
-          examType: selectedSubject?.exam_type ?? form.examType,
-          specification: isEnglishLanguagePractice
-            ? `${getSelectedSpecLabel(selectedSubject, effectiveCreationOption)} - ${getEnglishLanguagePaperLabel(form.englishLanguagePaper)}`
-            : getSelectedSpecLabel(selectedSubject, effectiveCreationOption),
+          topic: meta.topic,
+          subject: meta.subject,
+          examBoard: meta.examBoard,
+          examType: meta.examType,
+          specification: meta.specification,
           sourceMaterial,
           questions,
           answers,
@@ -485,17 +513,17 @@ export default function AIQuestionsPage() {
       setReport({ ...markedReport, sourceMaterial });
       setStatus({ tone: 'success', text: 'Attempt marked with predicted grade and next-step advice.' });
 
-      if (session?.user?.id && selectedSubject) {
+      if (session?.user?.id && meta.subject) {
         const allWeaknessTags = markedReport.markedAnswers.flatMap((a) => a.weaknessTags ?? []);
         const savedWeaknessTags = allWeaknessTags.length > 0
           ? allWeaknessTags
           : markedReport.weaknessAnalysis.map((item) => item.replace(/^Main pattern to fix:\s*/i, '').replace(/\.$/, '').trim()).filter(Boolean);
         const attemptRow = {
           user_id: session.user.id,
-          subject: selectedSubject.subject,
-          exam_board: selectedSubject.exam_board,
-          exam_type: selectedSubject.exam_type,
-          topic: attemptTopic,
+          subject: meta.subject,
+          exam_board: meta.examBoard,
+          exam_type: meta.examType,
+          topic: meta.topic,
           total_marks_awarded: Math.round(markedReport.totalMarksAwarded),
           total_available_marks: Math.round(markedReport.totalAvailableMarks),
           percentage: Math.round(markedReport.percentage),
@@ -538,12 +566,16 @@ export default function AIQuestionsPage() {
     setAnswers([]);
     setSourceMaterial('');
     setReport(null);
+    setSessionMeta(null);
     setStatus(null);
     try {
       sessionStorage.removeItem(SS_QUESTIONS);
       sessionStorage.removeItem(SS_ANSWERS);
       sessionStorage.removeItem(SS_SOURCE);
       sessionStorage.removeItem(SS_REPORT);
+      sessionStorage.removeItem(SS_SUBJECT_ID);
+      sessionStorage.removeItem(SS_FORM);
+      sessionStorage.removeItem(SS_SESSION_META);
     } catch {}
   };
 
@@ -856,17 +888,17 @@ export default function AIQuestionsPage() {
                           key={letter}
                           type="button"
                           onClick={() => updateAnswer(index, letter)}
-                          className={buttonStyles({
-                            variant: 'plain',
-                            size: 'none',
-                            className: `justify-start rounded-lg border px-4 py-3 text-left text-sm font-medium ${
-                              selected
-                                ? 'border-blue-600 bg-blue-50 text-blue-900 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-200'
-                                : 'border-slate-300 bg-white text-slate-800 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200'
-                            }`,
-                          })}
+                          className={`flex w-full items-center justify-start gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
+                            selected
+                              ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-500/30 dark:border-indigo-500 dark:bg-indigo-500 dark:shadow-indigo-500/20'
+                              : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/5'
+                          }`}
                         >
-                          <span className="mr-2 font-bold">{letter}.</span>
+                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                            selected
+                              ? 'border-white/40 bg-white/20 text-white'
+                              : 'border-slate-300 text-slate-500 dark:border-white/20 dark:text-slate-400'
+                          }`}>{letter}</span>
                           <MarkdownContent inline content={option} />
                         </button>
                       );

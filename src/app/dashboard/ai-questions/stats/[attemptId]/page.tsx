@@ -9,7 +9,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
-import { gcseTierLabelForGrade, gradeBadgeTone } from '@/lib/gradeTone';
+import { gcseTierLabelForGrade } from '@/lib/gradeTone';
 
 type ExamQuestion = {
   questionType?: 'open' | 'mcq';
@@ -206,13 +206,7 @@ export default function AttemptDetailPage() {
               { label: 'Questions', value: hasQuestionDetail ? detail.markedAnswers.length.toString() : '--', icon: BarChart3 },
             ].map((item) => {
               const Icon = item.icon;
-              const valueClassName = item.label === 'Grade'
-                ? `inline-flex rounded-lg px-3 py-1 text-2xl font-bold ${gradeBadgeTone({
-                    grade: attempt.predicted_grade,
-                    examType: attempt.exam_type,
-                    specTier,
-                  })}`
-                : 'mt-3 text-2xl font-bold text-slate-900 dark:text-white';
+              const valueClassName = 'mt-3 text-2xl font-bold text-slate-900 dark:text-white';
               return (
                 <article key={item.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
                   <Icon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />

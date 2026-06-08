@@ -63,6 +63,7 @@ export function SearchSelect({
             setQuery(selectedLabel);
           }}
           placeholder={placeholder}
+          autoComplete="off"
           className={`${inputClassName} ${isFocused && visibleOptions.length > 0 ? 'rounded-b-none' : ''}`}
         />
         {isFocused && visibleOptions.length > 0 ? (

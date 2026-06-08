@@ -52,6 +52,7 @@ export function TopicInput({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
+          autoComplete="off"
           className={`${inputClassName} ${isFocused && visibleSuggestions.length > 0 ? 'rounded-b-none' : ''} ${
             value.trim() && !isValidSelection ? 'border-amber-400 focus:border-amber-500 dark:border-amber-500' : ''
           }`}
