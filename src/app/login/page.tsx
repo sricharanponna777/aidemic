@@ -102,7 +102,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-400 to-blue-700 dark:from-blue-600 dark:to-blue-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-indigo-500 via-purple-600 to-fuchsia-700 dark:from-indigo-950 dark:via-purple-950 dark:to-fuchsia-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
         <h1 className="text-3xl font-bold text-center mb-2 text-gray-900 dark:text-gray-100">AIDemic</h1>
         <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
