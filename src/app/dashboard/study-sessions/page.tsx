@@ -410,7 +410,7 @@ export default function StudySessions() {
               Flashcards
             </Link>
             <button
-              className={buttonStyles({ variant: 'primary' })}
+              className={buttonStyles({ variant: 'secondary' })}
               onClick={() => setPhase('choosing')}
             >
               <Play className="h-4 w-4" />
@@ -418,7 +418,11 @@ export default function StudySessions() {
             </button>
             <Link
               href="/dashboard/ai-questions"
-              className={buttonStyles({ variant: 'secondary' })}
+              className={buttonStyles({
+                variant: 'primary',
+                size: 'lg',
+                className: 'shadow-lg shadow-indigo-500/25 hover:-translate-y-px hover:shadow-indigo-500/35',
+              })}
             >
               <Rocket className="h-4 w-4" />
               Smart Practice

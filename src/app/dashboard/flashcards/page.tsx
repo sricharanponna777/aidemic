@@ -187,11 +187,21 @@ export default function Flashcards() {
               <Plus className="h-4 w-4" />
               New Deck
             </Button>
-            <Link href="/dashboard/flashcards/ai" className={buttonStyles({ variant: 'primary' })}>
-              <Sparkles className="h-4 w-4" />
-              Generate with AI
+            <Link
+              href="/dashboard/flashcards/ai"
+              className={buttonStyles({ variant: 'secondary' })}
+            >
+              <Sparkles className="h-4 w-4 text-violet-500" />
+              <span className="bg-linear-to-r from-violet-500 to-indigo-600 bg-clip-text text-transparent">Generate with AI</span>
             </Link>
-            <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'subtle' })}>
+            <Link
+              href="/dashboard/study-sessions"
+              className={buttonStyles({
+                variant: 'primary',
+                size: 'lg',
+                className: 'shadow-lg shadow-indigo-500/25 hover:-translate-y-px hover:shadow-indigo-500/35',
+              })}
+            >
               <ShieldPlus className="h-4 w-4" />
               Flashcard Revision
               <ArrowRight className="h-4 w-4" />
