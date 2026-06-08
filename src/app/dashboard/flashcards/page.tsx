@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Plus, Sparkles, Trash2, Brain, ShieldPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bot, Plus, Sparkles, Trash2, Brain, ShieldPlus, Layers } from 'lucide-react';
 import { Flashcard, FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 import { Button, buttonStyles } from '@/components/ui/button';
@@ -171,7 +171,7 @@ export default function Flashcards() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 3 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <Brain className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+              <Layers className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
               <h1 id="notes-title" className="text-3xl font-bold text-slate-900 dark:text-white">Flashcards</h1>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
@@ -202,7 +202,7 @@ export default function Flashcards() {
                 className: 'shadow-lg shadow-indigo-500/25 hover:-translate-y-px hover:shadow-indigo-500/35',
               })}
             >
-              <ShieldPlus className="h-4 w-4" />
+              <Brain className="h-4 w-4" />
               Flashcard Revision
               <ArrowRight className="h-4 w-4" />
             </Link>

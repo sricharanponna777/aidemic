@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -146,6 +146,30 @@ const statusStyles: Record<StatusTone, string> = {
   error: 'border-red-200 bg-red-50 text-red-800 dark:border-red-700/70 dark:bg-red-950/35 dark:text-red-200',
 };
 
+const SS_QUESTIONS = 'exam-questions';
+const SS_ANSWERS = 'exam-answers';
+const SS_SOURCE = 'exam-source-material';
+const SS_REPORT = 'exam-report';
+
+function ssRead<T>(key: string, fallback: T): T {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw !== null ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function ssWrite(key: string, value: unknown) {
+  try {
+    if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      sessionStorage.removeItem(key);
+    } else {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch {}
+}
+
 const reportTone = (percentage: number) => {
   if (percentage >= 75) return 'text-emerald-700 dark:text-emerald-300';
   if (percentage >= 50) return 'text-blue-700 dark:text-blue-300';
@@ -265,12 +289,17 @@ export default function AIQuestionsPage() {
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMarking, setIsMarking] = useState(false);
-  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [sourceMaterial, setSourceMaterial] = useState('');
-  const [report, setReport] = useState<MarkingReport | null>(null);
+  const [questions, setQuestions] = useState<ExamQuestion[]>(() => ssRead<ExamQuestion[]>(SS_QUESTIONS, []));
+  const [answers, setAnswers] = useState<string[]>(() => ssRead<string[]>(SS_ANSWERS, []));
+  const [sourceMaterial, setSourceMaterial] = useState(() => ssRead(SS_SOURCE, ''));
+  const [report, setReport] = useState<MarkingReport | null>(() => ssRead<MarkingReport | null>(SS_REPORT, null));
   const { subjects: userSubjects, isLoading: subjectsLoading, error: subjectsError } = useUserSubjects();
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
+
+  useEffect(() => { ssWrite(SS_QUESTIONS, questions); }, [questions]);
+  useEffect(() => { ssWrite(SS_ANSWERS, answers); }, [answers]);
+  useEffect(() => { ssWrite(SS_SOURCE, sourceMaterial); }, [sourceMaterial]);
+  useEffect(() => { ssWrite(SS_REPORT, report); }, [report]);
 
   const effectiveSubjectId = selectedSubjectId || userSubjects[0]?.id || '';
   const selectedSubject = userSubjects.find((subject) => subject.id === effectiveSubjectId) ?? null;
@@ -510,6 +539,12 @@ export default function AIQuestionsPage() {
     setSourceMaterial('');
     setReport(null);
     setStatus(null);
+    try {
+      sessionStorage.removeItem(SS_QUESTIONS);
+      sessionStorage.removeItem(SS_ANSWERS);
+      sessionStorage.removeItem(SS_SOURCE);
+      sessionStorage.removeItem(SS_REPORT);
+    } catch {}
   };
 
   return (

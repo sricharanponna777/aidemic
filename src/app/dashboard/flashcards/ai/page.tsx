@@ -224,7 +224,7 @@ export default function AIFlashcardsPage() {
             <div className="mt-2 flex items-center gap-3">
               <Sparkles className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
               <h1 id="ai-flashcards-title" className="text-3xl font-bold text-slate-900 dark:text-white">
-                Flashcards
+                AI Flashcards
               </h1>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
@@ -232,13 +232,6 @@ export default function AIFlashcardsPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href="/dashboard"
-              className={buttonStyles({ variant: 'ghost' })}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Dashboard
-            </Link>
             <Link
               href="/dashboard/flashcards"
               className={buttonStyles({ variant: 'secondary' })}

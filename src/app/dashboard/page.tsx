@@ -451,7 +451,7 @@ export default function Dashboard() {
             href="/dashboard/subjects"
             className={buttonStyles({ variant: 'primary', size: 'lg', className: 'shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-px' })}
           >
-            <BookOpen className="h-4 w-4" />
+            <GraduationCap className="h-4 w-4" />
             Subjects
           </Link>
         </div>

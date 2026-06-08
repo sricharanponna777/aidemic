@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, BookOpen, Layers } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, GraduationCap, Layers } from 'lucide-react';
 import { SubjectManager } from '@/components/SubjectManager';
 import { buttonStyles } from '@/components/ui/button';
 
@@ -13,7 +13,7 @@ export default function SubjectsPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 1 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <BookOpen className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+              <GraduationCap className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
               <h1 id="subjects-title" className="text-3xl font-bold text-slate-900 dark:text-white">Subjects</h1>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
@@ -26,7 +26,7 @@ export default function SubjectsPage() {
               Dashboard
             </Link>
             <Link href="/dashboard/notes" className={buttonStyles({ variant: 'primary' })}>
-              <Layers className="h-4 w-4" />
+              <BookOpen className="h-4 w-4" />
               Learn
               <ArrowRight className="h-4 w-4" />
             </Link>

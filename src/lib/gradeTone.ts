@@ -34,8 +34,15 @@ export const gradeBadgeTone = ({
     return 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300';
   }
 
+  if (normalizedGrade === 'U') {
+    return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300';
+  }
+
   const value = numericGrade(normalizedGrade);
   if (value === null) {
+    // A-level letter grades: A*, A, B → green; C, D → amber; E → red
+    if (normalizedGrade === 'E') return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300';
+    if (normalizedGrade === 'C' || normalizedGrade === 'D') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
     return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300';
   }
 

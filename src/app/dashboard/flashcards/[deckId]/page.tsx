@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Brain, Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Brain, Edit, Layers, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag, FlashcardTagMapping } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -251,7 +251,10 @@ export default function DeckPage() {
       <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-white/6 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 id="deck-page-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
+            <div className='flex flex-row items-center gap-3'>
+              <Layers className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+              <h1 id="deck-page-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
+            </div>
             {deck.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{deck.description}</p> : null}
           </div>
           <div className="flex flex-wrap gap-2">

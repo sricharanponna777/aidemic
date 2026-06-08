@@ -394,7 +394,7 @@ export default function StudySessions() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 4 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <ShieldPlus className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+              <Brain className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
               <h1 id="study-sessions-title" className="text-3xl font-bold text-slate-900 dark:text-white">Flashcard Revision</h1>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
@@ -409,13 +409,6 @@ export default function StudySessions() {
               <ArrowLeft className="h-4 w-4" />
               Flashcards
             </Link>
-            <button
-              className={buttonStyles({ variant: 'secondary' })}
-              onClick={() => setPhase('choosing')}
-            >
-              <Play className="h-4 w-4" />
-              New session
-            </button>
             <Link
               href="/dashboard/ai-questions"
               className={buttonStyles({

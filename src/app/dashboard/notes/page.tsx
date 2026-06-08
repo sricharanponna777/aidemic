@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Brain, Loader2, MessageCircle, RotateCcw, Send, Sparkles } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, ArrowRight, BookOpen, Brain, Layers, Loader2, MessageCircle, RotateCcw, Send, Sparkles } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
@@ -30,18 +30,45 @@ import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
+const SS_TOPIC = 'notes-active-topic';
+const SS_SUBJECT = 'notes-active-subject';
+const SS_NOTES = 'notes-content';
+const SS_CHAT = 'notes-chat-messages';
+
+function ssRead<T>(key: string, fallback: T): T {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw !== null ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function ssWrite(key: string, value: unknown) {
+  try {
+    if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      sessionStorage.removeItem(key);
+    } else {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch {}
+}
+
 function StudyChat({
   concept,
   subject,
   examBoard,
   examType,
+  messages,
+  setMessages,
 }: {
   concept: string;
   subject: string;
   examBoard: string;
   examType: string;
+  messages: ChatMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -177,11 +204,17 @@ export default function NotesPage() {
   const [poemOne, setPoemOne] = useState('');
   const [poemTwo, setPoemTwo] = useState('');
   const [topic, setTopic] = useState('');
-  const [activeTopic, setActiveTopic] = useState('');
-  const [activeSubject, setActiveSubject] = useState<UserSubject | null>(null);
-  const [notes, setNotes] = useState('');
+  const [activeTopic, setActiveTopic] = useState(() => ssRead(SS_TOPIC, ''));
+  const [activeSubject, setActiveSubject] = useState<UserSubject | null>(() => ssRead<UserSubject | null>(SS_SUBJECT, null));
+  const [notes, setNotes] = useState(() => ssRead(SS_NOTES, ''));
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => ssRead<ChatMessage[]>(SS_CHAT, []));
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => { ssWrite(SS_TOPIC, activeTopic); }, [activeTopic]);
+  useEffect(() => { ssWrite(SS_SUBJECT, activeSubject); }, [activeSubject]);
+  useEffect(() => { ssWrite(SS_NOTES, notes); }, [notes]);
+  useEffect(() => { ssWrite(SS_CHAT, chatMessages); }, [chatMessages]);
 
   const effectiveSubjectId = selectedSubjectId || subjects[0]?.id || '';
   const selectedSubject = subjects.find((subject) => subject.id === effectiveSubjectId) ?? null;
@@ -252,6 +285,7 @@ export default function NotesPage() {
       setActiveTopic(topic.trim());
       setActiveSubject(selectedSubject);
       setNotes(body.script || '');
+      setChatMessages([]);
     } catch {
       setErrorMessage('Network error while generating notes.');
     } finally {
@@ -263,6 +297,7 @@ export default function NotesPage() {
     setActiveTopic('');
     setActiveSubject(null);
     setNotes('');
+    setChatMessages([]);
     setErrorMessage('');
   };
 
@@ -286,7 +321,7 @@ export default function NotesPage() {
               Subjects
             </Link>
             <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'primary' })}>
-              <Brain className="h-4 w-4" />
+              <Layers className="h-4 w-4" />
               Flashcards
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -426,6 +461,8 @@ export default function NotesPage() {
                 subject={activeSubject.subject}
                 examBoard={activeSubject.exam_board}
                 examType={activeSubject.exam_type}
+                messages={chatMessages}
+                setMessages={setChatMessages}
               />
             ) : null}
           </div>
