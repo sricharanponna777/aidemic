@@ -36,6 +36,7 @@ import {
 import { createClient } from '@/lib/supabase-client';
 import { getCreationOptionChoices, getCreationOptionLabel, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
+import { gradeBadgeTone } from '@/lib/gradeTone';
 
 
 type Subject =
@@ -874,7 +875,13 @@ export default function AIQuestionsPage() {
           <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/6 dark:bg-[#0A0F1E]">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Predicted Grade</p>
-              <p className={`mt-3 text-6xl font-black ${reportTone(report.percentage)}`}>{report.predictedGrade}</p>
+              <p className={`mt-3 inline-flex rounded-xl px-4 py-2 text-6xl font-black ${gradeBadgeTone({
+                grade: report.predictedGrade,
+                examType: selectedSubject?.exam_type,
+                specTier: selectedSubject?.spec_tier,
+              })}`}>
+                {report.predictedGrade}
+              </p>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 {report.totalMarksAwarded} / {report.totalAvailableMarks} marks - {report.percentage}%
               </p>

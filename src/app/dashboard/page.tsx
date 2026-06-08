@@ -7,8 +7,6 @@ import {
   ArrowRight,
   BookOpen,
   Brain,
-  Clock,
-  Flame,
   GraduationCap,
   Layers,
   Sparkles,
@@ -21,6 +19,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { Flashcard, FlashcardDeck, StudySession } from "@/types";
 import { weightedPredictedGrade } from "@/lib/ai/gradeAverages";
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/subjectConfig";
+import { gcseTierLabelForGrade, gradeBadgeTone } from "@/lib/gradeTone";
 
 type RecentSession = {
   id: string;
@@ -28,7 +27,6 @@ type RecentSession = {
   startedAt: string;
   durationMinutes: number;
   cardsStudied: number;
-  scorePercentage: number | null;
 };
 
 type RecentPracticeAttempt = {
@@ -36,6 +34,7 @@ type RecentPracticeAttempt = {
   topic: string;
   subject: string;
   examType: "gcse" | "a-level" | null;
+  specTier: string | null;
   percentage: number | null;
   predictedGrade: string | null;
   totalMarksAwarded: number | null;
@@ -53,7 +52,11 @@ type SubjectPredictedGrade = {
   subject: string;
   examBoard: string | null;
   examType: "gcse" | "a-level" | null;
+  specTier: string | null;
   predictedGrade: string;
+  totalMarksAwarded: number | null;
+  totalAvailableMarks: number | null;
+  totalPercentage: number | null;
   attempts: number;
   analysableAttempts: number;
 };
@@ -63,11 +66,9 @@ type DashboardMetrics = {
   totalCards: number;
   dueCards: number;
   reviewedCards: number;
-  retentionRate: number | null;
   sessionsCompleted: number;
   totalStudyMinutes: number;
   cardsStudied: number;
-  averageScore: number | null;
   studyStreak: number;
   recentSessions: RecentSession[];
   recentPracticeAttempts: RecentPracticeAttempt[];
@@ -85,6 +86,7 @@ type DashboardAttemptRow = {
   topic?: string | null;
   weakness_tags?: string[] | null;
   weakness_analysis?: string[] | null;
+  exam_board?: string | null;
   exam_type?: string | null;
   percentage?: number | null;
   predicted_grade?: string | null;
@@ -98,18 +100,19 @@ type DashboardSubjectRow = {
   subject: string;
   exam_board?: string | null;
   exam_type?: string | null;
+  spec_tier?: string | null;
 };
 
 type DashboardDeckRow = Pick<FlashcardDeck, "id" | "card_count">;
-type DashboardCardRow = Pick<Flashcard, "deck_id" | "next_review_date" | "times_studied" | "times_correct">;
-type DashboardSessionRow = Pick<StudySession, "id" | "started_at" | "duration_minutes" | "cards_studied" | "score_percentage"> & {
+type DashboardCardRow = Pick<Flashcard, "deck_id" | "next_review_date" | "times_studied">;
+type DashboardSessionRow = Pick<StudySession, "id" | "started_at" | "duration_minutes" | "cards_studied"> & {
   flashcard_decks?: { name?: string } | Array<{ name?: string }> | null;
 };
 
 const emptyMetrics: DashboardMetrics = {
   deckCount: 0, totalCards: 0, dueCards: 0, reviewedCards: 0,
-  retentionRate: null, sessionsCompleted: 0, totalStudyMinutes: 0,
-  cardsStudied: 0, averageScore: null, studyStreak: 0,
+  sessionsCompleted: 0, totalStudyMinutes: 0,
+  cardsStudied: 0, studyStreak: 0,
   recentSessions: [], recentPracticeAttempts: [], topWeaknesses: [], examAttemptsCount: 0,
   primaryExamType: null, latestPracticePercentage: null, latestPracticeGrade: null,
   subjectPredictedGrades: [],
@@ -133,6 +136,42 @@ const formatDate = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown date";
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
+};
+
+const formatQualificationLabel = ({
+  examBoard,
+  examType,
+  specTier,
+  grade,
+  fallback = "Qualification pending",
+}: {
+  examBoard?: string | null;
+  examType?: "gcse" | "a-level" | null;
+  specTier?: string | null;
+  grade?: string | null;
+  fallback?: string;
+}) => {
+  if (!examType) return fallback;
+  const tierLabel = gcseTierLabelForGrade({ grade, examType, specTier });
+  const parts = [
+    examBoard ? getExamBoardLabel(examBoard) : "",
+    getExamTypeLabel(examType),
+    tierLabel ?? "",
+  ].filter(Boolean);
+  return parts.join(" ");
+};
+
+const formatTotalScoreLabel = (item: {
+  totalMarksAwarded: number | null;
+  totalAvailableMarks: number | null;
+  totalPercentage: number | null;
+  analysableAttempts: number;
+  attempts: number;
+}) => {
+  if (item.totalMarksAwarded === null || item.totalAvailableMarks === null) {
+    return `${item.analysableAttempts}/${item.attempts} attempts`;
+  }
+  return `${item.totalMarksAwarded}/${item.totalAvailableMarks}${item.totalPercentage === null ? '' : ` (${item.totalPercentage}%)`}`;
 };
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -197,23 +236,23 @@ export default function Dashboard() {
           deckIds.length > 0
             ? supabase
                 .from("flashcards")
-                .select("deck_id, next_review_date, times_studied, times_correct")
+                .select("deck_id, next_review_date, times_studied")
                 .in("deck_id", deckIds)
             : Promise.resolve({ data: [], error: null }),
           supabase
             .from("study_sessions")
-            .select("id, started_at, duration_minutes, cards_studied, score_percentage, flashcard_decks(name)")
+            .select("id, started_at, duration_minutes, cards_studied, flashcard_decks(name)")
             .eq("user_id", session.user.id)
             .order("started_at", { ascending: false }),
           supabase
             .from("exam_practice_attempts")
-            .select("id, subject, topic, weakness_tags, weakness_analysis, exam_type, percentage, predicted_grade, total_marks_awarded, total_available_marks, created_at")
+            .select("id, subject, topic, weakness_tags, weakness_analysis, exam_board, exam_type, percentage, predicted_grade, total_marks_awarded, total_available_marks, created_at")
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: false })
             .limit(50),
           supabase
             .from("user_subjects")
-            .select("id, subject, exam_board, exam_type")
+            .select("id, subject, exam_board, exam_type, spec_tier")
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: true }),
         ]);
@@ -253,6 +292,14 @@ export default function Dashboard() {
           topic: attempt.topic || "Practice attempt",
           subject: attempt.subject,
           examType: attempt.exam_type === "a-level" ? "a-level" : attempt.exam_type === "gcse" ? "gcse" : null,
+          specTier: (
+            savedSubjects.find((subject) =>
+              subject.subject === attempt.subject &&
+              subject.exam_type === attempt.exam_type &&
+              (!attempt.exam_board || subject.exam_board === attempt.exam_board)
+            ) ??
+            savedSubjects.find((subject) => subject.subject === attempt.subject && subject.exam_type === attempt.exam_type)
+          )?.spec_tier ?? null,
           percentage:
             typeof attempt.percentage === "number" && Number.isFinite(attempt.percentage)
               ? attempt.percentage
@@ -279,24 +326,36 @@ export default function Dashboard() {
           const first = group[0];
           const examType = first.exam_type === "a-level" ? "a-level" : first.exam_type === "gcse" ? "gcse" : null;
           const key = `${first.subject}|${examType ?? "unknown"}`;
-          const savedSubject = savedSubjects.find((subject) => subject.subject === first.subject && subject.exam_type === examType);
+          const savedSubject = (
+            savedSubjects.find((subject) =>
+              subject.subject === first.subject &&
+              subject.exam_type === examType &&
+              (!first.exam_board || subject.exam_board === first.exam_board)
+            ) ??
+            savedSubjects.find((subject) => subject.subject === first.subject && subject.exam_type === examType)
+          );
           subjectReportKeys.set(key, {
             id: savedSubject?.id ?? key,
             subject: first.subject,
             exam_board: savedSubject?.exam_board ?? null,
             exam_type: examType,
+            spec_tier: savedSubject?.spec_tier ?? null,
           });
         }
         const subjectPredictedGrades: SubjectPredictedGrade[] = [...subjectReportKeys.values()]
           .map((subject) => {
             const examType = (subject.exam_type === "a-level" ? "a-level" : subject.exam_type === "gcse" ? "gcse" : null) as "gcse" | "a-level" | null;
             const group = subjectGroups.get(`${subject.subject}|${examType ?? "unknown"}`) ?? [];
-            const prediction = weightedPredictedGrade(group, examType);
+            const prediction = weightedPredictedGrade(group, examType, subject.spec_tier, subject.exam_board);
             return {
               subject: subject.subject,
               examBoard: subject.exam_board ?? null,
               examType,
+              specTier: subject.spec_tier ?? null,
               predictedGrade: prediction.grade,
+              totalMarksAwarded: prediction.totalMarksAwarded,
+              totalAvailableMarks: prediction.totalAvailableMarks,
+              totalPercentage: prediction.percentage,
               attempts: group.length,
               analysableAttempts: prediction.analysableCount,
             };
@@ -312,17 +371,7 @@ export default function Dashboard() {
           startedAt: item.started_at || "",
           durationMinutes: item.duration_minutes || 0,
           cardsStudied: item.cards_studied || 0,
-          scorePercentage:
-            typeof item.score_percentage === "number" && Number.isFinite(item.score_percentage)
-              ? item.score_percentage
-              : null,
         }));
-
-        const totalReviews = cards.reduce((sum, card) => sum + (card.times_studied || 0), 0);
-        const totalCorrect = cards.reduce((sum, card) => sum + (card.times_correct || 0), 0);
-        const scoreValues = sessions
-          .map((s) => s.scorePercentage)
-          .filter((score): score is number => typeof score === "number" && Number.isFinite(score));
 
         setMetrics({
           deckCount: deckRows.length,
@@ -333,14 +382,9 @@ export default function Dashboard() {
             return Number.isNaN(nextReview.getTime()) || nextReview <= now;
           }).length,
           reviewedCards: cards.filter((card) => (card.times_studied || 0) > 0).length,
-          retentionRate: totalReviews > 0 ? Math.round((totalCorrect / totalReviews) * 1000) / 10 : null,
           sessionsCompleted: sessions.length,
           totalStudyMinutes: sessions.reduce((sum, s) => sum + s.durationMinutes, 0),
           cardsStudied: sessions.reduce((sum, s) => sum + s.cardsStudied, 0),
-          averageScore:
-            scoreValues.length > 0
-              ? Math.round(scoreValues.reduce((sum, s) => sum + s, 0) / scoreValues.length)
-              : null,
           studyStreak: calculateStudyStreak(
             sessions.map((s) => new Date(s.startedAt).getTime()).filter((t) => Number.isFinite(t))
           ),
@@ -372,8 +416,6 @@ export default function Dashboard() {
     () => session?.user.email?.split("@")[0] || "there",
     [session?.user.email]
   );
-
-  const statCards: unknown[] = [];
 
   return (
     <div className="space-y-6">
@@ -438,7 +480,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-white/6 dark:bg-white/5 dark:text-slate-400 sm:grid-cols-[1.15fr_0.75fr_0.5fr_auto]">
             <span>Subject</span>
             <span className="hidden sm:block">Qualification</span>
-            <span className="hidden sm:block">Evidence</span>
+            <span className="hidden sm:block">Total Score</span>
             <span className="text-right">Grade</span>
           </div>
 
@@ -456,26 +498,40 @@ export default function Dashboard() {
             <div className="divide-y divide-slate-100 dark:divide-white/6">
               {metrics.subjectPredictedGrades.map((item) => (
                 <article
-                  key={`${item.subject}-${item.examType ?? "unknown"}-${item.examBoard ?? "board"}`}
+                  key={`${item.subject}-${item.examType ?? "unknown"}-${item.examBoard ?? "board"}-${item.specTier ?? "tier"}`}
                   className="grid grid-cols-[1fr_auto] gap-3 px-5 py-4 sm:grid-cols-[1.15fr_0.75fr_0.5fr_auto] sm:items-center"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{getSubjectLabel(item.subject)}</p>
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 sm:hidden">
-                      {item.examBoard ? `${getExamBoardLabel(item.examBoard)} ` : ''}{item.examType ? getExamTypeLabel(item.examType) : 'Qualification pending'}
+                      {formatQualificationLabel({
+                        examBoard: item.examBoard,
+                        examType: item.examType,
+                        specTier: item.specTier,
+                        grade: item.predictedGrade,
+                      })}
+                    </p>
+                    <p className="mt-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:hidden">
+                      Total score: {formatTotalScoreLabel(item)}
                     </p>
                   </div>
                   <p className="hidden text-sm text-slate-600 dark:text-slate-300 sm:block">
-                    {item.examBoard ? `${getExamBoardLabel(item.examBoard)} ` : ''}{item.examType ? getExamTypeLabel(item.examType) : 'Pending'}
+                    {formatQualificationLabel({
+                      examBoard: item.examBoard,
+                      examType: item.examType,
+                      specTier: item.specTier,
+                      grade: item.predictedGrade,
+                      fallback: "Pending",
+                    })}
                   </p>
                   <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
-                    {item.attempts === 0 ? 'No attempts' : `${item.analysableAttempts}/${item.attempts}`}
+                    {formatTotalScoreLabel(item)}
                   </p>
-                  <span className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${
-                    item.predictedGrade === 'N/A'
-                      ? 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300'
-                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                  }`}>
+                  <span className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({
+                    grade: item.predictedGrade,
+                    examType: item.examType,
+                    specTier: item.specTier,
+                  })}`}>
                     {item.predictedGrade}
                   </span>
                 </article>
@@ -543,7 +599,11 @@ export default function Dashboard() {
                   <span className="text-sm font-bold text-slate-900 dark:text-white">
                     {attempt.percentage === null ? "--" : `${attempt.percentage}%`}
                   </span>
-                  <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                  <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
+                    grade: attempt.predictedGrade,
+                    examType: attempt.examType,
+                    specTier: attempt.specTier,
+                  })}`}>
                     {attempt.predictedGrade || "N/A"}
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -663,19 +723,6 @@ export default function Dashboard() {
                         {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)} · {item.cardsStudied} cards
                       </p>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${
-                        item.scorePercentage === null
-                          ? "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300"
-                          : item.scorePercentage >= 80
-                            ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                            : item.scorePercentage >= 60
-                              ? "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300"
-                              : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300"
-                      }`}
-                    >
-                      {item.scorePercentage === null ? "--" : `${item.scorePercentage}%`}
-                    </span>
                   </div>
                 ))}
               </div>

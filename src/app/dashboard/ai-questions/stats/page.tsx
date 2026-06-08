@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
+import { gcseTierLabelForGrade, gradeBadgeTone } from '@/lib/gradeTone';
 
 type AttemptRow = {
   id: string;
@@ -27,7 +28,9 @@ type AttemptRow = {
 type SubjectRow = {
   id: string;
   subject: string;
+  exam_board: string | null;
   exam_type: string | null;
+  spec_tier: string | null;
 };
 
 const formatDate = (value: string | null) => {
@@ -35,6 +38,14 @@ const formatDate = (value: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown date';
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+};
+
+const formatTieredExamLabel = (examType: string | null, specTier?: string | null, grade?: string | null) => {
+  if (!examType) return 'Qualification pending';
+  return [
+    getExamTypeLabel(examType),
+    gcseTierLabelForGrade({ grade, examType, specTier }) ?? '',
+  ].filter(Boolean).join(' ');
 };
 
 const cleanWeakness = (value: string) =>
@@ -66,7 +77,7 @@ export default function SmartPracticeStatsPage() {
           .order('created_at', { ascending: false }),
         supabase
           .from('user_subjects')
-          .select('id, subject, exam_type')
+          .select('id, subject, exam_board, exam_type, spec_tier')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: true }),
       ]);
@@ -108,19 +119,36 @@ export default function SmartPracticeStatsPage() {
     for (const group of subjectMap.values()) {
       const first = group[0];
       const key = `${first.subject}|${first.exam_type ?? 'unknown'}`;
-      const savedSubject = subjects.find((subject) => subject.subject === first.subject && subject.exam_type === first.exam_type);
-      subjectKeys.set(key, { id: savedSubject?.id ?? key, subject: first.subject, exam_type: first.exam_type });
+      const savedSubject = (
+        subjects.find((subject) =>
+          subject.subject === first.subject &&
+          subject.exam_type === first.exam_type &&
+          (!first.exam_board || subject.exam_board === first.exam_board)
+        ) ??
+        subjects.find((subject) => subject.subject === first.subject && subject.exam_type === first.exam_type)
+      );
+      subjectKeys.set(key, {
+        id: savedSubject?.id ?? key,
+        subject: first.subject,
+        exam_board: savedSubject?.exam_board ?? null,
+        exam_type: first.exam_type,
+        spec_tier: savedSubject?.spec_tier ?? null,
+      });
     }
 
     return {
       subjectPredictions: [...subjectKeys.values()]
         .map((subject) => {
           const group = subjectMap.get(`${subject.subject}|${subject.exam_type ?? 'unknown'}`) ?? [];
-          const average = weightedPredictedGrade(group, subject.exam_type);
+          const average = weightedPredictedGrade(group, subject.exam_type, subject.spec_tier, subject.exam_board);
           return {
             subject: subject.subject,
             examType: subject.exam_type,
             grade: average.grade,
+            specTier: subject.spec_tier,
+            totalMarksAwarded: average.totalMarksAwarded,
+            totalAvailableMarks: average.totalAvailableMarks,
+            totalPercentage: average.percentage,
             attempts: group.length,
             analysableAttempts: average.analysableCount,
           };
@@ -178,11 +206,25 @@ export default function SmartPracticeStatsPage() {
             ) : (
               stats.subjectPredictions.map((item) => (
                 <div key={`${item.subject}-${item.examType}`} className="rounded-lg border border-slate-100 px-3 py-2 dark:border-white/6">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {getSubjectLabel(item.subject)}: {item.grade}
-                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                      {getSubjectLabel(item.subject)}
+                    </p>
+                    <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
+                      grade: item.grade,
+                      examType: item.examType,
+                      specTier: item.specTier,
+                    })}`}>
+                      {item.grade}
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {item.examType ? getExamTypeLabel(item.examType) : 'Qualification pending'} - {item.analysableAttempts === 0 ? 'no analysable grades' : `${item.analysableAttempts}/${item.attempts} attempts`}
+                    {formatTieredExamLabel(item.examType, item.specTier, item.grade)} - {item.analysableAttempts === 0 ? 'no analysable grades' : `${item.analysableAttempts}/${item.attempts} attempts`}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    Total score: {item.totalMarksAwarded === null || item.totalAvailableMarks === null
+                      ? '--'
+                      : `${item.totalMarksAwarded}/${item.totalAvailableMarks}${item.totalPercentage === null ? '' : ` (${item.totalPercentage}%)`}`}
                   </p>
                 </div>
               ))
@@ -217,11 +259,25 @@ export default function SmartPracticeStatsPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{attempt.topic}</p>
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {getExamTypeLabel(attempt.exam_type)} - {formatDate(attempt.created_at)}
+                      {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {formatTieredExamLabel(
+                        attempt.exam_type,
+                        subjects.find((subject) =>
+                          subject.subject === attempt.subject &&
+                          subject.exam_type === attempt.exam_type &&
+                          subject.exam_board === attempt.exam_board
+                        )?.spec_tier ??
+                          subjects.find((subject) => subject.subject === attempt.subject && subject.exam_type === attempt.exam_type)?.spec_tier ??
+                          null,
+                        attempt.predicted_grade
+                      )} - {formatDate(attempt.created_at)}
                     </p>
                   </div>
                   <span className="text-sm font-bold text-slate-900 dark:text-white">{attempt.percentage ?? '--'}%</span>
-                  <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                  <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
+                    grade: attempt.predicted_grade,
+                    examType: attempt.exam_type,
+                    specTier: subjects.find((subject) => subject.subject === attempt.subject && subject.exam_type === attempt.exam_type)?.spec_tier ?? null,
+                  })}`}>
                     {attempt.predicted_grade || 'N/A'}
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">

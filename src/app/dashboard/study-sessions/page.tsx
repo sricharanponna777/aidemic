@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, BarChart3, Brain, Clock3, Layers, Play, Rocket, RotateCcw, ShieldPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, Clock3, Layers, Play, Rocket, RotateCcw, ShieldPlus } from 'lucide-react';
 import { StudySession, FlashcardDeck, Flashcard } from '@/types';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase-client';
@@ -18,8 +18,6 @@ type Session = Pick<
   | 'ended_at'
   | 'duration_minutes'
   | 'cards_studied'
-  | 'cards_correct'
-  | 'score_percentage'
   | 'difficulty_level'
   | 'ai_recommendations'
 > & { deck_name: string };
@@ -29,13 +27,6 @@ type SessionRow = StudySession & {
   flashcard_decks?: { name?: string } | Array<{ name?: string }> | null;
 };
 type DueCardRow = Pick<Flashcard, 'deck_id' | 'next_review_date'>;
-
-type SessionResultDraft = {
-  flashcard_id: string;
-  was_correct: boolean;
-  time_to_answer_seconds?: number;
-  confidence_level?: number;
-};
 
 type Notice = {
   tone: 'success' | 'warning' | 'error';
@@ -77,13 +68,6 @@ const formatMinutes = (minutes?: number) => {
   return remainder > 0 ? `${hours}h ${remainder}m` : `${hours}h`;
 };
 
-const scoreTone = (score?: number | null) => {
-  if (typeof score !== 'number') return 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200';
-  if (score >= 80) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/45 dark:text-emerald-200';
-  if (score >= 50) return 'bg-amber-100 text-amber-800 dark:bg-amber-950/45 dark:text-amber-200';
-  return 'bg-red-100 text-red-800 dark:bg-red-950/45 dark:text-red-200';
-};
-
 export default function StudySessions() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [phase, setPhase] = useState<'idle' | 'choosing' | 'reviewing'>('idle');
@@ -94,8 +78,6 @@ export default function StudySessions() {
   const [showBack, setShowBack] = useState(false);
   const [sessionStartedAt, setSessionStartedAt] = useState<Date | null>(null);
   const [cardsStudied, setCardsStudied] = useState(0);
-  const [cardsCorrect, setCardsCorrect] = useState(0);
-  const [results, setResults] = useState<SessionResultDraft[]>([]);
   const [notice, setNotice] = useState<Notice | null>(null);
   const { session } = useAuth();
   const userId = session?.user?.id;
@@ -126,8 +108,6 @@ export default function StudySessions() {
           ended_at: item.ended_at || '',
           duration_minutes: item.duration_minutes || 0,
           cards_studied: item.cards_studied || 0,
-          cards_correct: item.cards_correct || 0,
-          score_percentage: item.score_percentage || 0,
           difficulty_level: item.difficulty_level || '',
           ai_recommendations: item.ai_recommendations || '',
         }));
@@ -211,23 +191,14 @@ export default function StudySessions() {
   );
 
   const sessionSummary = useMemo(() => {
-    const scoreValues = sessions
-      .map((item) => item.score_percentage)
-      .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
-
     return {
       completed: sessions.length,
       totalCards: sessions.reduce((sum, item) => sum + (item.cards_studied || 0), 0),
       totalMinutes: sessions.reduce((sum, item) => sum + (item.duration_minutes || 0), 0),
-      averageScore:
-        scoreValues.length > 0
-          ? Math.round(scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length)
-          : null,
     };
   }, [sessions]);
 
   const currentCard = cardsToReview[currentCardIndex];
-  const progressPercentage = cardsToReview.length > 0 ? ((currentCardIndex + 1) / cardsToReview.length) * 100 : 0;
 
   const reviewPreviews = useMemo<
     { label: string; quality: number; color: string; interval_days: number; next_review_date: string }[]
@@ -300,19 +271,13 @@ export default function StudySessions() {
     setCurrentCardIndex(0);
     setShowBack(false);
     setCardsStudied(0);
-    setCardsCorrect(0);
-    setResults([]);
     setPhase('reviewing');
   };
 
   const finishSession = async ({
     finalCardsStudied = cardsStudied,
-    finalCardsCorrect = cardsCorrect,
-    finalResults = results,
   }: {
     finalCardsStudied?: number;
-    finalCardsCorrect?: number;
-    finalResults?: SessionResultDraft[];
   } = {}) => {
     if (!session?.user?.id) {
       setNotice({ tone: 'error', text: 'Unable to save session because you are not signed in.' });
@@ -322,10 +287,9 @@ export default function StudySessions() {
     const endedAt = new Date();
     const elapsedMinutes = (endedAt.getTime() - (sessionStartedAt?.getTime() || endedAt.getTime())) / 60000;
     const durationMinutes = finalCardsStudied > 0 ? Math.max(1, Math.round(elapsedMinutes || 0)) : 0;
-    const score = finalCardsStudied > 0 ? Math.round((finalCardsCorrect / finalCardsStudied) * 100) : 0;
 
     const supabase = createClient();
-    const { data: insertedSession, error: sessionError } = await supabase
+    const { error: sessionError } = await supabase
       .from('study_sessions')
       .insert([
         {
@@ -335,8 +299,6 @@ export default function StudySessions() {
           ended_at: endedAt.toISOString(),
           duration_minutes: durationMinutes,
           cards_studied: finalCardsStudied,
-          cards_correct: finalCardsCorrect,
-          score_percentage: score,
         },
       ])
       .select()
@@ -348,26 +310,10 @@ export default function StudySessions() {
       return;
     }
 
-    let resultSaveFailed = false;
-
-    if (finalResults.length > 0 && insertedSession?.id) {
-      const formatted = finalResults.map((result) => ({
-        ...result,
-        session_id: insertedSession.id,
-        user_id: session.user.id,
-      }));
-      const { error: resultError } = await supabase.from('study_session_results').insert(formatted);
-      if (resultError) {
-        resultSaveFailed = true;
-      }
-    }
-
     await Promise.all([loadSessions(), loadDecks()]);
     setNotice({
-      tone: resultSaveFailed ? 'warning' : 'success',
-      text: resultSaveFailed
-        ? `Session saved: ${finalCardsStudied} cards, ${score}% score. Card-by-card details could not be saved.`
-        : `Session saved: ${finalCardsStudied} cards, ${score}% score.`,
+      tone: 'success',
+      text: `Session saved: ${finalCardsStudied} cards reviewed.`,
     });
     setPhase('idle');
     setSelectedDeckId('');
@@ -376,8 +322,6 @@ export default function StudySessions() {
     setShowBack(false);
     setSessionStartedAt(null);
     setCardsStudied(0);
-    setCardsCorrect(0);
-    setResults([]);
   };
 
   const handleGrade = async (quality: number) => {
@@ -394,7 +338,11 @@ export default function StudySessions() {
       times_studied: card.times_studied || 0,
       times_correct: card.times_correct || 0,
     };
-    const updated = updateSpacedRepetition(prev, quality);
+    const updated = {
+      ...updateSpacedRepetition(prev, quality),
+      consecutive_correct: prev.consecutive_correct,
+      times_correct: prev.times_correct,
+    };
     const supabase = createClient();
     await supabase.from('flashcards').update(updated).eq('id', card.id).eq('deck_id', selectedDeckId);
 
@@ -402,15 +350,10 @@ export default function StudySessions() {
       prevCards.map((item, index) => (index === currentCardIndex ? { ...item, ...updated } : item))
     );
 
-    const nextResult = { flashcard_id: card.id, was_correct: quality >= 2 };
-    const nextResults = [...results, nextResult];
     const nextCardsStudied = cardsStudied + 1;
-    const nextCardsCorrect = cardsCorrect + (quality >= 2 ? 1 : 0);
     const nextIndex = currentCardIndex + 1;
 
-    setResults(nextResults);
     setCardsStudied(nextCardsStudied);
-    setCardsCorrect(nextCardsCorrect);
 
     if (nextIndex < cardsToReview.length) {
       setCurrentCardIndex(nextIndex);
@@ -418,8 +361,6 @@ export default function StudySessions() {
     } else {
       await finishSession({
         finalCardsStudied: nextCardsStudied,
-        finalCardsCorrect: nextCardsCorrect,
-        finalResults: nextResults,
       });
     }
   };
@@ -473,7 +414,7 @@ export default function StudySessions() {
         </div>
       </section>
 
-      <section aria-label="Study overview" className="grid gap-4 md:grid-cols-3">
+      <section aria-label="Study overview" className="grid gap-4 md:grid-cols-2">
         <article className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-5 shadow-sm dark:shadow-none">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Sessions completed</p>
@@ -489,18 +430,6 @@ export default function StudySessions() {
           </div>
           <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{sessionSummary.totalCards}</p>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">from saved sessions</p>
-        </article>
-        <article className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-5 shadow-sm dark:shadow-none">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Average score</p>
-            <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">
-            {sessionSummary.averageScore === null ? '--' : `${sessionSummary.averageScore}%`}
-          </p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {sessionSummary.averageScore === null ? 'complete a session first' : 'across saved sessions'}
-          </p>
         </article>
       </section>
 
@@ -619,14 +548,6 @@ export default function StudySessions() {
                 Card {currentCardIndex + 1} of {cardsToReview.length}
               </p>
             </div>
-            <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/6">
-              <span className="font-semibold text-slate-900 dark:text-slate-100">{cardsCorrect}</span>
-              <span className="text-slate-500 dark:text-slate-400"> correct / {cardsStudied} answered</span>
-            </div>
-          </div>
-
-          <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-            <div className="h-full bg-linear-to-r from-indigo-600 to-purple-600 transition-all" style={{ width: `${progressPercentage}%` }} />
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/6 dark:bg-white/3" aria-labelledby="current-card-heading">
@@ -711,20 +632,13 @@ export default function StudySessions() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.deck_name}</h3>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${scoreTone(item.score_percentage)}`}>
-                      {typeof item.score_percentage === 'number' ? `${item.score_percentage}%` : '--'}
-                    </span>
                   </div>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{formatSessionDate(item.started_at)}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-right text-sm">
+                <div className="grid grid-cols-2 gap-2 text-right text-sm">
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{item.cards_studied || 0}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">cards</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{item.cards_correct || 0}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">correct</p>
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{formatMinutes(item.duration_minutes)}</p>

@@ -9,6 +9,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { gcseTierLabelForGrade, gradeBadgeTone } from '@/lib/gradeTone';
 
 type ExamQuestion = {
   questionType?: 'open' | 'mcq';
@@ -79,6 +80,12 @@ const formatDateTime = (value: string | null) => {
   }).format(date);
 };
 
+const formatTieredExamLabel = (examType: string, specTier?: string | null, grade?: string | null) =>
+  [
+    getExamTypeLabel(examType),
+    gcseTierLabelForGrade({ grade, examType, specTier }) ?? '',
+  ].filter(Boolean).join(' ');
+
 const asQuestions = (value: unknown): ExamQuestion[] => Array.isArray(value) ? value as ExamQuestion[] : [];
 const asAnswers = (value: unknown): string[] => Array.isArray(value) ? value.map((item) => String(item ?? '')) : [];
 const asReport = (value: unknown): MarkingReport | null =>
@@ -92,6 +99,7 @@ export default function AttemptDetailPage() {
   const params = useParams<{ attemptId: string }>();
   const attemptId = params?.attemptId;
   const [attempt, setAttempt] = useState<AttemptDetail | null>(null);
+  const [specTier, setSpecTier] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -123,8 +131,19 @@ export default function AttemptDetailPage() {
         console.warn('Practice attempt could not be loaded', response.error?.message ?? response.error ?? 'No row returned');
         setErrorMessage('Could not load this practice attempt.');
         setAttempt(null);
+        setSpecTier(null);
       } else {
-        setAttempt(response.data as AttemptDetail);
+        const loadedAttempt = response.data as AttemptDetail;
+        setAttempt(loadedAttempt);
+        const { data: subjectData } = await supabase
+          .from('user_subjects')
+          .select('spec_tier')
+          .eq('user_id', session.user.id)
+          .eq('subject', loadedAttempt.subject)
+          .eq('exam_board', loadedAttempt.exam_board)
+          .eq('exam_type', loadedAttempt.exam_type)
+          .maybeSingle();
+        setSpecTier((subjectData as { spec_tier?: string | null } | null)?.spec_tier ?? null);
       }
       setIsLoading(false);
     };
@@ -156,7 +175,7 @@ export default function AttemptDetailPage() {
             </div>
             {attempt ? (
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {getExamTypeLabel(attempt.exam_type)} - {formatDateTime(attempt.created_at)}
+                {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {formatTieredExamLabel(attempt.exam_type, specTier, attempt.predicted_grade)} - {formatDateTime(attempt.created_at)}
               </p>
             ) : null}
           </div>
@@ -187,10 +206,17 @@ export default function AttemptDetailPage() {
               { label: 'Questions', value: hasQuestionDetail ? detail.markedAnswers.length.toString() : '--', icon: BarChart3 },
             ].map((item) => {
               const Icon = item.icon;
+              const valueClassName = item.label === 'Grade'
+                ? `inline-flex rounded-lg px-3 py-1 text-2xl font-bold ${gradeBadgeTone({
+                    grade: attempt.predicted_grade,
+                    examType: attempt.exam_type,
+                    specTier,
+                  })}`
+                : 'mt-3 text-2xl font-bold text-slate-900 dark:text-white';
               return (
                 <article key={item.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
                   <Icon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                  <p className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">{item.value}</p>
+                  <p className={valueClassName}>{item.value}</p>
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{item.label}</p>
                 </article>
               );

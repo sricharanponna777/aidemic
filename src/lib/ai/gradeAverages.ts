@@ -17,17 +17,34 @@ export const averagePredictedGrade = (
     .filter((value) => value >= 0);
 
   if (values.length === 0) {
-    return { grade: 'N/A', analysableCount: 0 };
+    return { grade: 'N/A', analysableCount: 0, totalMarksAwarded: null, totalAvailableMarks: null, percentage: null };
   }
 
   const average = values.reduce((sum, value) => sum + value, 0) / values.length;
   return {
     grade: scale[Math.round(average)] ?? 'N/A',
     analysableCount: values.length,
+    totalMarksAwarded: null,
+    totalAvailableMarks: null,
+    percentage: null,
   };
 };
 
-const gradeFromPercentage = (percentage: number, examType: string | null | undefined) => {
+const normalizeGcseTier = (specTier: string | null | undefined) => {
+  const normalized = (specTier ?? '').toLowerCase();
+  if (normalized.includes('foundation')) return 'foundation';
+  if (normalized.includes('higher')) return 'higher';
+  return null;
+};
+
+const gradeFromPercentage = (
+  percentage: number,
+  examType: string | null | undefined,
+  specTier?: string | null,
+  examBoard?: string | null
+) => {
+  const gcseTier = normalizeGcseTier(specTier);
+  const adjustment = examBoard === 'edexcel' ? -2 : examBoard === 'ocr' ? -1 : 0;
   const boundaries =
     examType === 'a-level'
       ? [
@@ -38,6 +55,24 @@ const gradeFromPercentage = (percentage: number, examType: string | null | undef
           ['D', 45],
           ['E', 35],
         ]
+      : gcseTier === 'foundation'
+        ? [
+            ['5', 70],
+            ['4', 55],
+            ['3', 40],
+            ['2', 25],
+            ['1', 10],
+          ]
+        : gcseTier === 'higher'
+          ? [
+              ['9', 85],
+              ['8', 78],
+              ['7', 70],
+              ['6', 60],
+              ['5', 50],
+              ['4', 40],
+              ['3', 30],
+            ]
       : [
           ['9', 85],
           ['8', 78],
@@ -51,7 +86,7 @@ const gradeFromPercentage = (percentage: number, examType: string | null | undef
         ];
 
   for (const [grade, boundary] of boundaries) {
-    if (percentage >= Number(boundary)) return String(grade);
+    if (percentage >= Number(boundary) + adjustment) return String(grade);
   }
   return 'U';
 };
@@ -64,7 +99,9 @@ export type PracticeGradeInput = {
 
 export const weightedPredictedGrade = (
   attempts: PracticeGradeInput[],
-  examType: string | null | undefined
+  examType: string | null | undefined,
+  specTier?: string | null,
+  examBoard?: string | null
 ) => {
   const markAttempts = attempts.filter(
     (attempt) =>
@@ -80,8 +117,11 @@ export const weightedPredictedGrade = (
     const available = markAttempts.reduce((sum, attempt) => sum + (attempt.total_available_marks ?? 0), 0);
     const percentage = available > 0 ? (awarded / available) * 100 : 0;
     return {
-      grade: gradeFromPercentage(percentage, examType),
+      grade: gradeFromPercentage(percentage, examType, specTier, examBoard),
       analysableCount: markAttempts.length,
+      totalMarksAwarded: awarded,
+      totalAvailableMarks: available,
+      percentage: Math.round(percentage),
     };
   }
 

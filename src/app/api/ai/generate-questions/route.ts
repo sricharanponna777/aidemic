@@ -168,12 +168,15 @@ const coerceGeneratedQuestions = (value: unknown): GeneratedExamQuestions | null
   if (Array.isArray(value)) {
     return { questions: value as ExamQuestion[] };
   }
-  const direct = value as { questions?: unknown };
+  const direct = value as { questions?: unknown; question?: unknown };
   const sourceMaterial = typeof (value as { sourceMaterial?: unknown }).sourceMaterial === 'string'
     ? (value as { sourceMaterial: string }).sourceMaterial
     : '';
   if (Array.isArray(direct.questions)) {
     return { questions: direct.questions as ExamQuestion[], sourceMaterial };
+  }
+  if (direct.question && typeof direct.question === 'object') {
+    return { questions: [direct.question as ExamQuestion], sourceMaterial };
   }
   const nestedCandidates = Object.values(value as Record<string, unknown>);
   for (const candidate of nestedCandidates) {
