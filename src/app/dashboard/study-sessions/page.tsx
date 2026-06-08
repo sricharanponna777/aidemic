@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Brain, Clock3, Layers, Play, Rocket, RotateCcw, ShieldPlus } from 'lucide-react';
 import { StudySession, FlashcardDeck, Flashcard } from '@/types';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase-client';
 import { updateSpacedRepetition, formatInterval, previewNextReview } from '@/lib/spacedRepetition';
 import { useAuth } from '@/hooks/useAuth';
@@ -79,6 +79,7 @@ export default function StudySessions() {
   const [sessionStartedAt, setSessionStartedAt] = useState<Date | null>(null);
   const [cardsStudied, setCardsStudied] = useState(0);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const didApplyDeckParam = useRef(false);
   const { session } = useAuth();
   const userId = session?.user?.id;
 
@@ -176,6 +177,19 @@ export default function StudySessions() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadSessions, loadDecks]);
+
+  useEffect(() => {
+    if (didApplyDeckParam.current) return;
+    const deckId = new URLSearchParams(window.location.search).get('deckId');
+    if (!deckId || deckList.length === 0) return;
+    if (!deckList.some((deck) => deck.id === deckId)) return;
+    didApplyDeckParam.current = true;
+    const timer = window.setTimeout(() => {
+      setSelectedDeckId(deckId);
+      setPhase('choosing');
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [deckList]);
 
   const orderedDeckList = useMemo(() => {
     return [...deckList].sort((a, b) => {
@@ -393,7 +407,7 @@ export default function StudySessions() {
               className={buttonStyles({ variant: 'secondary' })}
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to flashcards
+              Flashcards
             </Link>
             <button
               className={buttonStyles({ variant: 'primary' })}
@@ -407,7 +421,7 @@ export default function StudySessions() {
               className={buttonStyles({ variant: 'secondary' })}
             >
               <Rocket className="h-4 w-4" />
-              Next: Smart Practice
+              Smart Practice
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

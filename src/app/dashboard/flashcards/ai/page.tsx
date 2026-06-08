@@ -244,14 +244,14 @@ export default function AIFlashcardsPage() {
               className={buttonStyles({ variant: 'secondary' })}
             >
               <ArrowLeft className="h-4 w-4" />
-              Decks
+              Flashcards
             </Link>
             <Link
               href="/dashboard/study-sessions"
               className={buttonStyles({ variant: 'primary' })}
             >
               <Brain className="h-4 w-4" />
-              Next: Flashcard Revision
+              Flashcard Revision
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

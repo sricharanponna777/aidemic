@@ -529,7 +529,7 @@ export default function AIQuestionsPage() {
           <div className="flex flex-wrap gap-2">
             <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'secondary' })}>
               <ArrowLeft className="h-4 w-4" />
-              Back to revision
+              Flashcard Revision
             </Link>
             <Link href="/dashboard" className={buttonStyles({ variant: 'primary' })}>
               <LayoutDashboard className="h-4 w-4" />

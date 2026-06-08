@@ -43,7 +43,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="mx-auto w-full max-w-5xl space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">Manage your account and preferences</p>
@@ -51,7 +51,7 @@ export default function Settings() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className="max-w-2xl">
             <div className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Subjects</h2>
@@ -61,17 +61,17 @@ export default function Settings() {
             </p>
           </div>
           <Link href="/dashboard/subjects" className={buttonStyles({ variant: "secondary" })}>
-            Manage Subjects
+            Subjects
           </Link>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none sm:p-8">
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Appearance</h2>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Pick the mode that feels best for your Flashcard reviews.</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <button
             type="button"
             onClick={() => handleThemeChange("light")}
@@ -116,7 +116,7 @@ export default function Settings() {
         </p>
       </div>
 
-      <div className="rounded-lg bg-red-50 p-8 dark:bg-red-950/60 dark:ring-1 dark:ring-red-800/70">
+      <div className="rounded-2xl bg-red-50 p-6 dark:bg-red-950/60 dark:ring-1 dark:ring-red-800/70 sm:p-8">
         <div className="mb-6 flex items-center gap-3">
           <LogOut className="h-6 w-6 text-red-600 dark:text-red-400" />
           <h2 className="text-xl font-bold text-red-900 dark:text-red-100">Sign Out</h2>

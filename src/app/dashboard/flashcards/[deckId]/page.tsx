@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Brain, Edit, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag, FlashcardTagMapping } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
@@ -254,10 +254,16 @@ export default function DeckPage() {
             <h1 id="deck-page-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
             {deck.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{deck.description}</p> : null}
           </div>
-          <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'secondary' })}>
-            <ArrowLeft className="h-4 w-4" />
-            Back to decks
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'secondary' })}>
+              <ArrowLeft className="h-4 w-4" />
+              Flashcards
+            </Link>
+            <Link href={`/dashboard/study-sessions?deckId=${deckId}`} className={buttonStyles({ variant: 'primary' })}>
+              <Brain className="h-4 w-4" />
+              Flashcard Revision
+            </Link>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
           <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-[#131B2E] dark:text-slate-200">{deck.card_count || cards.length} cards</span>

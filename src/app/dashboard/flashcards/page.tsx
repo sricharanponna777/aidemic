@@ -181,7 +181,7 @@ export default function Flashcards() {
           <div className="flex flex-wrap gap-3">
             <Link href="/dashboard/notes" className={buttonStyles({ variant: 'secondary' })}>
               <ArrowLeft className="h-4 w-4" />
-              Back to notes
+              Learn
             </Link>
             <Button variant="secondary" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4" />
@@ -193,7 +193,7 @@ export default function Flashcards() {
             </Link>
             <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'subtle' })}>
               <ShieldPlus className="h-4 w-4" />
-              Next: Flashcard Revision
+              Flashcard Revision
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

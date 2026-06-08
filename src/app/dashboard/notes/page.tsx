@@ -283,11 +283,11 @@ export default function NotesPage() {
           <div className="flex flex-wrap gap-2">
             <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'secondary' })}>
               <ArrowLeft className="h-4 w-4" />
-              Back to subjects
+              Subjects
             </Link>
             <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'primary' })}>
               <Brain className="h-4 w-4" />
-              Next: Flashcards
+              Flashcards
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

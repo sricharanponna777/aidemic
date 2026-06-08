@@ -452,7 +452,7 @@ export default function Dashboard() {
             className={buttonStyles({ variant: 'primary', size: 'lg', className: 'shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-px' })}
           >
             <BookOpen className="h-4 w-4" />
-            Start with subjects
+            Subjects
           </Link>
         </div>
 
@@ -578,7 +578,7 @@ export default function Dashboard() {
                 Complete a marked practice attempt to see your recent scores here.
               </p>
               <Link href="/dashboard/ai-questions" className={buttonStyles({ variant: 'primary', className: 'mt-4' })}>
-                Start Practice
+                Smart Practice
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -699,13 +699,13 @@ export default function Dashboard() {
                 <Brain className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
                 <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No sessions yet</p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Start a Flashcard Revision session
+                  Flashcard Revision
                 </p>
                 <Link
                   href="/dashboard/study-sessions"
                   className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-500/30 transition-colors"
                 >
-                  Start Now <ArrowRight className="h-3 w-3" />
+                  Flashcard Revision <ArrowRight className="h-3 w-3" />
                 </Link>
               </div>
             ) : (

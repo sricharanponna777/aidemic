@@ -23,11 +23,11 @@ export default function SubjectsPage() {
           <div className="flex flex-wrap gap-2">
             <Link href="/dashboard" className={buttonStyles({ variant: 'secondary' })}>
               <ArrowLeft className="h-4 w-4" />
-              Back to dashboard
+              Dashboard
             </Link>
             <Link href="/dashboard/notes" className={buttonStyles({ variant: 'primary' })}>
               <Layers className="h-4 w-4" />
-              Next: Notes
+              Learn
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
