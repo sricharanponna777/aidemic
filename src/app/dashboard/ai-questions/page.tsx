@@ -890,13 +890,13 @@ export default function AIQuestionsPage() {
                           onClick={() => updateAnswer(index, letter)}
                           className={`flex w-full items-center justify-start gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
                             selected
-                              ? 'border-indigo-600 bg-indigo-600 text-white shadow-md shadow-indigo-500/30 dark:border-indigo-500 dark:bg-indigo-500 dark:shadow-indigo-500/20'
+                              ? 'border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 brightness-125'
                               : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/5'
                           }`}
                         >
                           <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
                             selected
-                              ? 'border-white/40 bg-white/20 text-white'
+                              ? 'border-white/50 text-white'
                               : 'border-slate-300 text-slate-500 dark:border-white/20 dark:text-slate-400'
                           }`}>{letter}</span>
                           <MarkdownContent inline content={option} />

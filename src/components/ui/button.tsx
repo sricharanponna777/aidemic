@@ -24,7 +24,7 @@ const baseStyles =
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'border border-transparent bg-linear-to-r from-indigo-600 to-purple-600 text-white shadow-sm shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700 hover:shadow-indigo-500/30',
+    'border border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700 hover:shadow-indigo-500/30',
   secondary:
     'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:border-white/15',
   subtle:
@@ -37,7 +37,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     'border border-transparent bg-transparent text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300',
   plain: '',
   default:
-    'border border-transparent bg-linear-to-r from-indigo-600 to-purple-600 text-white shadow-sm shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700',
+    'border border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700',
   outline:
     'border border-indigo-200 bg-white text-indigo-700 shadow-sm hover:bg-indigo-50 hover:border-indigo-300 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 dark:hover:border-indigo-500/40',
 };

@@ -158,7 +158,7 @@ function StudyChat({
                 key={`${message.role}-${index}`}
                 className={`rounded-xl px-3 py-2 text-sm ${
                   message.role === 'user'
-                    ? 'ml-6 bg-linear-to-r from-indigo-600 to-purple-600 text-white'
+                    ? 'ml-6 bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white'
                     : 'mr-6 bg-slate-100 text-slate-800 dark:bg-white/8 dark:text-slate-100'
                 }`}
               >
