@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import renderMathInElement from 'katex/contrib/auto-render';
-import { normalizeLatexControlCharacters, wrapBareLatexExpressions } from '@/lib/mathText';
+import { normalizeLatexControlCharacters, normalizeEquationEnvironments, wrapBareLatexExpressions } from '@/lib/mathText';
 
 type MathContentProps = {
   content: string;
@@ -133,7 +133,8 @@ export function MathContent({
 
   const html = useMemo(() => {
     if (isHtml) return content || '';
-    return escapeHtml(content || '').replace(/\n/g, '<br />');
+    const normalized = normalizeEquationEnvironments(content || '');
+    return escapeHtml(normalized).replace(/\n/g, '<br />');
   }, [content, isHtml]);
 
   const markup = useMemo(() => ({ __html: html }), [html]);

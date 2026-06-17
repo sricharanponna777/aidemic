@@ -30,7 +30,7 @@ export default function LoginPage() {
       const supabase = createClient();
 
       if (isSignUp) {
-        const origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://aidemic.vercel.app';
+        const origin = 'https://aidemic725.vercel.app';
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
