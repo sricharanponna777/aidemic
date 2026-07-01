@@ -66,12 +66,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-[#eef2fb] dark:bg-[#0A0F1E]">
 
       {/* Fixed sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col max-lg:hidden bg-white dark:bg-[#0D1324] border-r border-slate-200 dark:border-white/6 shadow-[2px_0_16px_-4px_rgba(99,102,241,0.08)] dark:shadow-none">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col max-lg:hidden bg-white dark:bg-[#0D1324] border-r border-slate-200 dark:border-indigo-500/20 shadow-[2px_0_16px_-4px_rgba(99,102,241,0.08)] dark:shadow-[2px_0_28px_-4px_rgba(99,102,241,0.25)]">
 
         {/* Brand */}
         <div className="border-b border-slate-200 dark:border-white/6 px-5 py-5">
           <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 transition-shadow">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 transition-shadow dark:animate-glow-pulse">
               <Zap className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -94,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={item.href}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group ${
                   active
-                    ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20"
+                    ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 dark:shadow-indigo-500/40 dark:ring-1 dark:ring-indigo-400/30"
                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
@@ -171,7 +171,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <div className="lg:pl-64">
         <main className="mx-auto max-w-6xl px-4 pt-16 pb-10 sm:px-6 lg:pt-8">
-          {children}
+          <div key={pathname} className="animate-page-enter">
+            {children}
+          </div>
         </main>
       </div>
 

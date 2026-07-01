@@ -20,11 +20,11 @@ type ButtonStyleOptions = {
 };
 
 const baseStyles =
-  'inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-[#0A0F1E]';
+  'inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-[#0A0F1E] active:scale-[0.97]';
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'border border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700 hover:shadow-indigo-500/30',
+    'border border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg hover:shadow-indigo-500/40 dark:hover:shadow-indigo-500/60',
   secondary:
     'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:border-white/15',
   subtle:

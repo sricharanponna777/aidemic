@@ -28,7 +28,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -55,20 +55,24 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+  font-family: var(--font-space-grotesk), "Segoe UI", sans-serif;
   min-height: 100vh;
-  /* Light-mode ambient glow — visible on the pale #f4f6fb base */
   background-image:
+    linear-gradient(rgba(99, 102, 241, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.025) 1px, transparent 1px),
     radial-gradient(1000px 600px at 5% -15%, rgba(99, 102, 241, 0.13), transparent 50%),
     radial-gradient(800px 500px at 95% 5%, rgba(139, 92, 246, 0.09), transparent 45%);
+  background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
   background-attachment: fixed;
 }
 
-/* Stronger glow for the deep-navy dark base */
 .dark body {
   background-image:
-    radial-gradient(900px 600px at 10% -10%, rgba(99, 102, 241, 0.16), transparent 50%),
-    radial-gradient(700px 500px at 90% 10%, rgba(139, 92, 246, 0.10), transparent 50%);
+    linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+    radial-gradient(900px 600px at 10% -10%, rgba(99, 102, 241, 0.18), transparent 50%),
+    radial-gradient(700px 500px at 90% 10%, rgba(139, 92, 246, 0.12), transparent 50%);
+  background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
 }
 
 @keyframes shimmer {
@@ -79,6 +83,21 @@ body {
 @keyframes gradient-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px 0 rgba(99, 102, 241, 0.3); }
+  50%       { box-shadow: 0 0 22px 4px rgba(99, 102, 241, 0.55); }
+}
+
+@keyframes border-scan {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 0% 100%; }
 }
 
 .animate-shimmer {
@@ -92,10 +111,26 @@ body {
   animation: gradient-shift 4s ease infinite;
 }
 
+.animate-page-enter {
+  animation: page-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2.8s ease-in-out infinite;
+}
+
 h1,
 h2,
 h3 {
   letter-spacing: -0.01em;
+}
+
+.dark h1 {
+  text-shadow: 0 0 40px rgba(129, 140, 248, 0.25);
+}
+
+.dark h2 {
+  text-shadow: 0 0 28px rgba(129, 140, 248, 0.15);
 }
 
 ::selection {

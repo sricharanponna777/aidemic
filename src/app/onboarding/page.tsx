@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { BookOpen, Brain, CheckCircle2, Layers, LogOut, Plus, Target, Trash2, Zap } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -53,14 +53,22 @@ const appSteps = [
   },
 ];
 
-export default function OnboardingPage() {
+function OnboardingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const { session, isLoading } = useAuth();
   const [subjects, setSubjects] = useState<UserSubject[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(true);
-  const [newCountry, setNewCountry] = useState<Country>('uk');
-  const [newQualId, setNewQualId] = useState('gcse');
+  const [newCountry, setNewCountry] = useState<Country>(() => {
+    const fromUrl = searchParams.get('country');
+    return (COUNTRIES.includes(fromUrl as Country) ? fromUrl : 'uk') as Country;
+  });
+  const [newQualId, setNewQualId] = useState(() => {
+    const fromUrl = searchParams.get('country');
+    const country = (COUNTRIES.includes(fromUrl as Country) ? fromUrl : 'uk') as Country;
+    return getQualifications(country)[0]?.id ?? 'gcse';
+  });
   const [newSubject, setNewSubject] = useState<SupportedSubject>('biology');
   const [newBoard, setNewBoard] = useState<ExamBoard>('aqa');
   const [newSpecName, setNewSpecName] = useState('');
@@ -461,5 +469,13 @@ export default function OnboardingPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense>
+      <OnboardingContent />
+    </Suspense>
   );
 }
