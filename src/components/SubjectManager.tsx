@@ -8,34 +8,50 @@ import { createClient } from '@/lib/supabase-client';
 import {
   buildSpecString,
   getExamBoardLabel,
-  getExamTypeLabel,
   getSpecEntries,
   getSubjectLabel,
   requiresTierSelection,
   SELECTABLE_SUBJECTS,
   type ExamBoard,
-  type ExamType,
-  type SupportedSubject,
   type UserSubject,
+  type SupportedSubject,
 } from '@/lib/ai/subjectConfig';
+import {
+  COUNTRIES,
+  COUNTRY_LABELS,
+  getQualificationConfig,
+  getQualifications,
+  type Country,
+} from '@/lib/ai/countryConfig';
 
 const isMissingSubjectSpecColumns = (error: { code?: string; message?: string } | null) => {
   const message = error?.message?.toLowerCase() ?? '';
   return error?.code === '42703' || message.includes('spec_name') || message.includes('spec_tier');
 };
 
+const selectClass =
+  'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
+
 export function SubjectManager() {
   const { session } = useAuth();
   const supabase = createClient();
   const [subjects, setSubjects] = useState<UserSubject[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(true);
+  const [newCountry, setNewCountry] = useState<Country>('uk');
+  const [newQualId, setNewQualId] = useState('gcse');
   const [newSubject, setNewSubject] = useState<SupportedSubject>('biology');
   const [newBoard, setNewBoard] = useState<ExamBoard>('aqa');
-  const [newType, setNewType] = useState<ExamType>('gcse');
   const [newSpecName, setNewSpecName] = useState('');
   const [newSpecTier, setNewSpecTier] = useState('');
   const [subjectSaving, setSubjectSaving] = useState(false);
   const [subjectError, setSubjectError] = useState('');
+
+  const qualifications = getQualifications(newCountry);
+  const qualConfig = getQualificationConfig(newCountry, newQualId);
+  const isComingSoon = qualConfig?.comingSoon ?? false;
+  const newType = qualConfig?.examType ?? 'gcse';
+  const boardOptions: ExamBoard[] =
+    newSubject === 'english language' ? ['aqa'] : (qualConfig?.boards ?? ['aqa', 'edexcel', 'ocr']);
 
   const pendingSubject: UserSubject = {
     id: 'new',
@@ -47,12 +63,10 @@ export function SubjectManager() {
   };
   const specEntries = getSpecEntries(pendingSubject);
   const effectiveSpecName = specEntries.length === 1 ? specEntries[0].name : newSpecName;
-  const selectedSpecEntry = specEntries.length === 1
-    ? specEntries[0]
-    : specEntries.find((entry) => entry.name === newSpecName) ?? null;
+  const selectedSpecEntry =
+    specEntries.length === 1 ? specEntries[0] : specEntries.find((e) => e.name === newSpecName) ?? null;
   const tierRequired = requiresTierSelection(pendingSubject, effectiveSpecName);
   const selectedSpecLabel = buildSpecString(effectiveSpecName, newSpecTier, '');
-  const boardOptions: ExamBoard[] = newSubject === 'english language' ? ['aqa'] : ['aqa', 'edexcel', 'ocr'];
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -73,11 +87,9 @@ export function SubjectManager() {
           .select('id, subject, exam_board, exam_type')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: true });
-        setSubjects(((fallbackData as UserSubject[]) ?? []).map((subject) => ({
-          ...subject,
-          spec_name: null,
-          spec_tier: null,
-        })));
+        setSubjects(
+          ((fallbackData as UserSubject[]) ?? []).map((s) => ({ ...s, spec_name: null, spec_tier: null })),
+        );
         setSubjectError('Run the latest Supabase migration before saving subject specs and tiers.');
       } else if (error) {
         console.error('Failed to load user subjects', error);
@@ -106,12 +118,12 @@ export function SubjectManager() {
       return;
     }
     const duplicate = subjects.some(
-      (subject) =>
-        subject.subject === newSubject &&
-        subject.exam_board === newBoard &&
-        subject.exam_type === newType &&
-        (subject.spec_name ?? '') === effectiveSpecName &&
-        (subject.spec_tier ?? '') === newSpecTier
+      (s) =>
+        s.subject === newSubject &&
+        s.exam_board === newBoard &&
+        s.exam_type === newType &&
+        (s.spec_name ?? '') === effectiveSpecName &&
+        (s.spec_tier ?? '') === newSpecTier,
     );
     if (duplicate) {
       setSubjectError('That subject is already in your list.');
@@ -136,7 +148,7 @@ export function SubjectManager() {
       setSubjectError(
         isMissingSubjectSpecColumns(error)
           ? 'Run the latest Supabase migration before saving subject specs and tiers.'
-          : 'Failed to save subject.'
+          : 'Failed to save subject.',
       );
     } else {
       setSubjects((prev) => [...prev, data as UserSubject]);
@@ -148,7 +160,14 @@ export function SubjectManager() {
 
   const handleRemoveSubject = async (id: string) => {
     await supabase.from('user_subjects').delete().eq('id', id);
-    setSubjects((prev) => prev.filter((subject) => subject.id !== id));
+    setSubjects((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const resetSubjectFields = () => {
+    setNewSubject('biology');
+    setNewBoard('aqa');
+    setNewSpecName('');
+    setNewSpecTier('');
   };
 
   return (
@@ -169,14 +188,19 @@ export function SubjectManager() {
           </p>
         ) : (
           subjects.map((subject) => (
-            <div key={subject.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-2.5 dark:border-white/6">
+            <div
+              key={subject.id}
+              className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-2.5 dark:border-white/6"
+            >
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-semibold text-slate-900 dark:text-slate-100">{getSubjectLabel(subject.subject)}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  {getSubjectLabel(subject.subject)}
+                </span>
                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-indigo-500/15 dark:text-blue-300">
                   {getExamBoardLabel(subject.exam_board)}
                 </span>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                  {getExamTypeLabel(subject.exam_type)}
+                  {subject.exam_type === 'a-level' ? 'A-Level' : 'GCSE'}
                 </span>
                 {buildSpecString(subject.spec_name ?? '', subject.spec_tier ?? '', '') ? (
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
@@ -197,100 +221,155 @@ export function SubjectManager() {
         )}
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <select
-          value={newSubject}
-          onChange={(event) => {
-            const nextSubject = event.target.value as SupportedSubject;
-            setNewSubject(nextSubject);
-            if (nextSubject === 'english language') setNewBoard('aqa');
-            setNewSpecName('');
-            setNewSpecTier('');
-          }}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
-        >
-          {SELECTABLE_SUBJECTS.map((subject) => (
-            <option key={subject} value={subject}>{getSubjectLabel(subject)}</option>
-          ))}
-        </select>
-        <select
-          value={newBoard}
-          onChange={(event) => {
-            setNewBoard(event.target.value as ExamBoard);
-            setNewSpecName('');
-            setNewSpecTier('');
-          }}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
-        >
-          {boardOptions.map((board) => (
-            <option key={board} value={board}>{getExamBoardLabel(board)}</option>
-          ))}
-        </select>
-        <select
-          value={newType}
-          onChange={(event) => {
-            setNewType(event.target.value as ExamType);
-            setNewSpecName('');
-            setNewSpecTier('');
-          }}
-          className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
-        >
-          <option value="gcse">GCSE</option>
-          <option value="a-level">A-Level</option>
-        </select>
+      {/* Country + Qualification */}
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Country</label>
+          <select
+            value={newCountry}
+            onChange={(event) => {
+              const country = event.target.value as Country;
+              const firstQual = getQualifications(country)[0];
+              setNewCountry(country);
+              setNewQualId(firstQual?.id ?? '');
+              resetSubjectFields();
+            }}
+            className={selectClass}
+          >
+            {COUNTRIES.map((country) => (
+              <option key={country} value={country}>
+                {COUNTRY_LABELS[country]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Qualification</label>
+          <select
+            value={newQualId}
+            onChange={(event) => {
+              setNewQualId(event.target.value);
+              resetSubjectFields();
+            }}
+            className={selectClass}
+          >
+            {qualifications.map((qual) => (
+              <option key={qual.id} value={qual.id}>
+                {qual.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
-        {specEntries.length === 0 ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
-            No specification options are available for this combination.
-          </div>
-        ) : specEntries.length === 1 ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
-            {specEntries[0].name}
-          </div>
-        ) : (
-          <select
-            value={newSpecName}
-            onChange={(event) => {
-              setNewSpecName(event.target.value);
-              setNewSpecTier('');
-            }}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
-          >
-            <option value="">Select specification</option>
-            {specEntries.map((entry) => (
-              <option key={entry.name} value={entry.name}>{entry.name}</option>
-            ))}
-          </select>
-        )}
-        {selectedSpecEntry?.tiers?.length ? (
-          <select
-            value={newSpecTier}
-            onChange={(event) => setNewSpecTier(event.target.value)}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
-          >
-            <option value="">Tier</option>
-            {selectedSpecEntry.tiers.map((tier) => (
-              <option key={tier} value={tier}>{tier}</option>
-            ))}
-          </select>
-        ) : null}
-        <button
-          type="button"
-          onClick={handleAddSubject}
-          disabled={subjectSaving || specEntries.length === 0}
-          className={buttonStyles({ variant: 'primary' })}
-        >
-          <Plus className="h-4 w-4" />
-          {subjectSaving ? 'Adding...' : 'Add'}
-        </button>
-      </div>
-      {selectedSpecLabel ? (
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          AI generation will use {selectedSpecLabel}.
+      {isComingSoon ? (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-300">
+          {qualConfig?.label} support is coming soon — stay tuned.
         </p>
-      ) : null}
+      ) : (
+        <>
+          {/* Exam Board + Subject */}
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Exam Board</label>
+              <select
+                value={newBoard}
+                onChange={(event) => {
+                  setNewBoard(event.target.value as ExamBoard);
+                  setNewSpecName('');
+                  setNewSpecTier('');
+                }}
+                className={selectClass}
+              >
+                {boardOptions.map((board) => (
+                  <option key={board} value={board}>
+                    {getExamBoardLabel(board)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Subject</label>
+              <select
+                value={newSubject}
+                onChange={(event) => {
+                  const next = event.target.value as SupportedSubject;
+                  setNewSubject(next);
+                  if (next === 'english language') setNewBoard('aqa');
+                  setNewSpecName('');
+                  setNewSpecTier('');
+                }}
+                className={selectClass}
+              >
+                {SELECTABLE_SUBJECTS.map((subject) => (
+                  <option key={subject} value={subject}>
+                    {getSubjectLabel(subject)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Specification + Tier + Add */}
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
+            {specEntries.length === 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+                No specification options available for this combination.
+              </div>
+            ) : specEntries.length === 1 ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
+                {specEntries[0].name}
+              </div>
+            ) : (
+              <select
+                value={newSpecName}
+                onChange={(event) => {
+                  setNewSpecName(event.target.value);
+                  setNewSpecTier('');
+                }}
+                className={selectClass}
+              >
+                <option value="">Select specification</option>
+                {specEntries.map((entry) => (
+                  <option key={entry.name} value={entry.name}>
+                    {entry.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {selectedSpecEntry?.tiers?.length ? (
+              <select
+                value={newSpecTier}
+                onChange={(event) => setNewSpecTier(event.target.value)}
+                className={selectClass}
+              >
+                <option value="">Tier</option>
+                {selectedSpecEntry.tiers.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {tier}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleAddSubject}
+              disabled={subjectSaving || specEntries.length === 0}
+              className={buttonStyles({ variant: 'primary' })}
+            >
+              <Plus className="h-4 w-4" />
+              {subjectSaving ? 'Adding...' : 'Add'}
+            </button>
+          </div>
+
+          {selectedSpecLabel ? (
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              AI generation will use {selectedSpecLabel}.
+            </p>
+          ) : null}
+        </>
+      )}
+
       {subjectError ? (
         <p className="mt-2 text-sm text-red-600 dark:text-red-400">{subjectError}</p>
       ) : null}
