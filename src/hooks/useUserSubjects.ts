@@ -4,11 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import type { UserSubject } from '@/lib/ai/subjectConfig';
-
-const isMissingSubjectSpecColumns = (error: { code?: string; message?: string } | null) => {
-  const message = error?.message?.toLowerCase() ?? '';
-  return error?.code === '42703' || message.includes('spec_name') || message.includes('spec_tier');
-};
+import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 
 export function useUserSubjects() {
   const { session } = useAuth();
@@ -28,37 +24,18 @@ export function useUserSubjects() {
 
       const supabase = createClient();
       const { data, error: loadError } = await supabase
-        .from('user_subjects')
-        .select('id, subject, exam_board, exam_type, spec_name, spec_tier')
+        .from('student_subjects')
+        .select(STUDENT_SUBJECT_SELECT)
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: true });
 
       if (!isMounted) return;
       if (loadError) {
-        if (isMissingSubjectSpecColumns(loadError)) {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('user_subjects')
-            .select('id, subject, exam_board, exam_type')
-            .eq('user_id', session.user.id)
-            .order('created_at', { ascending: true });
-
-          if (!isMounted) return;
-          if (!fallbackError) {
-            setSubjects(((fallbackData as UserSubject[]) ?? []).map((subject) => ({
-              ...subject,
-              spec_name: null,
-              spec_tier: null,
-            })));
-            setError('Run the latest Supabase migration, then update each saved subject with its specification and tier.');
-            setIsLoading(false);
-            return;
-          }
-        }
         console.error('Failed to load user subjects', loadError);
         setSubjects([]);
         setError('Could not load your saved subjects.');
       } else {
-        setSubjects((data as UserSubject[]) ?? []);
+        setSubjects(((data as unknown as StudentSubjectRow[]) ?? []).map(mapStudentSubjectRow));
       }
       setIsLoading(false);
     };

@@ -9,11 +9,12 @@ import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectS
 import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
+import { useTopicOptions } from '@/hooks/useTopicOptions';
+import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
 import {
   buildLiteratureCreationOption,
   getPoetryClusterPoems,
   getQualificationTopicError,
-  getMajorTopicsForSubject,
   isAllowedQualificationTopic,
   isPoetryCluster,
 } from '@/lib/ai/majorTopics';
@@ -204,6 +205,7 @@ export default function NotesPage() {
   const [poemOne, setPoemOne] = useState('');
   const [poemTwo, setPoemTwo] = useState('');
   const [topic, setTopic] = useState('');
+  const [subtopic, setSubtopic] = useState('');
   const [activeTopic, setActiveTopic] = useState(() => ssRead(SS_TOPIC, ''));
   const [activeSubject, setActiveSubject] = useState<UserSubject | null>(() => ssRead<UserSubject | null>(SS_SUBJECT, null));
   const [notes, setNotes] = useState(() => ssRead(SS_NOTES, ''));
@@ -223,16 +225,20 @@ export default function NotesPage() {
   const poetryPoems = getPoetryClusterPoems(specOption);
   const isSelectedPoetryCluster = isPoetryCluster(specOption);
   const effectiveCreationOption = buildLiteratureCreationOption(specOption, poemOne, poemTwo);
-  const topicSuggestions = getMajorTopicsForSubject(selectedSubject, specOption, poemOne, poemTwo);
-  const topicIsAllowed = !topic.trim() || isAllowedQualificationTopic(topic, topicSuggestions);
+  const { topics: topicOptions, isLoading: topicsLoading } = useTopicOptions(selectedSubject, specOption, poemOne, poemTwo);
+  const topicSuggestions = topicOptions.map((option) => option.name);
+  const selectedTopicOption = topicOptions.find((option) => option.name === topic.trim()) ?? null;
+  const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
+  const topicIsAllowed = !topic.trim() || topicsLoading || isAllowedQualificationTopic(topic, topicSuggestions);
   const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
   const poetrySelectionComplete = !isSelectedPoetryCluster || !!poemOne;
-  const canGenerate = topic.trim().length >= 3 && topicIsAllowed && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
+  const canGenerate = topic.trim().length >= 3 && topicIsAllowed && !topicsLoading && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
   const validationMessage = subjectsError
     || errorMessage
     || (!selectedSubject ? 'Choose one of your saved subjects.' : '')
     || (!subjectSpecComplete ? 'Update this subject on the Subjects page with its specification and tier.' : '')
     || (!poetrySelectionComplete ? 'Choose the first poem for this poetry cluster.' : '')
+    || (topicsLoading ? 'Loading topics for this qualification...' : '')
     || (topic.trim().length < 3 ? 'Add a clear topic to generate notes.' : '')
     || (!topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
 
@@ -269,6 +275,7 @@ export default function NotesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           concept: topic.trim(),
+          subtopic: subtopic.trim() || undefined,
           subject: selectedSubject.subject,
           examBoard: selectedSubject.exam_board,
           examType: selectedSubject.exam_type,
@@ -343,6 +350,7 @@ export default function NotesPage() {
                 setPoemOne('');
                 setPoemTwo('');
                 setTopic('');
+                setSubtopic('');
               }}
             />
 
@@ -355,6 +363,7 @@ export default function NotesPage() {
                     setPoemOne('');
                     setPoemTwo('');
                     setTopic('');
+                    setSubtopic('');
                 }}
                 options={[
                   { value: '', label: `Any ${creationOptionLabel.toLowerCase()}` },
@@ -373,6 +382,7 @@ export default function NotesPage() {
                     onChange={(event) => {
                       setPoemOne(event.target.value);
                       setTopic('');
+                      setSubtopic('');
                       if (event.target.value === poemTwo) setPoemTwo('');
                     }}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
@@ -390,6 +400,7 @@ export default function NotesPage() {
                     onChange={(event) => {
                       setPoemTwo(event.target.value);
                       setTopic('');
+                      setSubtopic('');
                     }}
                     disabled={!poemOne}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100 dark:disabled:bg-white/5"
@@ -408,12 +419,23 @@ export default function NotesPage() {
               value={topic}
               onChange={(value) => {
                 setTopic(value);
+                setSubtopic('');
                 setErrorMessage('');
               }}
               suggestions={topicSuggestions}
               isValidSelection={topicIsAllowed}
               placeholder="Start typing a topic from this qualification"
             />
+
+            {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
+              <TopicInput
+                label="Subtopic (optional)"
+                value={subtopic}
+                onChange={setSubtopic}
+                suggestions={subtopicSuggestions}
+                placeholder="Narrow the focus within this topic"
+              />
+            ) : null}
 
             {validationMessage ? (
               <p className={`text-xs ${errorMessage || subjectsError ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'}`}>

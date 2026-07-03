@@ -8,6 +8,7 @@ import { LATEX_COMMAND_PATTERN, normalizeLatexControlCharacters } from '@/lib/ma
 type NotesPayload = {
   flashcardId?: string;
   concept: string;
+  subtopic?: string;
   subject: string;
   duration?: '30' | '60' | '120';
   examBoard?: string;
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body: NotesPayload = await request.json();
-    const { concept, subject, duration = '120', flashcardId, examBoard, examType, specification, mode = 'notes' } = body;
+    const { concept, subtopic, subject, duration = '120', flashcardId, examBoard, examType, specification, mode = 'notes' } = body;
 
     if (mode !== 'notes') {
       return NextResponse.json({ error: 'Only study notes generation is supported.' }, { status: 400 });
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { script, slides } = await generateNotes(concept, subject, duration, examBoard, examType, specification);
+    const { script, slides } = await generateNotes(concept, subtopic, subject, duration, examBoard, examType, specification);
 
     const { data, error } = await supabase
       .from('generated_videos')
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
 
 async function generateNotes(
   concept: string,
+  subtopic: string | undefined,
   subject: string,
   duration: string,
   examBoard?: string,
@@ -156,6 +158,7 @@ async function generateNotes(
 
   const instruction = `Create study notes about "${concept}" in ${subject}.
 Depth: ${complexity}. Target reading time: ~${seconds} seconds total.${courseContext ? `\n${courseContext}` : ''}
+${subtopic ? `\nSubtopic focus: ${subtopic}. Concentrate the notes on this subtopic rather than covering the whole topic broadly.` : ''}
 
 Before writing, internally identify the exact qualification/specification being studied and check whether "${concept}" belongs on that specification.
 Use the selected exam board, qualification level, specification, tier, option, text, or topic focus as hard constraints.

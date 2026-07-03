@@ -25,11 +25,12 @@ import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
+import { useTopicOptions } from '@/hooks/useTopicOptions';
+import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
 import {
   buildLiteratureCreationOption,
   getPoetryClusterPoems,
   getQualificationTopicError,
-  getMajorTopicsForSubject,
   isAllowedQualificationTopic,
   isPoetryCluster,
 } from '@/lib/ai/majorTopics';
@@ -101,6 +102,7 @@ type MarkingReport = {
 
 interface AIGenerateForm {
   topic: string;
+  subtopic: string;
   subject: Subject;
   examBoard: ExamBoard;
   examType: ExamType;
@@ -126,6 +128,7 @@ const optionLetters = ['A', 'B', 'C', 'D'] as const;
 
 const defaultForm: AIGenerateForm = {
   topic: '',
+  subtopic: '',
   subject: 'biology',
   examBoard: 'aqa',
   examType: 'gcse',
@@ -323,9 +326,12 @@ export default function AIQuestionsPage() {
   const poetryPoems = getPoetryClusterPoems(form.specOption);
   const isSelectedPoetryCluster = isPoetryCluster(form.specOption);
   const effectiveCreationOption = buildLiteratureCreationOption(form.specOption, form.poemOne, form.poemTwo);
-  const topicSuggestions = getMajorTopicsForSubject(selectedSubject, form.specOption, form.poemOne, form.poemTwo);
+  const { topics: topicOptions, isLoading: topicsLoading } = useTopicOptions(selectedSubject, form.specOption, form.poemOne, form.poemTwo);
+  const topicSuggestions = topicOptions.map((option) => option.name);
+  const selectedTopicOption = topicOptions.find((option) => option.name === form.topic.trim()) ?? null;
+  const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
   const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
-  const topicIsAllowed = !form.topic.trim() || isAllowedQualificationTopic(form.topic, topicSuggestions);
+  const topicIsAllowed = !form.topic.trim() || topicsLoading || isAllowedQualificationTopic(form.topic, topicSuggestions);
   const poetrySelectionComplete = !isSelectedPoetryCluster || !!form.poemOne;
   const isEnglishLanguagePractice =
     selectedSubject?.subject === 'english language' &&
@@ -337,7 +343,7 @@ export default function AIQuestionsPage() {
       : 5
     : Math.min(Math.max(Math.floor(form.questionCount || 6), MIN_QUESTIONS), MAX_QUESTIONS);
 
-  const isGenerationValid = isEnglishLanguagePractice || (form.topic.trim().length >= 3 && topicIsAllowed && poetrySelectionComplete);
+  const isGenerationValid = isEnglishLanguagePractice || (form.topic.trim().length >= 3 && topicIsAllowed && !topicsLoading && poetrySelectionComplete);
   const inPractice = questions.length > 0;
   const answeredCount = useMemo(() => answers.filter((answer) => answer.trim().length > 0).length, [answers]);
   const totalAvailableMarks = useMemo(() => questions.reduce((sum, question) => sum + question.marks, 0), [questions]);
@@ -345,6 +351,7 @@ export default function AIQuestionsPage() {
     || (!selectedSubject ? 'Choose one of your saved subjects.' : '')
     || (!subjectSpecComplete ? 'Update this subject on the Subjects page with its specification and tier.' : '')
     || (!isEnglishLanguagePractice && !poetrySelectionComplete ? 'Choose the first poem for this poetry cluster.' : '')
+    || (!isEnglishLanguagePractice && topicsLoading ? 'Loading topics for this qualification...' : '')
     || (!isEnglishLanguagePractice && form.topic.trim().length < 3 ? 'Provide a clear topic.' : '')
     || (!isEnglishLanguagePractice && !topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
   const handleGenerate = async () => {
@@ -388,6 +395,7 @@ export default function AIQuestionsPage() {
     }
     const payload = {
       topic: isEnglishLanguagePractice ? `AQA English Language ${paperLabel}` : form.topic.trim(),
+      subtopic: isEnglishLanguagePractice ? undefined : form.subtopic.trim() || undefined,
       subject: selectedSubject.subject,
       examBoard: selectedSubject.exam_board,
       examType: selectedSubject.exam_type,
@@ -626,7 +634,7 @@ export default function AIQuestionsPage() {
             selectedSubjectId={effectiveSubjectId}
             onSubjectChange={(id) => {
               setSelectedSubjectId(id);
-              setForm((prev) => ({ ...prev, specOption: '', poemOne: '', poemTwo: '', topic: '' }));
+              setForm((prev) => ({ ...prev, specOption: '', poemOne: '', poemTwo: '', topic: '', subtopic: '' }));
             }}
           />
 
@@ -669,6 +677,7 @@ export default function AIQuestionsPage() {
                     poemOne: '',
                     poemTwo: '',
                     topic: '',
+                    subtopic: '',
                   }))}
                 options={[
                   { value: '', label: `Any ${creationOptionLabel.toLowerCase()}` },
@@ -691,6 +700,7 @@ export default function AIQuestionsPage() {
                       poemOne: event.target.value,
                       poemTwo: event.target.value === prev.poemTwo ? '' : prev.poemTwo,
                       topic: '',
+                      subtopic: '',
                     }))}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
                   >
@@ -704,7 +714,7 @@ export default function AIQuestionsPage() {
                   Second poem <span className="text-slate-400">(optional)</span>
                   <select
                     value={form.poemTwo}
-                    onChange={(event) => setForm((prev) => ({ ...prev, poemTwo: event.target.value, topic: '' }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, poemTwo: event.target.value, topic: '', subtopic: '' }))}
                     disabled={!form.poemOne}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100 dark:disabled:bg-white/5"
                   >
@@ -722,12 +732,24 @@ export default function AIQuestionsPage() {
                 label="Topic"
                 value={form.topic}
                 onChange={(value) => {
-                  setForm((prev) => ({ ...prev, topic: value }));
+                  setForm((prev) => ({ ...prev, topic: value, subtopic: '' }));
                   setStatus(null);
                 }}
                 suggestions={topicSuggestions}
                 isValidSelection={topicIsAllowed}
                 placeholder="Start typing a topic from this qualification"
+                className="text-sm text-slate-700 dark:text-slate-300"
+                inputClassName="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+              />
+            ) : null}
+
+            {!isEnglishLanguagePractice && selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
+              <TopicInput
+                label="Subtopic (optional)"
+                value={form.subtopic}
+                onChange={(value) => setForm((prev) => ({ ...prev, subtopic: value }))}
+                suggestions={subtopicSuggestions}
+                placeholder="Narrow the focus within this topic"
                 className="text-sm text-slate-700 dark:text-slate-300"
                 inputClassName="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
               />

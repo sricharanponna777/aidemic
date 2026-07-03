@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase-client';
 import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
 import { gcseTierLabelForGrade, gradeBadgeTone } from '@/lib/gradeTone';
+import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 
 type AttemptRow = {
   id: string;
@@ -76,8 +77,8 @@ export default function SmartPracticeStatsPage() {
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false }),
         supabase
-          .from('user_subjects')
-          .select('id, subject, exam_board, exam_type, spec_tier')
+          .from('student_subjects')
+          .select(STUDENT_SUBJECT_SELECT)
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: true }),
       ]);
@@ -93,7 +94,9 @@ export default function SmartPracticeStatsPage() {
         console.error('Failed to load saved subjects for practice statistics', subjectsResponse.error);
         setSubjects([]);
       } else {
-        setSubjects((subjectsResponse.data as SubjectRow[]) ?? []);
+        setSubjects(
+          ((subjectsResponse.data ?? []) as unknown as StudentSubjectRow[]).map(mapStudentSubjectRow) as SubjectRow[]
+        );
       }
       setIsLoading(false);
     };

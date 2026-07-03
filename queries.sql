@@ -3,6 +3,7 @@
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- ============================================================================
 -- DROP TABLES (destructive)
@@ -19,6 +20,25 @@ DROP TABLE IF EXISTS user_profiles CASCADE;
 DROP TABLE IF EXISTS generated_videos CASCADE;
 DROP TABLE IF EXISTS exam_practice_attempts CASCADE;
 DROP TABLE IF EXISTS user_subjects CASCADE;
+DROP TABLE IF EXISTS study_plan_progress CASCADE;
+DROP TABLE IF EXISTS study_plan_items CASCADE;
+DROP TABLE IF EXISTS academic_terms CASCADE;
+DROP TABLE IF EXISTS student_analytics CASCADE;
+DROP TABLE IF EXISTS topic_performance CASCADE;
+DROP TABLE IF EXISTS mock_test_answers CASCADE;
+DROP TABLE IF EXISTS mock_test_attempts CASCADE;
+DROP TABLE IF EXISTS mock_test_questions CASCADE;
+DROP TABLE IF EXISTS mock_tests CASCADE;
+DROP TABLE IF EXISTS questions CASCADE;
+DROP TABLE IF EXISTS student_subjects CASCADE;
+DROP TABLE IF EXISTS learning_objectives CASCADE;
+DROP TABLE IF EXISTS subtopics CASCADE;
+DROP TABLE IF EXISTS topics CASCADE;
+DROP TABLE IF EXISTS specifications CASCADE;
+DROP TABLE IF EXISTS subjects CASCADE;
+DROP TABLE IF EXISTS exam_boards CASCADE;
+DROP TABLE IF EXISTS qualifications CASCADE;
+DROP TABLE IF EXISTS curricula CASCADE;
 
 -- ============================================================================
 -- CREATE TABLES
@@ -33,6 +53,7 @@ CREATE TABLE user_profiles (
   avatar_url TEXT,
   preferred_study_time TEXT, -- e.g., "morning", "afternoon", "evening"
   daily_study_goal_minutes INT DEFAULT 30,
+  country TEXT DEFAULT 'uk',
   theme TEXT DEFAULT 'light', -- light or dark
   notifications_enabled BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -201,6 +222,221 @@ CREATE TABLE exam_practice_attempts (
 );
 
 -- ============================================================================
+-- MASTER CURRICULUM (global reference data)
+-- ============================================================================
+CREATE TABLE curricula (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  country TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE qualifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  curriculum_id UUID REFERENCES curricula(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  level TEXT,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE exam_boards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  qualification_id UUID REFERENCES qualifications(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  website TEXT,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE subjects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  exam_board_id UUID REFERENCES exam_boards(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- SPECIFICATION / SYLLABUS
+CREATE TABLE specifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
+  code TEXT,
+  name TEXT NOT NULL,
+  tier TEXT,
+  academic_year TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE topics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  specification_id UUID REFERENCES specifications(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE subtopics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  order_index INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE learning_objectives (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subtopic_id UUID REFERENCES subtopics(id) ON DELETE CASCADE,
+  code TEXT,
+  objective TEXT NOT NULL,
+  command_word TEXT,
+  difficulty TEXT,
+  estimated_minutes INT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- STUDENT SUBJECTS (extends user_subjects; user_subjects kept for now)
+CREATE TABLE student_subjects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  specification_id UUID REFERENCES specifications(id) ON DELETE CASCADE,
+  target_grade TEXT,
+  current_grade TEXT,
+  exam_date DATE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (user_id, specification_id)
+);
+
+-- ============================================================================
+-- QUESTION BANK
+-- ============================================================================
+CREATE TABLE questions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
+  learning_objective_id UUID REFERENCES learning_objectives(id) ON DELETE SET NULL,
+  question_text TEXT NOT NULL,
+  question_type TEXT,
+  options JSONB DEFAULT '[]',
+  correct_answer TEXT,
+  mark_scheme JSONB,
+  total_marks INT NOT NULL DEFAULT 1,
+  difficulty TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
+-- MOCK TESTS
+-- user_id is nullable to allow system-authored mock tests (created_by =
+-- 'system') that are shared across all students, alongside user-authored ones.
+-- ============================================================================
+CREATE TABLE mock_tests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  student_subject_id UUID REFERENCES student_subjects(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  test_type TEXT NOT NULL,
+  duration_minutes INT,
+  total_marks INT DEFAULT 0,
+  status TEXT DEFAULT 'draft',
+  created_by TEXT DEFAULT 'system',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE mock_test_questions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mock_test_id UUID REFERENCES mock_tests(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+  marks INT NOT NULL DEFAULT 1,
+  order_index INT DEFAULT 0
+);
+
+-- MOCK TEST ATTEMPTS
+CREATE TABLE mock_test_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mock_test_id UUID REFERENCES mock_tests(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  completed_at TIMESTAMP WITH TIME ZONE,
+  marks_obtained INT DEFAULT 0,
+  percentage NUMERIC,
+  predicted_grade TEXT,
+  time_taken_minutes INT,
+  is_submitted BOOLEAN DEFAULT false
+);
+
+CREATE TABLE mock_test_answers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  attempt_id UUID REFERENCES mock_test_attempts(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+  user_answer TEXT,
+  marks_obtained INT DEFAULT 0,
+  feedback TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
+-- TERM PLANNER
+-- ============================================================================
+CREATE TABLE academic_terms (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE study_plan_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  term_id UUID REFERENCES academic_terms(id) ON DELETE CASCADE,
+  learning_objective_id UUID REFERENCES learning_objectives(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  planned_date DATE NOT NULL,
+  estimated_minutes INT DEFAULT 30,
+  status TEXT DEFAULT 'planned',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE study_plan_progress (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  plan_item_id UUID REFERENCES study_plan_items(id) ON DELETE CASCADE,
+  completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  time_spent_minutes INT,
+  notes TEXT
+);
+
+-- ============================================================================
+-- ANALYTICS
+-- ============================================================================
+CREATE TABLE topic_performance (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  topic_id UUID REFERENCES topics(id) ON DELETE CASCADE,
+  attempts INT DEFAULT 0,
+  avg_score NUMERIC DEFAULT 0,
+  last_attempted TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (user_id, topic_id)
+);
+
+CREATE TABLE student_analytics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  overall_accuracy NUMERIC DEFAULT 0,
+  predicted_grade TEXT,
+  study_streak INT DEFAULT 0,
+  total_study_minutes INT DEFAULT 0,
+  exam_readiness NUMERIC DEFAULT 0,
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================================================
 -- INDEXES (recreate)
 -- ============================================================================
 CREATE INDEX idx_flashcard_decks_user_id ON flashcard_decks(user_id);
@@ -224,6 +460,30 @@ CREATE UNIQUE INDEX user_subjects_unique_profile ON user_subjects (
   COALESCE(spec_name, ''),
   COALESCE(spec_tier, '')
 );
+CREATE INDEX idx_qualifications_curriculum_id ON qualifications(curriculum_id);
+CREATE INDEX idx_exam_boards_qualification_id ON exam_boards(qualification_id);
+CREATE INDEX idx_subjects_exam_board_id ON subjects(exam_board_id);
+CREATE INDEX idx_specifications_subject_id ON specifications(subject_id);
+CREATE INDEX idx_topics_specification_id ON topics(specification_id);
+CREATE INDEX idx_subtopics_topic_id ON subtopics(topic_id);
+CREATE INDEX idx_learning_objectives_subtopic_id ON learning_objectives(subtopic_id);
+CREATE INDEX idx_student_subjects_user_id ON student_subjects(user_id);
+CREATE INDEX idx_student_subjects_specification_id ON student_subjects(specification_id);
+CREATE INDEX idx_questions_subject_id ON questions(subject_id);
+CREATE INDEX idx_questions_learning_objective_id ON questions(learning_objective_id);
+CREATE INDEX idx_mock_tests_user_id ON mock_tests(user_id);
+CREATE INDEX idx_mock_tests_student_subject_id ON mock_tests(student_subject_id);
+CREATE INDEX idx_mock_test_questions_mock_test_id ON mock_test_questions(mock_test_id);
+CREATE INDEX idx_mock_test_questions_question_id ON mock_test_questions(question_id);
+CREATE INDEX idx_mock_test_attempts_user_id ON mock_test_attempts(user_id);
+CREATE INDEX idx_mock_test_attempts_mock_test_id ON mock_test_attempts(mock_test_id);
+CREATE INDEX idx_mock_test_answers_attempt_id ON mock_test_answers(attempt_id);
+CREATE INDEX idx_mock_test_answers_question_id ON mock_test_answers(question_id);
+CREATE INDEX idx_academic_terms_user_id ON academic_terms(user_id);
+CREATE INDEX idx_study_plan_items_term_id ON study_plan_items(term_id);
+CREATE INDEX idx_study_plan_items_learning_objective_id ON study_plan_items(learning_objective_id);
+CREATE INDEX idx_study_plan_progress_plan_item_id ON study_plan_progress(plan_item_id);
+CREATE INDEX idx_topic_performance_topic_id ON topic_performance(topic_id);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (enable & policies)
@@ -240,11 +500,38 @@ ALTER TABLE study_goals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE generated_videos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exam_practice_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE curricula ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qualifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exam_boards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE specifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE topics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subtopics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE learning_objectives ENABLE ROW LEVEL SECURITY;
+-- questions holds correct_answer/mark_scheme: RLS is enabled with no SELECT
+-- policy for authenticated/anon roles, so answer keys can't be fetched
+-- directly via the REST API. Serve questions to students through a
+-- server-side route using the service role key instead.
+ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mock_test_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mock_tests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mock_test_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mock_test_answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE academic_terms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE study_plan_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE study_plan_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE topic_performance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_analytics ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see their own data
 CREATE POLICY "Users can view their own profile"
   ON user_profiles FOR SELECT
   USING (auth.uid() = id);
+
+CREATE POLICY "Users can create their own profile"
+  ON user_profiles FOR INSERT
+  WITH CHECK (auth.uid() = id);
 
 CREATE POLICY "Users can update their own profile"
   ON user_profiles FOR UPDATE
@@ -261,6 +548,11 @@ CREATE POLICY "Users can create their own subjects"
 CREATE POLICY "Users can delete their own subjects"
   ON user_subjects FOR DELETE
   USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage their own subjects"
+  ON user_subjects FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can view their own decks"
   ON flashcard_decks FOR SELECT
@@ -411,6 +703,11 @@ CREATE POLICY "Users can delete their own exam practice attempts"
   ON exam_practice_attempts FOR DELETE
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can manage their own practice attempts"
+  ON exam_practice_attempts FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
 CREATE POLICY "Users can update tags in their decks"
   ON flashcard_tags FOR UPDATE
   USING (
@@ -441,6 +738,169 @@ CREATE POLICY "Users can delete tag mappings in their decks"
       AND flashcard_decks.user_id = auth.uid()
     )
   );
+
+-- Master curriculum data: readable by anyone, writable only via
+-- migrations/service role (no write policies for regular users).
+CREATE POLICY "Anyone can view curricula" ON curricula FOR SELECT USING (true);
+CREATE POLICY "Anyone can view qualifications" ON qualifications FOR SELECT USING (true);
+CREATE POLICY "Anyone can view exam boards" ON exam_boards FOR SELECT USING (true);
+CREATE POLICY "Anyone can view subjects" ON subjects FOR SELECT USING (true);
+CREATE POLICY "Anyone can view specifications" ON specifications FOR SELECT USING (true);
+CREATE POLICY "Anyone can view topics" ON topics FOR SELECT USING (true);
+CREATE POLICY "Anyone can view subtopics" ON subtopics FOR SELECT USING (true);
+CREATE POLICY "Anyone can view learning objectives" ON learning_objectives FOR SELECT USING (true);
+
+-- mock_test_questions is readable when its parent mock test is visible
+-- (owned by the user, or a system-wide test with no owner).
+CREATE POLICY "Users can view questions in accessible mock tests"
+  ON mock_test_questions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM mock_tests
+      WHERE mock_tests.id = mock_test_questions.mock_test_id
+      AND (mock_tests.user_id = auth.uid() OR mock_tests.user_id IS NULL)
+    )
+  );
+
+CREATE POLICY "Users can view their own student subjects"
+  ON student_subjects FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create their own student subjects"
+  ON student_subjects FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own student subjects"
+  ON student_subjects FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own student subjects"
+  ON student_subjects FOR DELETE USING (auth.uid() = user_id);
+
+-- mock_tests: visible if owned by the user, or system-wide (user_id IS NULL)
+CREATE POLICY "Users can view accessible mock tests"
+  ON mock_tests FOR SELECT USING (auth.uid() = user_id OR user_id IS NULL);
+CREATE POLICY "Users can create their own mock tests"
+  ON mock_tests FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own mock tests"
+  ON mock_tests FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own mock tests"
+  ON mock_tests FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view their own mock test attempts"
+  ON mock_test_attempts FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create their own mock test attempts"
+  ON mock_test_attempts FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own mock test attempts"
+  ON mock_test_attempts FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own mock test attempts"
+  ON mock_test_attempts FOR DELETE USING (auth.uid() = user_id);
+
+-- mock_test_answers: scoped through the owning attempt
+CREATE POLICY "Users can view answers for their own attempts"
+  ON mock_test_answers FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM mock_test_attempts
+      WHERE mock_test_attempts.id = mock_test_answers.attempt_id
+      AND mock_test_attempts.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Users can create answers for their own attempts"
+  ON mock_test_answers FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM mock_test_attempts
+      WHERE mock_test_attempts.id = mock_test_answers.attempt_id
+      AND mock_test_attempts.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Users can update answers for their own attempts"
+  ON mock_test_answers FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM mock_test_attempts
+      WHERE mock_test_attempts.id = mock_test_answers.attempt_id
+      AND mock_test_attempts.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can view their own academic terms"
+  ON academic_terms FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create their own academic terms"
+  ON academic_terms FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own academic terms"
+  ON academic_terms FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own academic terms"
+  ON academic_terms FOR DELETE USING (auth.uid() = user_id);
+
+-- study_plan_items: scoped through the owning term
+CREATE POLICY "Users can view their own study plan items"
+  ON study_plan_items FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM academic_terms
+      WHERE academic_terms.id = study_plan_items.term_id
+      AND academic_terms.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Users can create their own study plan items"
+  ON study_plan_items FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM academic_terms
+      WHERE academic_terms.id = study_plan_items.term_id
+      AND academic_terms.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Users can update their own study plan items"
+  ON study_plan_items FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM academic_terms
+      WHERE academic_terms.id = study_plan_items.term_id
+      AND academic_terms.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Users can delete their own study plan items"
+  ON study_plan_items FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM academic_terms
+      WHERE academic_terms.id = study_plan_items.term_id
+      AND academic_terms.user_id = auth.uid()
+    )
+  );
+
+-- study_plan_progress: scoped through the owning plan item -> term
+CREATE POLICY "Users can view their own study plan progress"
+  ON study_plan_progress FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM study_plan_items
+      JOIN academic_terms ON academic_terms.id = study_plan_items.term_id
+      WHERE study_plan_items.id = study_plan_progress.plan_item_id
+      AND academic_terms.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Users can create their own study plan progress"
+  ON study_plan_progress FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM study_plan_items
+      JOIN academic_terms ON academic_terms.id = study_plan_items.term_id
+      WHERE study_plan_items.id = study_plan_progress.plan_item_id
+      AND academic_terms.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can view their own topic performance"
+  ON topic_performance FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create their own topic performance"
+  ON topic_performance FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own topic performance"
+  ON topic_performance FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view their own analytics"
+  ON student_analytics FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create their own analytics"
+  ON student_analytics FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own analytics"
+  ON student_analytics FOR UPDATE USING (auth.uid() = user_id);
 
 -- ============================================================================
 -- TRIGGERS AND HELPERS

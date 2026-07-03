@@ -17,27 +17,26 @@ import {
   type SupportedSubject,
 } from '@/lib/ai/subjectConfig';
 import {
-  COUNTRIES,
   COUNTRY_LABELS,
   getQualificationConfig,
   getQualifications,
   type Country,
 } from '@/lib/ai/countryConfig';
-
-const isMissingSubjectSpecColumns = (error: { code?: string; message?: string } | null) => {
-  const message = error?.message?.toLowerCase() ?? '';
-  return error?.code === '42703' || message.includes('spec_name') || message.includes('spec_tier');
-};
+import {
+  mapStudentSubjectRow,
+  resolveSpecificationId,
+  STUDENT_SUBJECT_SELECT,
+  type StudentSubjectRow,
+} from '@/lib/ai/studentSubjects';
 
 const selectClass =
   'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
 
 export function SubjectManager() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const supabase = createClient();
   const [subjects, setSubjects] = useState<UserSubject[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(true);
-  const [newCountry, setNewCountry] = useState<Country>('uk');
   const [newQualId, setNewQualId] = useState('gcse');
   const [newSubject, setNewSubject] = useState<SupportedSubject>('biology');
   const [newBoard, setNewBoard] = useState<ExamBoard>('aqa');
@@ -46,8 +45,12 @@ export function SubjectManager() {
   const [subjectSaving, setSubjectSaving] = useState(false);
   const [subjectError, setSubjectError] = useState('');
 
-  const qualifications = getQualifications(newCountry);
-  const qualConfig = getQualificationConfig(newCountry, newQualId);
+  const userCountry: Country = profile?.country ?? 'uk';
+  const qualifications = getQualifications(userCountry);
+  const effectiveQualId = qualifications.some((qual) => qual.id === newQualId)
+    ? newQualId
+    : qualifications[0]?.id ?? '';
+  const qualConfig = getQualificationConfig(userCountry, effectiveQualId);
   const isComingSoon = qualConfig?.comingSoon ?? false;
   const newType = qualConfig?.examType ?? 'gcse';
   const boardOptions: ExamBoard[] =
@@ -75,27 +78,17 @@ export function SubjectManager() {
     const load = async () => {
       setSubjectsLoading(true);
       const { data, error } = await supabase
-        .from('user_subjects')
-        .select('id, subject, exam_board, exam_type, spec_name, spec_tier')
+        .from('student_subjects')
+        .select(STUDENT_SUBJECT_SELECT)
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: true });
 
       if (!isMounted) return;
-      if (error && isMissingSubjectSpecColumns(error)) {
-        const { data: fallbackData } = await supabase
-          .from('user_subjects')
-          .select('id, subject, exam_board, exam_type')
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: true });
-        setSubjects(
-          ((fallbackData as UserSubject[]) ?? []).map((s) => ({ ...s, spec_name: null, spec_tier: null })),
-        );
-        setSubjectError('Run the latest Supabase migration before saving subject specs and tiers.');
-      } else if (error) {
+      if (error) {
         console.error('Failed to load user subjects', error);
         setSubjectError('Could not load your saved subjects.');
       } else {
-        setSubjects((data as UserSubject[]) ?? []);
+        setSubjects(((data as unknown as StudentSubjectRow[]) ?? []).map(mapStudentSubjectRow));
       }
       setSubjectsLoading(false);
     };
@@ -131,27 +124,30 @@ export function SubjectManager() {
     }
 
     setSubjectSaving(true);
+    const specificationId = await resolveSpecificationId(supabase, {
+      qualificationLabel: qualConfig?.label ?? '',
+      boardLabel: getExamBoardLabel(newBoard),
+      subjectLabel: getSubjectLabel(newSubject),
+      specName: effectiveSpecName,
+      specTier: newSpecTier || null,
+    });
+
+    if (!specificationId) {
+      setSubjectError('Could not find that specification in the curriculum database.');
+      setSubjectSaving(false);
+      return;
+    }
+
     const { data, error } = await supabase
-      .from('user_subjects')
-      .insert({
-        user_id: session.user.id,
-        subject: newSubject,
-        exam_board: newBoard,
-        exam_type: newType,
-        spec_name: effectiveSpecName || null,
-        spec_tier: newSpecTier || null,
-      })
-      .select('id, subject, exam_board, exam_type, spec_name, spec_tier')
+      .from('student_subjects')
+      .insert({ user_id: session.user.id, specification_id: specificationId })
+      .select(STUDENT_SUBJECT_SELECT)
       .single();
 
     if (error) {
-      setSubjectError(
-        isMissingSubjectSpecColumns(error)
-          ? 'Run the latest Supabase migration before saving subject specs and tiers.'
-          : 'Failed to save subject.',
-      );
+      setSubjectError(error.code === '23505' ? 'That subject is already in your list.' : 'Failed to save subject.');
     } else {
-      setSubjects((prev) => [...prev, data as UserSubject]);
+      setSubjects((prev) => [...prev, mapStudentSubjectRow(data as unknown as StudentSubjectRow)]);
       setNewSpecName('');
       setNewSpecTier('');
     }
@@ -159,7 +155,7 @@ export function SubjectManager() {
   };
 
   const handleRemoveSubject = async (id: string) => {
-    await supabase.from('user_subjects').delete().eq('id', id);
+    await supabase.from('student_subjects').delete().eq('id', id);
     setSubjects((prev) => prev.filter((s) => s.id !== id));
   };
 
@@ -221,32 +217,16 @@ export function SubjectManager() {
         )}
       </div>
 
-      {/* Country + Qualification */}
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Country</label>
+      <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
+        Country: <span className="font-semibold text-slate-900 dark:text-slate-100">{COUNTRY_LABELS[userCountry]}</span>
+      </div>
+
+      {/* Qualification + Exam Board + Subject */}
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="flex items-center gap-2">
+          <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Qualification</label>
           <select
-            value={newCountry}
-            onChange={(event) => {
-              const country = event.target.value as Country;
-              const firstQual = getQualifications(country)[0];
-              setNewCountry(country);
-              setNewQualId(firstQual?.id ?? '');
-              resetSubjectFields();
-            }}
-            className={selectClass}
-          >
-            {COUNTRIES.map((country) => (
-              <option key={country} value={country}>
-                {COUNTRY_LABELS[country]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Qualification</label>
-          <select
-            value={newQualId}
+            value={effectiveQualId}
             onChange={(event) => {
               setNewQualId(event.target.value);
               resetSubjectFields();
@@ -260,18 +240,10 @@ export function SubjectManager() {
             ))}
           </select>
         </div>
-      </div>
-
-      {isComingSoon ? (
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-300">
-          {qualConfig?.label} support is coming soon — stay tuned.
-        </p>
-      ) : (
-        <>
-          {/* Exam Board + Subject */}
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Exam Board</label>
+        {!isComingSoon && (
+          <>
+            <div className="flex items-center gap-2">
+              <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Exam Board</label>
               <select
                 value={newBoard}
                 onChange={(event) => {
@@ -288,8 +260,8 @@ export function SubjectManager() {
                 ))}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Subject</label>
+            <div className="flex items-center gap-2">
+              <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Subject</label>
               <select
                 value={newSubject}
                 onChange={(event) => {
@@ -308,8 +280,16 @@ export function SubjectManager() {
                 ))}
               </select>
             </div>
-          </div>
+          </>
+        )}
+      </div>
 
+      {isComingSoon ? (
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-300">
+          {qualConfig?.label} support is coming soon — stay tuned.
+        </p>
+      ) : (
+        <>
           {/* Specification + Tier + Add */}
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
             {specEntries.length === 0 ? (

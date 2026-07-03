@@ -4,12 +4,10 @@ import { createClient } from '@/lib/supabase-client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { buttonStyles } from '@/components/ui/button';
-import { COUNTRIES, COUNTRY_LABELS, type Country } from '@/lib/ai/countryConfig';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [country, setCountry] = useState<Country>('uk');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isSignUp, setIsSignUp] = useState(() => {
@@ -33,7 +31,7 @@ export default function LoginPage() {
 
       if (isSignUp) {
         const origin = 'https://aidemic725.vercel.app';
-        const onboardingPath = `/onboarding?country=${country}`;
+        const onboardingPath = '/onboarding';
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -122,22 +120,6 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
-          {isSignUp && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Where are you studying?
-              </label>
-              <select
-                value={country}
-                onChange={(e) => setCountry(e.target.value as Country)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
-              >
-                {COUNTRIES.map((c) => (
-                  <option key={c} value={c}>{COUNTRY_LABELS[c]}</option>
-                ))}
-              </select>
-            </div>
-          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email

@@ -8,6 +8,7 @@ export interface UserProfile {
   avatar_url?: string;
   preferred_study_time?: string;
   daily_study_goal_minutes?: number;
+  country?: 'uk' | 'india' | 'us' | 'international';
   theme?: 'light' | 'dark';
   notifications_enabled?: boolean;
   created_at?: string;

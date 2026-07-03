@@ -8,8 +8,9 @@ import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
-import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { gcseTierLabelForGrade } from '@/lib/gradeTone';
+import { findSavedTierForSubject } from '@/lib/ai/studentSubjects';
 
 type ExamQuestion = {
   questionType?: 'open' | 'mcq';
@@ -135,15 +136,13 @@ export default function AttemptDetailPage() {
       } else {
         const loadedAttempt = response.data as AttemptDetail;
         setAttempt(loadedAttempt);
-        const { data: subjectData } = await supabase
-          .from('user_subjects')
-          .select('spec_tier')
-          .eq('user_id', session.user.id)
-          .eq('subject', loadedAttempt.subject)
-          .eq('exam_board', loadedAttempt.exam_board)
-          .eq('exam_type', loadedAttempt.exam_type)
-          .maybeSingle();
-        setSpecTier((subjectData as { spec_tier?: string | null } | null)?.spec_tier ?? null);
+        const tier = await findSavedTierForSubject(supabase, {
+          userId: session.user.id,
+          qualificationLabel: getExamTypeLabel(loadedAttempt.exam_type),
+          boardLabel: getExamBoardLabel(loadedAttempt.exam_board),
+          subjectLabel: getSubjectLabel(loadedAttempt.subject),
+        });
+        setSpecTier(tier);
       }
       setIsLoading(false);
     };

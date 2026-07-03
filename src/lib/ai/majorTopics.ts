@@ -435,7 +435,7 @@ const TOPIC_OVERRIDES: Record<string, string[]> = {
   ],
 };
 
-const isEnglishLiteratureSubject = (subject: UserSubject | null, specName = '') =>
+export const isEnglishLiteratureSubject = (subject: UserSubject | null, specName = '') =>
   subject?.subject === 'english literature' ||
   (subject?.subject === 'english' && specName.toLowerCase().includes('literature'));
 

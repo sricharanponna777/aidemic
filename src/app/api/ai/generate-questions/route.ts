@@ -27,6 +27,7 @@ type CorrectOption = '' | 'A' | 'B' | 'C' | 'D';
 
 interface GenerateQuestionsPayload {
   topic?: string;
+  subtopic?: string;
   subject?: string;
   prompt?: string;
   examBoard?: string;
@@ -223,6 +224,7 @@ const logInvalidQuestionJson = (source: string, payload: unknown) => {
 
 const normalizePayload = (raw: GenerateQuestionsPayload) => ({
   topic: txt(raw.topic || '', 200),
+  subtopic: txt(raw.subtopic || '', 200),
   subject: txt((raw.subject || '').toLowerCase(), 60),
   prompt: txt(raw.prompt || '', 2000),
   examBoard: normalizeBoard(raw.examBoard),
@@ -537,6 +539,7 @@ const buildPrompt = (
 
   const user = [
     `Topic: ${payload.topic}`,
+    payload.subtopic ? `Subtopic focus: ${payload.subtopic}. Concentrate the questions on this subtopic rather than the whole topic.` : '',
     payload.prompt ? `Prompt requirements: ${payload.prompt}` : '',
     figureUrls.length > 0 ? `Figure URLs:\n${figureUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')}` : '',
   ]

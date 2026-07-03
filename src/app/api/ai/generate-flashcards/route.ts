@@ -21,6 +21,7 @@ type FlashcardPayload = {
   name?: string;
   description?: string;
   topic?: string;
+  subtopic?: string;
   subject?: string;
   examBoard?: string;
   examType?: string;
@@ -102,6 +103,7 @@ const normalizePayload = (raw: FlashcardPayload) => ({
   name: txt(raw.name || '', 120),
   description: txt(raw.description || '', 280),
   topic: txt(raw.topic || '', 200),
+  subtopic: txt(raw.subtopic || '', 200),
   subject: normalizeSubject(raw.subject),
   examBoard: normalizeBoard(raw.examBoard),
   examType: normalizeExamType(raw.examType),
@@ -148,6 +150,7 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
     payload.specification ? `Specification focus: ${payload.specification}` : '',
     `Topic: ${payload.topic}.`,
+    payload.subtopic ? `Subtopic focus: ${payload.subtopic}. Concentrate the cards on this subtopic rather than the whole topic.` : '',
     'Before generating cards, internally identify the exact qualification/specification being studied and verify that the topic belongs to it.',
     'Treat board, qualification level, specification, tier, option, text, and topic focus as hard constraints.',
     'Only write cards for content that is assessable on the selected course. Do not import topics, case studies, set texts, terminology, or depth from another exam board, another qualification level, or a different option route.',

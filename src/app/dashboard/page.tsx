@@ -20,6 +20,7 @@ import { Flashcard, FlashcardDeck, StudySession } from "@/types";
 import { weightedPredictedGrade } from "@/lib/ai/gradeAverages";
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/subjectConfig";
 import { gcseTierLabelForGrade, gradeBadgeTone } from "@/lib/gradeTone";
+import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from "@/lib/ai/studentSubjects";
 
 type RecentSession = {
   id: string;
@@ -251,8 +252,8 @@ export default function Dashboard() {
             .order("created_at", { ascending: false })
             .limit(50),
           supabase
-            .from("user_subjects")
-            .select("id, subject, exam_board, exam_type, spec_tier")
+            .from("student_subjects")
+            .select(STUDENT_SUBJECT_SELECT)
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: true }),
         ]);
@@ -268,7 +269,9 @@ export default function Dashboard() {
         }
 
         const attempts = (attemptsResponse.data ?? []) as DashboardAttemptRow[];
-        const savedSubjects = (subjectsResponse.data ?? []) as DashboardSubjectRow[];
+        const savedSubjects = ((subjectsResponse.data ?? []) as unknown as StudentSubjectRow[]).map(
+          mapStudentSubjectRow
+        ) as DashboardSubjectRow[];
         const latestAttempt = attempts[0];
         const primaryExamType = (attempts[0]?.exam_type === "a-level" ? "a-level" : attempts.length > 0 ? "gcse" : null) as "gcse" | "a-level" | null;
         const tagMap = new Map<string, { count: number; subjects: Set<string> }>();

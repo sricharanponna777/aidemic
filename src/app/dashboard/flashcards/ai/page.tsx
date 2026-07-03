@@ -19,11 +19,12 @@ import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectS
 import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
+import { useTopicOptions } from '@/hooks/useTopicOptions';
+import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
 import {
   buildLiteratureCreationOption,
   getPoetryClusterPoems,
   getQualificationTopicError,
-  getMajorTopicsForSubject,
   isAllowedQualificationTopic,
   isPoetryCluster,
 } from '@/lib/ai/majorTopics';
@@ -89,6 +90,7 @@ export default function AIFlashcardsPage() {
   const router = useRouter();
   const [deckName, setDeckName] = useState('');
   const [topic, setTopic] = useState('');
+  const [subtopic, setSubtopic] = useState('');
   const [description, setDescription] = useState('');
   const [specOption, setSpecOption] = useState('');
   const [poemOne, setPoemOne] = useState('');
@@ -108,18 +110,22 @@ export default function AIFlashcardsPage() {
   const poetryPoems = getPoetryClusterPoems(specOption);
   const isSelectedPoetryCluster = isPoetryCluster(specOption);
   const effectiveCreationOption = buildLiteratureCreationOption(specOption, poemOne, poemTwo);
-  const topicSuggestions = getMajorTopicsForSubject(selectedSubject, specOption, poemOne, poemTwo);
+  const { topics: topicOptions, isLoading: topicsLoading } = useTopicOptions(selectedSubject, specOption, poemOne, poemTwo);
+  const topicSuggestions = topicOptions.map((option) => option.name);
+  const selectedTopicOption = topicOptions.find((option) => option.name === topic.trim()) ?? null;
+  const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
   const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
 
   const safeCardCount = clampCardCount(cardCount);
   const topicIsReady = topic.trim().length >= 3;
-  const topicIsAllowed = !topic.trim() || isAllowedQualificationTopic(topic, topicSuggestions);
+  const topicIsAllowed = !topic.trim() || topicsLoading || isAllowedQualificationTopic(topic, topicSuggestions);
   const poetrySelectionComplete = !isSelectedPoetryCluster || !!poemOne;
-  const canGenerate = topicIsReady && topicIsAllowed && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
+  const canGenerate = topicIsReady && topicIsAllowed && !topicsLoading && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
   const validationMessage = subjectsError
     || (!selectedSubject ? 'Choose one of your saved subjects to generate.' : '')
     || (!subjectSpecComplete ? 'Update this subject on the Subjects page with its specification and tier.' : '')
     || (!poetrySelectionComplete ? 'Choose the first poem for this poetry cluster.' : '')
+    || (topicsLoading ? 'Loading topics for this qualification...' : '')
     || (!topicIsReady ? 'Add a topic to generate.' : '')
     || (!topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
 
@@ -186,6 +192,7 @@ export default function AIFlashcardsPage() {
           name: deckName.trim() || undefined,
           description: description.trim(),
           topic: topic.trim(),
+          subtopic: subtopic.trim() || undefined,
           subject: selectedSubject.subject,
           examBoard: selectedSubject.exam_board,
           examType: selectedSubject.exam_type,
@@ -298,6 +305,7 @@ export default function AIFlashcardsPage() {
                   setPoemOne('');
                   setPoemTwo('');
                   setTopic('');
+                  setSubtopic('');
                 }}
               />
               {creationOptions.length > 0 ? (
@@ -309,6 +317,7 @@ export default function AIFlashcardsPage() {
                       setPoemOne('');
                       setPoemTwo('');
                       setTopic('');
+                      setSubtopic('');
                   }}
                   options={[
                     { value: '', label: `Any ${creationOptionLabel.toLowerCase()}` },
@@ -327,6 +336,7 @@ export default function AIFlashcardsPage() {
                       onChange={(event) => {
                         setPoemOne(event.target.value);
                         setTopic('');
+                        setSubtopic('');
                         if (event.target.value === poemTwo) setPoemTwo('');
                       }}
                       className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
@@ -344,6 +354,7 @@ export default function AIFlashcardsPage() {
                       onChange={(event) => {
                         setPoemTwo(event.target.value);
                         setTopic('');
+                        setSubtopic('');
                       }}
                       disabled={!poemOne}
                       className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100 dark:disabled:bg-white/5"
@@ -361,6 +372,7 @@ export default function AIFlashcardsPage() {
                 value={topic}
                 onChange={(value) => {
                   setTopic(value);
+                  setSubtopic('');
                   setStatus(null);
                 }}
                 suggestions={topicSuggestions}
@@ -368,6 +380,16 @@ export default function AIFlashcardsPage() {
                 placeholder="Start typing a topic from this qualification"
                 className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300"
               />
+              {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
+                <TopicInput
+                  label="Subtopic (optional)"
+                  value={subtopic}
+                  onChange={setSubtopic}
+                  suggestions={subtopicSuggestions}
+                  placeholder="Narrow the focus within this topic"
+                  className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300"
+                />
+              ) : null}
             </div>
           </div>
 
