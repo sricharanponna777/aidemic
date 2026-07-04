@@ -3,12 +3,15 @@ import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
+import { isDataAnalysisObjective } from '@/lib/ai/text';
 import { LATEX_COMMAND_PATTERN, normalizeLatexControlCharacters } from '@/lib/mathText';
 
 type NotesPayload = {
   flashcardId?: string;
   concept: string;
   subtopic?: string;
+  learningObjective?: string;
+  paper?: string;
   subject: string;
   duration?: '30' | '60' | '120';
   examBoard?: string;
@@ -58,29 +61,31 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body: NotesPayload = await request.json();
-    const { concept, subtopic, subject, duration = '120', flashcardId, examBoard, examType, specification, mode = 'notes' } = body;
+    const { concept, subtopic, learningObjective, paper, subject, duration = '120', flashcardId, examBoard, examType, specification, mode = 'notes' } = body;
 
     if (mode !== 'notes') {
       return NextResponse.json({ error: 'Only study notes generation is supported.' }, { status: 400 });
     }
 
-    if (!concept || !subject) {
-      return NextResponse.json({ error: 'Concept and subject are required' }, { status: 400 });
+    if (!subject) {
+      return NextResponse.json({ error: 'Subject is required' }, { status: 400 });
     }
-    const allowedTopics = getMajorTopicsForQualification({ subject, examBoard, examType, specification });
-    const topicError = getQualificationTopicError(concept, allowedTopics);
-    if (topicError) {
-      return NextResponse.json({ error: topicError }, { status: 400 });
-    }
-    const relevanceError = getTopicRelevanceError({
-      topic: concept,
-      subject,
-      examBoard,
-      examType,
-      specification,
-    });
-    if (relevanceError) {
-      return NextResponse.json({ error: relevanceError }, { status: 400 });
+    if (concept) {
+      const allowedTopics = getMajorTopicsForQualification({ subject, examBoard, examType, specification });
+      const topicError = getQualificationTopicError(concept, allowedTopics);
+      if (topicError) {
+        return NextResponse.json({ error: topicError }, { status: 400 });
+      }
+      const relevanceError = getTopicRelevanceError({
+        topic: concept,
+        subject,
+        examBoard,
+        examType,
+        specification,
+      });
+      if (relevanceError) {
+        return NextResponse.json({ error: relevanceError }, { status: 400 });
+      }
     }
 
     const supabase = await createClient();
@@ -89,14 +94,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { script, slides } = await generateNotes(concept, subtopic, subject, duration, examBoard, examType, specification);
+    const { script, slides } = await generateNotes(concept, subtopic, learningObjective, paper, subject, duration, examBoard, examType, specification);
 
     const { data, error } = await supabase
       .from('generated_videos')
       .insert({
         user_id: user.id,
         flashcard_id: flashcardId ?? null,
-        concept,
+        concept: concept || 'General revision',
         subject,
         style: 'study-notes',
         duration: parseInt(duration, 10),
@@ -132,6 +137,8 @@ export async function POST(request: Request) {
 async function generateNotes(
   concept: string,
   subtopic: string | undefined,
+  learningObjective: string | undefined,
+  paper: string | undefined,
   subject: string,
   duration: string,
   examBoard?: string,
@@ -156,11 +163,17 @@ async function generateNotes(
   const specContext = specification ? `Specification: ${specification}.` : '';
   const courseContext = [examContext, specContext].filter(Boolean).join(' ');
 
-  const instruction = `Create study notes about "${concept}" in ${subject}.
+  const instruction = `${concept
+    ? `Create study notes about "${concept}" in ${subject}.`
+    : `Create general study notes for ${subject}. No specific topic was given, so generalise across ${paper ? `the topics assessed on ${paper} of the specification` : 'the whole specification'}, choosing a well-rounded, representative spread of topics.`}
 Depth: ${complexity}. Target reading time: ~${seconds} seconds total.${courseContext ? `\n${courseContext}` : ''}
 ${subtopic ? `\nSubtopic focus: ${subtopic}. Concentrate the notes on this subtopic rather than covering the whole topic broadly.` : ''}
+${learningObjective ? `\nLearning objective: ${learningObjective}` : ''}
+${learningObjective && isDataAnalysisObjective(learningObjective) ? '\nThis is a data-analysis focused session: include at least one worked example presented as a markdown table (| col | col |) of realistic data that the notes show how to read, calculate from, or interpret.' : ''}
+${paper ? `\n${paper}. Only include content that is assessed on this paper of the specification, not content exclusive to another paper.` : ''}
 
-Before writing, internally identify the exact qualification/specification being studied and check whether "${concept}" belongs on that specification.
+When the notes involve a data set, present it as a markdown table (| col | col |) so it renders correctly.
+${concept ? `Before writing, internally identify the exact qualification/specification being studied and check whether "${concept}" belongs on that specification.` : 'Before writing, internally identify the exact qualification/specification being studied.'}
 Use the selected exam board, qualification level, specification, tier, option, text, or topic focus as hard constraints.
 Only include content that is assessable for that course. Do not import topics from another board, another qualification level, or a different option route.
 For example, do not treat a topic as universal just because it appears in another exam board's course.

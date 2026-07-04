@@ -7,7 +7,8 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "chemistry": [
@@ -16,7 +17,8 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "physics": [
@@ -25,7 +27,8 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "mathematics": [
@@ -34,12 +37,14 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 3
         }
       ],
       "english": [
         {
-          "name": "AQA GCSE English Language"
+          "name": "AQA GCSE English Language",
+          "papers": 2
         },
         {
           "name": "AQA GCSE English Literature",
@@ -60,7 +65,8 @@
             "Power and Conflict poetry",
             "Love and Relationships poetry",
             "Unseen poetry"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "history": [
@@ -80,37 +86,44 @@
             "Britain: Migration, Empires and the People",
             "Norman England, c1066–c1100",
             "Medieval England: The Reign of Edward I, 1272–1307"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "geography": [
         {
-          "name": "AQA GCSE Geography"
+          "name": "AQA GCSE Geography",
+          "papers": 3
         }
       ],
       "economics": [
         {
-          "name": "AQA GCSE Economics"
+          "name": "AQA GCSE Economics",
+          "papers": 2
         }
       ],
       "psychology": [
         {
-          "name": "AQA GCSE Psychology"
+          "name": "AQA GCSE Psychology",
+          "papers": 2
         }
       ],
       "business": [
         {
-          "name": "AQA GCSE Business"
+          "name": "AQA GCSE Business",
+          "papers": 2
         }
       ],
       "computer science": [
         {
-          "name": "AQA GCSE Computer Science"
+          "name": "AQA GCSE Computer Science",
+          "papers": 2
         }
       ],
       "english language": [
         {
-          "name": "AQA GCSE English Language"
+          "name": "AQA GCSE English Language",
+          "papers": 2
         }
       ],
       "english literature": [
@@ -133,34 +146,40 @@
             "Power and Conflict poetry",
             "Love and Relationships poetry",
             "Unseen poetry"
-          ]
+          ],
+          "papers": 2
         }
       ]
     },
     "a-level": {
       "biology": [
         {
-          "name": "AQA A-Level Biology"
+          "name": "AQA A-Level Biology",
+          "papers": 3
         }
       ],
       "chemistry": [
         {
-          "name": "AQA A-Level Chemistry"
+          "name": "AQA A-Level Chemistry",
+          "papers": 3
         }
       ],
       "physics": [
         {
-          "name": "AQA A-Level Physics"
+          "name": "AQA A-Level Physics",
+          "papers": 3
         }
       ],
       "mathematics": [
         {
-          "name": "AQA A-Level Mathematics"
+          "name": "AQA A-Level Mathematics",
+          "papers": 3
         }
       ],
       "english": [
         {
-          "name": "AQA A-Level English Language"
+          "name": "AQA A-Level English Language",
+          "papers": 2
         },
         {
           "name": "AQA A-Level English Literature A",
@@ -173,7 +192,8 @@
             "Songs of Innocence and Experience",
             "Feminine Gospels",
             "Modern Times anthology"
-          ]
+          ],
+          "papers": 2
         },
         {
           "name": "AQA A-Level English Literature B",
@@ -186,7 +206,8 @@
             "The Kite Runner",
             "The Handmaid's Tale",
             "Poetry anthology"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "history": [
@@ -208,37 +229,44 @@
             "2Q – The American Dream: Reality and Illusion, 1945–1980",
             "2R – The Cold War, c1945–1991",
             "2S – The Making of Modern Britain, 1951–2007"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "geography": [
         {
-          "name": "AQA A-Level Geography"
+          "name": "AQA A-Level Geography",
+          "papers": 2
         }
       ],
       "economics": [
         {
-          "name": "AQA A-Level Economics"
+          "name": "AQA A-Level Economics",
+          "papers": 3
         }
       ],
       "psychology": [
         {
-          "name": "AQA A-Level Psychology"
+          "name": "AQA A-Level Psychology",
+          "papers": 3
         }
       ],
       "business": [
         {
-          "name": "AQA A-Level Business"
+          "name": "AQA A-Level Business",
+          "papers": 3
         }
       ],
       "computer science": [
         {
-          "name": "AQA A-Level Computer Science"
+          "name": "AQA A-Level Computer Science",
+          "papers": 2
         }
       ],
       "english language": [
         {
-          "name": "AQA A-Level English Language"
+          "name": "AQA A-Level English Language",
+          "papers": 2
         }
       ],
       "english literature": [
@@ -253,7 +281,8 @@
             "Songs of Innocence and Experience",
             "Feminine Gospels",
             "Modern Times anthology"
-          ]
+          ],
+          "papers": 2
         },
         {
           "name": "AQA A-Level English Literature B",
@@ -266,7 +295,8 @@
             "The Kite Runner",
             "The Handmaid's Tale",
             "Poetry anthology"
-          ]
+          ],
+          "papers": 2
         }
       ]
     }
@@ -279,7 +309,8 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "chemistry": [
@@ -288,7 +319,8 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "physics": [
@@ -297,7 +329,8 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "mathematics": [
@@ -306,12 +339,14 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 3
         }
       ],
       "english": [
         {
-          "name": "Edexcel GCSE English Language"
+          "name": "Edexcel GCSE English Language",
+          "papers": 2
         },
         {
           "name": "Edexcel GCSE English Literature",
@@ -331,7 +366,8 @@
             "Conflict poetry anthology",
             "Relationships poetry anthology",
             "Unseen poetry"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "history": [
@@ -353,40 +389,48 @@
             "Medicine in Britain, c1250–present",
             "Warfare and British Society, c1250–present",
             "Migrants in Britain, c800–present"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "geography": [
         {
-          "name": "Edexcel GCSE Geography A"
+          "name": "Edexcel GCSE Geography A",
+          "papers": 3
         },
         {
-          "name": "Edexcel GCSE Geography B"
+          "name": "Edexcel GCSE Geography B",
+          "papers": 3
         }
       ],
       "economics": [
         {
-          "name": "Edexcel GCSE Economics"
+          "name": "Edexcel GCSE Economics",
+          "papers": 2
         }
       ],
       "psychology": [
         {
-          "name": "Edexcel GCSE Psychology"
+          "name": "Edexcel GCSE Psychology",
+          "papers": 2
         }
       ],
       "business": [
         {
-          "name": "Edexcel GCSE Business"
+          "name": "Edexcel GCSE Business",
+          "papers": 2
         }
       ],
       "computer science": [
         {
-          "name": "Edexcel GCSE Computer Science"
+          "name": "Edexcel GCSE Computer Science",
+          "papers": 2
         }
       ],
       "english language": [
         {
-          "name": "Edexcel GCSE English Language"
+          "name": "Edexcel GCSE English Language",
+          "papers": 2
         }
       ],
       "english literature": [
@@ -408,40 +452,48 @@
             "Conflict poetry anthology",
             "Relationships poetry anthology",
             "Unseen poetry"
-          ]
+          ],
+          "papers": 2
         }
       ]
     },
     "a-level": {
       "biology": [
         {
-          "name": "Edexcel A-Level Biology A"
+          "name": "Edexcel A-Level Biology A",
+          "papers": 3
         },
         {
-          "name": "Edexcel A-Level Biology B"
+          "name": "Edexcel A-Level Biology B",
+          "papers": 3
         }
       ],
       "chemistry": [
         {
-          "name": "Edexcel A-Level Chemistry"
+          "name": "Edexcel A-Level Chemistry",
+          "papers": 3
         }
       ],
       "physics": [
         {
-          "name": "Edexcel A-Level Physics"
+          "name": "Edexcel A-Level Physics",
+          "papers": 3
         }
       ],
       "mathematics": [
         {
-          "name": "Edexcel A-Level Mathematics"
+          "name": "Edexcel A-Level Mathematics",
+          "papers": 3
         }
       ],
       "english": [
         {
-          "name": "Edexcel A-Level English Language"
+          "name": "Edexcel A-Level English Language",
+          "papers": 2
         },
         {
-          "name": "Edexcel A-Level English Language and Literature"
+          "name": "Edexcel A-Level English Language and Literature",
+          "papers": 3
         },
         {
           "name": "Edexcel A-Level English Literature",
@@ -455,7 +507,8 @@
             "The Handmaid's Tale",
             "Poems of the Decade",
             "Selected poetry"
-          ]
+          ],
+          "papers": 3
         }
       ],
       "history": [
@@ -469,43 +522,52 @@
             "1F – In Search of the American Dream: The USA, c1917–1996",
             "1G – Germany and West Germany, 1918–1989",
             "1H – Britain Transformed, 1918–1997"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "geography": [
         {
-          "name": "Edexcel A-Level Geography"
+          "name": "Edexcel A-Level Geography",
+          "papers": 3
         }
       ],
       "economics": [
         {
-          "name": "Edexcel A-Level Economics A"
+          "name": "Edexcel A-Level Economics A",
+          "papers": 3
         },
         {
-          "name": "Edexcel A-Level Economics B"
+          "name": "Edexcel A-Level Economics B",
+          "papers": 3
         }
       ],
       "psychology": [
         {
-          "name": "Edexcel A-Level Psychology"
+          "name": "Edexcel A-Level Psychology",
+          "papers": 3
         }
       ],
       "business": [
         {
-          "name": "Edexcel A-Level Business"
+          "name": "Edexcel A-Level Business",
+          "papers": 3
         }
       ],
       "computer science": [
         {
-          "name": "Edexcel A-Level Computer Science"
+          "name": "Edexcel A-Level Computer Science",
+          "papers": 2
         }
       ],
       "english language": [
         {
-          "name": "Edexcel A-Level English Language"
+          "name": "Edexcel A-Level English Language",
+          "papers": 2
         },
         {
-          "name": "Edexcel A-Level English Language and Literature"
+          "name": "Edexcel A-Level English Language and Literature",
+          "papers": 2
         }
       ],
       "english literature": [
@@ -521,7 +583,8 @@
             "The Handmaid's Tale",
             "Poems of the Decade",
             "Selected poetry"
-          ]
+          ],
+          "papers": 3
         }
       ]
     }
@@ -534,14 +597,16 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         },
         {
           "name": "OCR GCSE Biology B (Twenty First Century Science)",
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "chemistry": [
@@ -550,14 +615,16 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         },
         {
           "name": "OCR GCSE Chemistry B (Twenty First Century Science)",
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "physics": [
@@ -566,14 +633,16 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         },
         {
           "name": "OCR GCSE Physics B (Twenty First Century Science)",
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "mathematics": [
@@ -582,12 +651,14 @@
           "tiers": [
             "Foundation",
             "Higher"
-          ]
+          ],
+          "papers": 3
         }
       ],
       "english": [
         {
-          "name": "OCR GCSE English Language"
+          "name": "OCR GCSE English Language",
+          "papers": 2
         },
         {
           "name": "OCR GCSE English Literature",
@@ -606,7 +677,8 @@
             "Conflict poetry anthology",
             "Love and Relationships poetry",
             "Unseen poetry"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "history": [
@@ -620,7 +692,8 @@
             "Thematic: Migration to Britain, c1000–c2010",
             "Thematic: Power – Monarchy and Democracy in Britain, c1000–2014",
             "Thematic: War and British Society, c790–c2010"
-          ]
+          ],
+          "papers": 2
         },
         {
           "name": "OCR GCSE History B (Schools History Project)",
@@ -630,36 +703,43 @@
             "Depth: The Norman Conquest, 1065–1087",
             "Depth: The Elizabethans, 1580–1603",
             "Depth: Britain in Peace and War, 1900–1918"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "geography": [
         {
-          "name": "OCR GCSE Geography A"
+          "name": "OCR GCSE Geography A",
+          "papers": 3
         },
         {
-          "name": "OCR GCSE Geography B"
+          "name": "OCR GCSE Geography B",
+          "papers": 3
         }
       ],
       "economics": [],
       "psychology": [
         {
-          "name": "OCR GCSE Psychology"
+          "name": "OCR GCSE Psychology",
+          "papers": 2
         }
       ],
       "business": [
         {
-          "name": "OCR GCSE Business"
+          "name": "OCR GCSE Business",
+          "papers": 2
         }
       ],
       "computer science": [
         {
-          "name": "OCR GCSE Computer Science"
+          "name": "OCR GCSE Computer Science",
+          "papers": 2
         }
       ],
       "english language": [
         {
-          "name": "OCR GCSE English Language"
+          "name": "OCR GCSE English Language",
+          "papers": 2
         }
       ],
       "english literature": [
@@ -680,46 +760,56 @@
             "Conflict poetry anthology",
             "Love and Relationships poetry",
             "Unseen poetry"
-          ]
+          ],
+          "papers": 2
         }
       ]
     },
     "a-level": {
       "biology": [
         {
-          "name": "OCR A-Level Biology A"
+          "name": "OCR A-Level Biology A",
+          "papers": 3
         },
         {
-          "name": "OCR A-Level Biology B (Advancing Biology)"
+          "name": "OCR A-Level Biology B (Advancing Biology)",
+          "papers": 3
         }
       ],
       "chemistry": [
         {
-          "name": "OCR A-Level Chemistry A"
+          "name": "OCR A-Level Chemistry A",
+          "papers": 3
         },
         {
-          "name": "OCR A-Level Chemistry B (Salters)"
+          "name": "OCR A-Level Chemistry B (Salters)",
+          "papers": 3
         }
       ],
       "physics": [
         {
-          "name": "OCR A-Level Physics A"
+          "name": "OCR A-Level Physics A",
+          "papers": 3
         },
         {
-          "name": "OCR A-Level Physics B (Advancing Physics)"
+          "name": "OCR A-Level Physics B (Advancing Physics)",
+          "papers": 3
         }
       ],
       "mathematics": [
         {
-          "name": "OCR A-Level Mathematics A"
+          "name": "OCR A-Level Mathematics A",
+          "papers": 3
         },
         {
-          "name": "OCR A-Level Mathematics B (MEI)"
+          "name": "OCR A-Level Mathematics B (MEI)",
+          "papers": 3
         }
       ],
       "english": [
         {
-          "name": "OCR A-Level English Language"
+          "name": "OCR A-Level English Language",
+          "papers": 3
         },
         {
           "name": "OCR A-Level English Literature",
@@ -732,7 +822,8 @@
             "The Handmaid's Tale",
             "Christina Rossetti poetry",
             "The Bloody Chamber"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "history": [
@@ -745,37 +836,44 @@
             "Y107 – England 1547–1603: The Later Tudors",
             "Y112 – Britain 1900–1951",
             "Y113 – Britain c1930–1997"
-          ]
+          ],
+          "papers": 2
         }
       ],
       "geography": [
         {
-          "name": "OCR A-Level Geography"
+          "name": "OCR A-Level Geography",
+          "papers": 3
         }
       ],
       "economics": [
         {
-          "name": "OCR A-Level Economics"
+          "name": "OCR A-Level Economics",
+          "papers": 3
         }
       ],
       "psychology": [
         {
-          "name": "OCR A-Level Psychology"
+          "name": "OCR A-Level Psychology",
+          "papers": 3
         }
       ],
       "business": [
         {
-          "name": "OCR A-Level Business"
+          "name": "OCR A-Level Business",
+          "papers": 3
         }
       ],
       "computer science": [
         {
-          "name": "OCR A-Level Computer Science"
+          "name": "OCR A-Level Computer Science",
+          "papers": 2
         }
       ],
       "english language": [
         {
-          "name": "OCR A-Level English Language"
+          "name": "OCR A-Level English Language",
+          "papers": 3
         }
       ],
       "english literature": [
@@ -790,7 +888,8 @@
             "The Handmaid's Tale",
             "Christina Rossetti poetry",
             "The Bloody Chamber"
-          ]
+          ],
+          "papers": 2
         }
       ]
     }

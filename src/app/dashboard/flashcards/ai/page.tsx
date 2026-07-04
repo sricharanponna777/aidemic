@@ -21,6 +21,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useTopicOptions } from '@/hooks/useTopicOptions';
 import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
+import { useLearningObjectives } from '@/hooks/useLearningObjectives';
 import {
   buildLiteratureCreationOption,
   getPoetryClusterPoems,
@@ -33,6 +34,7 @@ import {
   getCreationOptionLabel,
   getExamBoardLabel,
   getExamTypeLabel,
+  getPaperOptions,
   getSubjectLabel,
   isSubjectSpecComplete,
 } from '@/lib/ai/subjectConfig';
@@ -91,6 +93,8 @@ export default function AIFlashcardsPage() {
   const [deckName, setDeckName] = useState('');
   const [topic, setTopic] = useState('');
   const [subtopic, setSubtopic] = useState('');
+  const [learningObjective, setLearningObjective] = useState('');
+  const [paper, setPaper] = useState('');
   const [description, setDescription] = useState('');
   const [specOption, setSpecOption] = useState('');
   const [poemOne, setPoemOne] = useState('');
@@ -114,10 +118,12 @@ export default function AIFlashcardsPage() {
   const topicSuggestions = topicOptions.map((option) => option.name);
   const selectedTopicOption = topicOptions.find((option) => option.name === topic.trim()) ?? null;
   const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
+  const { objectives: learningObjectiveOptions } = useLearningObjectives(selectedSubject, 'flashcards');
+  const paperOptions = getPaperOptions(selectedSubject);
   const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
 
   const safeCardCount = clampCardCount(cardCount);
-  const topicIsReady = topic.trim().length >= 3;
+  const topicIsReady = topic.trim().length === 0 || topic.trim().length >= 3;
   const topicIsAllowed = !topic.trim() || topicsLoading || isAllowedQualificationTopic(topic, topicSuggestions);
   const poetrySelectionComplete = !isSelectedPoetryCluster || !!poemOne;
   const canGenerate = topicIsReady && topicIsAllowed && !topicsLoading && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
@@ -126,12 +132,12 @@ export default function AIFlashcardsPage() {
     || (!subjectSpecComplete ? 'Update this subject on the Subjects page with its specification and tier.' : '')
     || (!poetrySelectionComplete ? 'Choose the first poem for this poetry cluster.' : '')
     || (topicsLoading ? 'Loading topics for this qualification...' : '')
-    || (!topicIsReady ? 'Add a topic to generate.' : '')
+    || (!topicIsReady ? 'Topic must be at least 3 characters, or leave it blank to generalise.' : '')
     || (!topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
 
   const summaryRows = [
     { label: 'Deck', value: deckName.trim() || 'AI-generated name' },
-    { label: 'Topic', value: topic.trim() || 'Add a topic' },
+    { label: 'Topic', value: topic.trim() || 'General (AI will generalise)' },
     { label: 'Subject', value: selectedSubject ? getSubjectLabel(selectedSubject.subject) : 'Choose subject' },
     { label: 'Level', value: selectedSubject ? `${getExamBoardLabel(selectedSubject.exam_board)} ${getExamTypeLabel(selectedSubject.exam_type)}` : '--' },
     { label: 'Cards', value: `${safeCardCount}` },
@@ -149,7 +155,7 @@ export default function AIFlashcardsPage() {
     event.preventDefault();
 
     if (!topicIsReady) {
-      setStatus({ tone: 'error', text: 'Add a topic with at least 3 characters.' });
+      setStatus({ tone: 'error', text: 'Topic must be at least 3 characters, or leave it blank to generalise.' });
       return;
     }
     if (!selectedSubject) {
@@ -164,22 +170,24 @@ export default function AIFlashcardsPage() {
       setStatus(null);
       return;
     }
-    const topicError = getQualificationTopicError(topic.trim(), topicSuggestions);
-    if (topicError) {
-      setStatus(null);
-      return;
-    }
     const specification = getSelectedSpecLabel(selectedSubject, effectiveCreationOption);
-    const relevanceError = getTopicRelevanceError({
-      topic: topic.trim(),
-      subject: selectedSubject.subject,
-      examBoard: selectedSubject.exam_board,
-      examType: selectedSubject.exam_type,
-      specification,
-    });
-    if (relevanceError) {
-      setStatus({ tone: 'error', text: relevanceError });
-      return;
+    if (topic.trim()) {
+      const topicError = getQualificationTopicError(topic.trim(), topicSuggestions);
+      if (topicError) {
+        setStatus(null);
+        return;
+      }
+      const relevanceError = getTopicRelevanceError({
+        topic: topic.trim(),
+        subject: selectedSubject.subject,
+        examBoard: selectedSubject.exam_board,
+        examType: selectedSubject.exam_type,
+        specification,
+      });
+      if (relevanceError) {
+        setStatus({ tone: 'error', text: relevanceError });
+        return;
+      }
     }
     setIsGenerating(true);
     setStatus({ tone: 'info', text: 'Generating the deck...' });
@@ -193,6 +201,8 @@ export default function AIFlashcardsPage() {
           description: description.trim(),
           topic: topic.trim(),
           subtopic: subtopic.trim() || undefined,
+          learningObjective: learningObjective || undefined,
+          paper: paper || undefined,
           subject: selectedSubject.subject,
           examBoard: selectedSubject.exam_board,
           examType: selectedSubject.exam_type,
@@ -306,6 +316,8 @@ export default function AIFlashcardsPage() {
                   setPoemTwo('');
                   setTopic('');
                   setSubtopic('');
+                  setLearningObjective('');
+                  setPaper('');
                 }}
               />
               {creationOptions.length > 0 ? (
@@ -368,7 +380,7 @@ export default function AIFlashcardsPage() {
                 </div>
               ) : null}
               <TopicInput
-                label="Topic"
+                label="Topic (optional)"
                 value={topic}
                 onChange={(value) => {
                   setTopic(value);
@@ -377,7 +389,7 @@ export default function AIFlashcardsPage() {
                 }}
                 suggestions={topicSuggestions}
                 isValidSelection={topicIsAllowed}
-                placeholder="Start typing a topic from this qualification"
+                placeholder="Start typing a topic, or leave blank to generalise"
                 className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300"
               />
               {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
@@ -389,6 +401,36 @@ export default function AIFlashcardsPage() {
                   placeholder="Narrow the focus within this topic"
                   className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300"
                 />
+              ) : null}
+              {learningObjectiveOptions.length > 0 ? (
+                <label className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Learning objective (optional)
+                  <select
+                    value={learningObjective}
+                    onChange={(event) => setLearningObjective(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  >
+                    <option value="">No specific focus</option>
+                    {learningObjectiveOptions.map((objective) => (
+                      <option key={objective} value={objective}>{objective}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {paperOptions.length > 0 ? (
+                <label className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Paper (optional)
+                  <select
+                    value={paper}
+                    onChange={(event) => setPaper(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  >
+                    <option value="">General (any paper)</option>
+                    {paperOptions.map((paperOption) => (
+                      <option key={paperOption} value={paperOption}>{paperOption}</option>
+                    ))}
+                  </select>
+                </label>
               ) : null}
             </div>
           </div>

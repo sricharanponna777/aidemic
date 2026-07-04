@@ -4,7 +4,7 @@ import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/
 import { extractFromResponsesBody, extractJsonWithCoercer, tryExtractWithCoercer, type OpenAIResponseBody, type ChatCompletionsResponseBody } from '@/lib/ai/json';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { normalizeMathNotation } from '@/lib/ai/math';
-import { MAX_AI_ERROR_TEXT, safe, txt } from '@/lib/ai/text';
+import { isDataAnalysisObjective, MAX_AI_ERROR_TEXT, safe, txt } from '@/lib/ai/text';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import {
   clampCount,
@@ -22,6 +22,8 @@ type FlashcardPayload = {
   description?: string;
   topic?: string;
   subtopic?: string;
+  learningObjective?: string;
+  paper?: string;
   subject?: string;
   examBoard?: string;
   examType?: string;
@@ -104,6 +106,8 @@ const normalizePayload = (raw: FlashcardPayload) => ({
   description: txt(raw.description || '', 280),
   topic: txt(raw.topic || '', 200),
   subtopic: txt(raw.subtopic || '', 200),
+  learningObjective: txt(raw.learningObjective || '', 300),
+  paper: txt(raw.paper || '', 30),
   subject: normalizeSubject(raw.subject),
   examBoard: normalizeBoard(raw.examBoard),
   examType: normalizeExamType(raw.examType),
@@ -149,8 +153,16 @@ const aiGenerate = async (payload: ReturnType<typeof normalizePayload>): Promise
     'Never use ambiguous shorthand such as x2, xy3, x^n+1, or (x4y^2)/(xy3).',
     `Board: ${payload.examBoard}. Type: ${payload.examType}. Subject: ${payload.subject}.`,
     payload.specification ? `Specification focus: ${payload.specification}` : '',
-    `Topic: ${payload.topic}.`,
+    payload.topic
+      ? `Topic: ${payload.topic}.`
+      : `No specific topic given. Generalise across ${payload.paper ? `the topics assessed on ${payload.paper} of the specification` : 'the whole specification'}, choosing a well-rounded, representative spread of topics.`,
     payload.subtopic ? `Subtopic focus: ${payload.subtopic}. Concentrate the cards on this subtopic rather than the whole topic.` : '',
+    payload.learningObjective ? `Learning objective: ${payload.learningObjective}` : '',
+    payload.learningObjective && isDataAnalysisObjective(payload.learningObjective)
+      ? 'This is a data-analysis focused session: at least half of the generated flashcards must present a small, realistic data set as a markdown table (| col | col |) on the front or back that the student must read, calculate from, or interpret. Do not make every card purely a definition or recall fact.'
+      : '',
+    payload.paper ? `${payload.paper}. Only include content that is assessed on this paper of the specification, not content exclusive to another paper.` : '',
+    'When a card front or back involves a data set, present it as a markdown table (| col | col |) so it renders correctly.',
     'Before generating cards, internally identify the exact qualification/specification being studied and verify that the topic belongs to it.',
     'Treat board, qualification level, specification, tier, option, text, and topic focus as hard constraints.',
     'Only write cards for content that is assessable on the selected course. Do not import topics, case studies, set texts, terminology, or depth from another exam board, another qualification level, or a different option route.',
@@ -246,9 +258,6 @@ export async function POST(request: Request) {
     const rawBody = (await request.json()) as FlashcardPayload;
     const payload = normalizePayload(rawBody);
 
-    if (!payload.topic) {
-      return NextResponse.json({ error: 'Topic is required.' }, { status: 400 });
-    }
     if (!payload.subject) {
       return NextResponse.json({ error: `Subject must be one of: ${SUPPORTED_SUBJECTS.join(', ')}.` }, { status: 400 });
     }
@@ -258,25 +267,27 @@ export async function POST(request: Request) {
     if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
       return NextResponse.json({ error: 'Exam type must be GCSE or A-Level.' }, { status: 400 });
     }
-    const allowedTopics = getMajorTopicsForQualification({
-      subject: payload.subject,
-      examBoard: payload.examBoard,
-      examType: payload.examType,
-      specification: payload.specification,
-    });
-    const topicError = getQualificationTopicError(payload.topic, allowedTopics);
-    if (topicError) {
-      return NextResponse.json({ error: topicError }, { status: 400 });
-    }
-    const relevanceError = getTopicRelevanceError({
-      topic: payload.topic,
-      subject: payload.subject,
-      examBoard: payload.examBoard,
-      examType: payload.examType,
-      specification: payload.specification,
-    });
-    if (relevanceError) {
-      return NextResponse.json({ error: relevanceError }, { status: 400 });
+    if (payload.topic) {
+      const allowedTopics = getMajorTopicsForQualification({
+        subject: payload.subject,
+        examBoard: payload.examBoard,
+        examType: payload.examType,
+        specification: payload.specification,
+      });
+      const topicError = getQualificationTopicError(payload.topic, allowedTopics);
+      if (topicError) {
+        return NextResponse.json({ error: topicError }, { status: 400 });
+      }
+      const relevanceError = getTopicRelevanceError({
+        topic: payload.topic,
+        subject: payload.subject,
+        examBoard: payload.examBoard,
+        examType: payload.examType,
+        specification: payload.specification,
+      });
+      if (relevanceError) {
+        return NextResponse.json({ error: relevanceError }, { status: 400 });
+      }
     }
     if (!payload.prompt || payload.prompt.length < 20) {
       return NextResponse.json({ error: 'A detailed prompt is required.' }, { status: 400 });

@@ -10,7 +10,7 @@ import {
 } from '@/lib/ai/json';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { normalizeMathNotation } from '@/lib/ai/math';
-import { cleanText, dedupe, extractFigureUrls, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
+import { cleanText, dedupe, extractFigureUrls, isDataAnalysisObjective, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import {
   clampCount,
@@ -28,6 +28,8 @@ type CorrectOption = '' | 'A' | 'B' | 'C' | 'D';
 interface GenerateQuestionsPayload {
   topic?: string;
   subtopic?: string;
+  learningObjective?: string;
+  paper?: string;
   subject?: string;
   prompt?: string;
   examBoard?: string;
@@ -225,6 +227,8 @@ const logInvalidQuestionJson = (source: string, payload: unknown) => {
 const normalizePayload = (raw: GenerateQuestionsPayload) => ({
   topic: txt(raw.topic || '', 200),
   subtopic: txt(raw.subtopic || '', 200),
+  learningObjective: txt(raw.learningObjective || '', 300),
+  paper: txt(raw.paper || '', 30),
   subject: txt((raw.subject || '').toLowerCase(), 60),
   prompt: txt(raw.prompt || '', 2000),
   examBoard: normalizeBoard(raw.examBoard),
@@ -360,7 +364,8 @@ const getSourceMaterialFromRawItem = (value: unknown, payload: ReturnType<typeof
 
 const normalizeQuestion = (
   question: ExamQuestion,
-  payload: ReturnType<typeof normalizePayload>
+  payload: ReturnType<typeof normalizePayload>,
+  figureUrls: string[]
 ): ExamQuestion | null => {
   if (!question || typeof question !== 'object') return null;
   const record = question as unknown as Record<string, unknown>;
@@ -413,7 +418,10 @@ const normalizeQuestion = (
     markScheme: repairedMarkScheme,
     modelAnswer: txt(modelAnswer, 1400),
     skillsAssessed: skillsAssessed.length > 0 ? skillsAssessed : ['Exam technique'],
-    figureUrl: sanitizeFigureUrl(readString(record, ['figureUrl', 'figure_url', 'imageUrl', 'image_url'])),
+    figureUrl: (() => {
+      const candidate = sanitizeFigureUrl(readString(record, ['figureUrl', 'figure_url', 'imageUrl', 'image_url']));
+      return candidate && figureUrls.includes(candidate) ? candidate : '';
+    })(),
     sourceTitle: cleanText(readString(record, ['sourceTitle', 'source_title', 'source', 'citationTitle', 'citation_title']), 160),
     sourceUrl: sanitizeFigureUrl(readString(record, ['sourceUrl', 'source_url', 'url', 'citationUrl', 'citation_url'])),
   };
@@ -485,7 +493,7 @@ const getEnglishLanguageInstructions = (payload: ReturnType<typeof normalizePayl
 
   return [
     'AQA GCSE English Language Paper 2 only. Generate exactly 5 questions; ignore requested count.',
-    'Create two original linked unseen sources of 350-500 words each: one non-fiction and one literary non-fiction with contrasting viewpoints on the same issue. Put both full sources only in top-level sourceMaterial under "Source A" and "Source B". Do not include the sources inside any question. Do not use copyrighted text.',
+    'Create two original linked unseen sources of 350-500 words each: one 20th/21st century non-fiction and one 19th century..... non-fiction with contrasting viewpoints on the same issue. Put both full sources only in top-level sourceMaterial under "Source A" and "Source B". Do not include the sources inside any question. Do not use copyrighted text.',
     'Question 1: open, 4 marks, short retrieval/inference about Source A.',
     'Question 2: open, 8 marks, write a summary comparing differences between Source A and Source B.',
     'Question 3: open, 12 marks, analyse how the writer uses language in a named section of one source.',
@@ -531,6 +539,7 @@ const buildPrompt = (
     'Use GFM Markdown in strings. No raw HTML.',
     'Math: inline \\\\(...\\\\), display \\\\[...\\\\]. Double-escape backslashes in JSON. Always group: x^{2} not x^2.',
     'sourceMaterial: use only for separate extracts/sources needed to answer the questions. Empty string for ordinary practice.',
+    'When a question involves a data set, present it as a markdown table (| col | col |) inside the question text so it renders correctly.',
     'Keep all text fields concise: question≤2 sentences, markScheme items≤15 words each, modelAnswer≤40 words, skillsAssessed≤1 item.',
     'Return JSON only. Match schema exactly.',
   ]
@@ -538,8 +547,15 @@ const buildPrompt = (
     .join(' ');
 
   const user = [
-    `Topic: ${payload.topic}`,
+    payload.topic
+      ? `Topic: ${payload.topic}`
+      : `No specific topic given. Generalise across ${payload.paper ? `the topics assessed on ${payload.paper} of the specification` : 'the whole specification'}, choosing a well-rounded, representative spread of topics.`,
     payload.subtopic ? `Subtopic focus: ${payload.subtopic}. Concentrate the questions on this subtopic rather than the whole topic.` : '',
+    payload.learningObjective ? `Learning objective: ${payload.learningObjective}` : '',
+    payload.learningObjective && isDataAnalysisObjective(payload.learningObjective)
+      ? 'This is a data-analysis focused session: at least half of the generated questions must present a small, realistic data set as a markdown table (| col | col |) that the student must read, calculate from, or interpret (e.g. rates, means, percentages, trends). Do not make every question purely descriptive or recall-based.'
+      : '',
+    payload.paper ? `${payload.paper}. Only include content that is assessed on this paper of the specification, not content exclusive to another paper.` : '',
     payload.prompt ? `Prompt requirements: ${payload.prompt}` : '',
     figureUrls.length > 0 ? `Figure URLs:\n${figureUrls.map((url, i) => `${i + 1}. ${url}`).join('\n')}` : '',
   ]
@@ -776,7 +792,8 @@ const appendUniqueQuestions = (
   seen: Set<string>,
   rawQuestions: ExamQuestion[],
   payload: ReturnType<typeof normalizePayload>,
-  sourceMaterialItems: string[]
+  sourceMaterialItems: string[],
+  figureUrls: string[]
 ) => {
   let malformedCount = 0;
 
@@ -788,7 +805,7 @@ const appendUniqueQuestions = (
       continue;
     }
 
-    const question = normalizeQuestion(rawQuestion, payload);
+    const question = normalizeQuestion(rawQuestion, payload, figureUrls);
     if (!question) {
       malformedCount += 1;
       continue;
@@ -882,7 +899,6 @@ export async function POST(request: Request) {
     const rawBody = (await request.json()) as GenerateQuestionsPayload;
     const payload = normalizePayload(rawBody);
 
-    if (!payload.topic) return NextResponse.json({ error: 'Topic is required.' }, { status: 400 });
     if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
       return NextResponse.json({ error: 'Exam board must be one of: AQA, Edexcel, OCR.' }, { status: 400 });
     }
@@ -899,7 +915,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'English Language practice currently supports AQA only.' }, { status: 400 });
     }
     const englishLanguagePaper = getEnglishLanguagePaper(payload);
-    if (!englishLanguagePaper) {
+    if (!englishLanguagePaper && payload.topic) {
       const allowedTopics = getMajorTopicsForQualification({
         subject: payload.subject,
         examBoard: payload.examBoard,
@@ -955,7 +971,7 @@ export async function POST(request: Request) {
     const seen = new Set<string>();
     const rawQuestions = Array.isArray(aiResult.generated.questions) ? aiResult.generated.questions : [];
     const sourceMaterialItems: string[] = [];
-    let malformedCount = appendUniqueQuestions(uniqueQuestions, seen, rawQuestions, payload, sourceMaterialItems);
+    let malformedCount = appendUniqueQuestions(uniqueQuestions, seen, rawQuestions, payload, sourceMaterialItems, figureUrls);
     let totalRawQuestions = rawQuestions.length;
 
     if (uniqueQuestions.length < payload.questionCount) {
@@ -964,7 +980,7 @@ export async function POST(request: Request) {
         const backfillRaw = await aiBackfillQuestions(payload, figureUrls, uniqueQuestions, missingCount);
         const backfillQuestions = Array.isArray(backfillRaw.questions) ? backfillRaw.questions : [];
         totalRawQuestions += backfillQuestions.length;
-        malformedCount += appendUniqueQuestions(uniqueQuestions, seen, backfillQuestions, payload, sourceMaterialItems);
+        malformedCount += appendUniqueQuestions(uniqueQuestions, seen, backfillQuestions, payload, sourceMaterialItems, figureUrls);
       } catch {
         warnings.push('Replacement question generation could not complete.');
       }

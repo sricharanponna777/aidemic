@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -27,6 +26,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useTopicOptions } from '@/hooks/useTopicOptions';
 import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
+import { useLearningObjectives } from '@/hooks/useLearningObjectives';
 import {
   buildLiteratureCreationOption,
   getPoetryClusterPoems,
@@ -35,7 +35,7 @@ import {
   isPoetryCluster,
 } from '@/lib/ai/majorTopics';
 import { createClient } from '@/lib/supabase-client';
-import { getCreationOptionChoices, getCreationOptionLabel, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
+import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 
@@ -103,6 +103,8 @@ type MarkingReport = {
 interface AIGenerateForm {
   topic: string;
   subtopic: string;
+  learningObjective: string;
+  paper: string;
   subject: Subject;
   examBoard: ExamBoard;
   examType: ExamType;
@@ -129,6 +131,8 @@ const optionLetters = ['A', 'B', 'C', 'D'] as const;
 const defaultForm: AIGenerateForm = {
   topic: '',
   subtopic: '',
+  learningObjective: '',
+  paper: '',
   subject: 'biology',
   examBoard: 'aqa',
   examType: 'gcse',
@@ -330,6 +334,8 @@ export default function AIQuestionsPage() {
   const topicSuggestions = topicOptions.map((option) => option.name);
   const selectedTopicOption = topicOptions.find((option) => option.name === form.topic.trim()) ?? null;
   const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
+  const { objectives: learningObjectiveOptions } = useLearningObjectives(selectedSubject, 'exam_practice');
+  const paperOptions = getPaperOptions(selectedSubject);
   const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
   const topicIsAllowed = !form.topic.trim() || topicsLoading || isAllowedQualificationTopic(form.topic, topicSuggestions);
   const poetrySelectionComplete = !isSelectedPoetryCluster || !!form.poemOne;
@@ -343,7 +349,8 @@ export default function AIQuestionsPage() {
       : 5
     : Math.min(Math.max(Math.floor(form.questionCount || 6), MIN_QUESTIONS), MAX_QUESTIONS);
 
-  const isGenerationValid = isEnglishLanguagePractice || (form.topic.trim().length >= 3 && topicIsAllowed && !topicsLoading && poetrySelectionComplete);
+  const topicIsReady = form.topic.trim().length === 0 || form.topic.trim().length >= 3;
+  const isGenerationValid = isEnglishLanguagePractice || (topicIsReady && topicIsAllowed && !topicsLoading && poetrySelectionComplete);
   const inPractice = questions.length > 0;
   const answeredCount = useMemo(() => answers.filter((answer) => answer.trim().length > 0).length, [answers]);
   const totalAvailableMarks = useMemo(() => questions.reduce((sum, question) => sum + question.marks, 0), [questions]);
@@ -352,7 +359,7 @@ export default function AIQuestionsPage() {
     || (!subjectSpecComplete ? 'Update this subject on the Subjects page with its specification and tier.' : '')
     || (!isEnglishLanguagePractice && !poetrySelectionComplete ? 'Choose the first poem for this poetry cluster.' : '')
     || (!isEnglishLanguagePractice && topicsLoading ? 'Loading topics for this qualification...' : '')
-    || (!isEnglishLanguagePractice && form.topic.trim().length < 3 ? 'Provide a clear topic.' : '')
+    || (!isEnglishLanguagePractice && !topicIsReady ? 'Topic must be at least 3 characters, or leave it blank to generalise.' : '')
     || (!isEnglishLanguagePractice && !topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
   const handleGenerate = async () => {
     if (!selectedSubject) {
@@ -364,8 +371,10 @@ export default function AIQuestionsPage() {
       return;
     }
     if (!isGenerationValid) {
-      if (topicIsAllowed) {
-        setStatus({ tone: 'error', text: 'Add a topic before generating questions.' });
+      if (!topicIsReady) {
+        setStatus({ tone: 'error', text: 'Topic must be at least 3 characters, or leave it blank to generalise.' });
+      } else if (topicIsAllowed) {
+        setStatus({ tone: 'error', text: 'Complete the setup above before generating questions.' });
       } else {
         setStatus(null);
       }
@@ -375,7 +384,7 @@ export default function AIQuestionsPage() {
     const specification = isEnglishLanguagePractice
       ? `${getSelectedSpecLabel(selectedSubject, effectiveCreationOption)} - ${paperLabel}`
       : getSelectedSpecLabel(selectedSubject, effectiveCreationOption);
-    if (!isEnglishLanguagePractice) {
+    if (!isEnglishLanguagePractice && form.topic.trim()) {
       const topicError = getQualificationTopicError(form.topic.trim(), topicSuggestions);
       if (topicError) {
         setStatus(null);
@@ -396,6 +405,8 @@ export default function AIQuestionsPage() {
     const payload = {
       topic: isEnglishLanguagePractice ? `AQA English Language ${paperLabel}` : form.topic.trim(),
       subtopic: isEnglishLanguagePractice ? undefined : form.subtopic.trim() || undefined,
+      learningObjective: isEnglishLanguagePractice ? undefined : form.learningObjective || undefined,
+      paper: isEnglishLanguagePractice ? undefined : form.paper || undefined,
       subject: selectedSubject.subject,
       examBoard: selectedSubject.exam_board,
       examType: selectedSubject.exam_type,
@@ -445,7 +456,7 @@ export default function AIQuestionsPage() {
         ? body.warnings.filter((item: unknown): item is string => typeof item === 'string')
         : [];
       setSessionMeta({
-        topic: payload.topic,
+        topic: payload.topic || 'General revision',
         subject: selectedSubject.subject,
         examBoard: selectedSubject.exam_board,
         examType: selectedSubject.exam_type,
@@ -487,7 +498,7 @@ export default function AIQuestionsPage() {
     const meta = sessionMeta ?? {
       topic: isEnglishLanguagePractice
         ? `AQA English Language ${getEnglishLanguagePaperLabel(form.englishLanguagePaper)}`
-        : form.topic.trim(),
+        : form.topic.trim() || 'General revision',
       subject: selectedSubject?.subject ?? '',
       examBoard: selectedSubject?.exam_board ?? '',
       examType: selectedSubject?.exam_type ?? '',
@@ -634,7 +645,7 @@ export default function AIQuestionsPage() {
             selectedSubjectId={effectiveSubjectId}
             onSubjectChange={(id) => {
               setSelectedSubjectId(id);
-              setForm((prev) => ({ ...prev, specOption: '', poemOne: '', poemTwo: '', topic: '', subtopic: '' }));
+              setForm((prev) => ({ ...prev, specOption: '', poemOne: '', poemTwo: '', topic: '', subtopic: '', learningObjective: '', paper: '' }));
             }}
           />
 
@@ -729,7 +740,7 @@ export default function AIQuestionsPage() {
 
             {!isEnglishLanguagePractice ? (
               <TopicInput
-                label="Topic"
+                label="Topic (optional)"
                 value={form.topic}
                 onChange={(value) => {
                   setForm((prev) => ({ ...prev, topic: value, subtopic: '' }));
@@ -737,7 +748,7 @@ export default function AIQuestionsPage() {
                 }}
                 suggestions={topicSuggestions}
                 isValidSelection={topicIsAllowed}
-                placeholder="Start typing a topic from this qualification"
+                placeholder="Start typing a topic, or leave blank to generalise"
                 className="text-sm text-slate-700 dark:text-slate-300"
                 inputClassName="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
               />
@@ -753,6 +764,38 @@ export default function AIQuestionsPage() {
                 className="text-sm text-slate-700 dark:text-slate-300"
                 inputClassName="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
               />
+            ) : null}
+
+            {!isEnglishLanguagePractice && learningObjectiveOptions.length > 0 ? (
+              <label className="text-sm text-slate-700 dark:text-slate-300">
+                Learning objective (optional)
+                <select
+                  value={form.learningObjective}
+                  onChange={(event) => setForm((prev) => ({ ...prev, learningObjective: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                >
+                  <option value="">No specific focus</option>
+                  {learningObjectiveOptions.map((objective) => (
+                    <option key={objective} value={objective}>{objective}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {!isEnglishLanguagePractice && paperOptions.length > 0 ? (
+              <label className="text-sm text-slate-700 dark:text-slate-300">
+                Paper (optional)
+                <select
+                  value={form.paper}
+                  onChange={(event) => setForm((prev) => ({ ...prev, paper: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                >
+                  <option value="">General (any paper)</option>
+                  {paperOptions.map((paper) => (
+                    <option key={paper} value={paper}>{paper}</option>
+                  ))}
+                </select>
+              </label>
             ) : null}
 
             {!isEnglishLanguagePractice ? (
@@ -880,11 +923,10 @@ export default function AIQuestionsPage() {
 
                 <MarkdownContent className="mt-4 text-lg font-semibold text-slate-900 dark:text-slate-100" content={question.question} />
                 {question.figureUrl ? (
-                  <Image
+                  // eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL (AI/user supplied); host isn't known ahead of time for next/image's remotePatterns
+                  <img
                     src={question.figureUrl}
                     alt="Question figure"
-                    width={1200}
-                    height={720}
                     className="mt-4 max-h-72 w-full rounded-lg border border-slate-300 object-contain dark:border-white/6"
                   />
                 ) : null}

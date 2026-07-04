@@ -1,5 +1,8 @@
 export const MAX_AI_ERROR_TEXT = 2400;
 
+export const isDataAnalysisObjective = (learningObjective: string) =>
+  /graphs,\s*tables,\s*and\s*data\s*sets/i.test(learningObjective);
+
 export const txt = (value: string, length: number) =>
   value
     .replace(/\r\n/g, '\n')

@@ -290,12 +290,18 @@ CREATE TABLE subtopics (
 CREATE TABLE learning_objectives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   subtopic_id UUID REFERENCES subtopics(id) ON DELETE CASCADE,
+  subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
   code TEXT,
   objective TEXT NOT NULL,
   command_word TEXT,
   difficulty TEXT,
   estimated_minutes INT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  applies_to TEXT[] NOT NULL DEFAULT ARRAY['notes', 'flashcards', 'exam_practice'],
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT learning_objectives_scope_check CHECK (
+    (subtopic_id IS NOT NULL AND subject_id IS NULL) OR
+    (subtopic_id IS NULL AND subject_id IS NOT NULL)
+  )
 );
 
 -- STUDENT SUBJECTS (extends user_subjects; user_subjects kept for now)
@@ -467,6 +473,7 @@ CREATE INDEX idx_specifications_subject_id ON specifications(subject_id);
 CREATE INDEX idx_topics_specification_id ON topics(specification_id);
 CREATE INDEX idx_subtopics_topic_id ON subtopics(topic_id);
 CREATE INDEX idx_learning_objectives_subtopic_id ON learning_objectives(subtopic_id);
+CREATE INDEX idx_learning_objectives_subject_id ON learning_objectives(subject_id);
 CREATE INDEX idx_student_subjects_user_id ON student_subjects(user_id);
 CREATE INDEX idx_student_subjects_specification_id ON student_subjects(specification_id);
 CREATE INDEX idx_questions_subject_id ON questions(subject_id);

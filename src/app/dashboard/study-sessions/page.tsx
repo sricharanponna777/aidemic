@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase-client';
 import { updateSpacedRepetition, formatInterval, previewNextReview } from '@/lib/spacedRepetition';
 import { useAuth } from '@/hooks/useAuth';
-import { MathContent } from '@/components/MathContent';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
 
 type Session = Pick<
@@ -565,19 +565,17 @@ export default function StudySessions() {
             <p id="current-card-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Front
             </p>
-            <MathContent
+            <MarkdownContent
               className="prose prose-sm mt-2 max-w-none text-slate-900 dark:text-slate-100"
               content={currentCard.front}
-              isHtml
             />
 
             {showBack ? (
               <>
                 <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Back</p>
-                <MathContent
+                <MarkdownContent
                   className="prose prose-sm mt-2 max-w-none text-slate-800 dark:text-slate-200"
                   content={currentCard.back}
-                  isHtml
                 />
               </>
             ) : (

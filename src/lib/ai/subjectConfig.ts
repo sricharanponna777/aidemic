@@ -30,7 +30,7 @@ export type UserSubject = {
   spec_tier?: string | null;
 };
 
-export type SpecEntry = { name: string; tiers?: string[]; options?: string[] };
+export type SpecEntry = { name: string; tiers?: string[]; options?: string[]; papers?: number };
 type SpecBoard = Record<string, Record<string, Record<string, SpecEntry[]>>>;
 
 export const specifications = specificationsData as SpecBoard;
@@ -72,6 +72,14 @@ export const getSelectedSpecEntry = (subject: UserSubject | null, specName?: str
 
 export const requiresTierSelection = (subject: UserSubject | null, specName?: string | null) =>
   subject?.exam_type === 'gcse' && !!getSelectedSpecEntry(subject, specName)?.tiers?.length;
+
+export const getPaperCount = (subject: UserSubject | null, specName?: string | null): number =>
+  getSelectedSpecEntry(subject, specName ?? getSavedSpecName(subject))?.papers ?? 0;
+
+export const getPaperOptions = (subject: UserSubject | null, specName?: string | null): string[] => {
+  const count = getPaperCount(subject, specName);
+  return Array.from({ length: count }, (_, index) => `Paper ${index + 1}`);
+};
 
 export const buildSpecString = (specName: string, specTier: string, specOption: string): string => {
   if (!specName) return '';

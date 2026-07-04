@@ -11,6 +11,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useTopicOptions } from '@/hooks/useTopicOptions';
 import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
+import { useLearningObjectives } from '@/hooks/useLearningObjectives';
 import {
   buildLiteratureCreationOption,
   getPoetryClusterPoems,
@@ -23,6 +24,7 @@ import {
   getCreationOptionLabel,
   getExamBoardLabel,
   getExamTypeLabel,
+  getPaperOptions,
   getSubjectLabel,
   isSubjectSpecComplete,
   type UserSubject,
@@ -206,6 +208,8 @@ export default function NotesPage() {
   const [poemTwo, setPoemTwo] = useState('');
   const [topic, setTopic] = useState('');
   const [subtopic, setSubtopic] = useState('');
+  const [learningObjective, setLearningObjective] = useState('');
+  const [paper, setPaper] = useState('');
   const [activeTopic, setActiveTopic] = useState(() => ssRead(SS_TOPIC, ''));
   const [activeSubject, setActiveSubject] = useState<UserSubject | null>(() => ssRead<UserSubject | null>(SS_SUBJECT, null));
   const [notes, setNotes] = useState(() => ssRead(SS_NOTES, ''));
@@ -229,41 +233,46 @@ export default function NotesPage() {
   const topicSuggestions = topicOptions.map((option) => option.name);
   const selectedTopicOption = topicOptions.find((option) => option.name === topic.trim()) ?? null;
   const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
+  const { objectives: learningObjectiveOptions } = useLearningObjectives(selectedSubject, 'notes');
+  const paperOptions = getPaperOptions(selectedSubject);
   const topicIsAllowed = !topic.trim() || topicsLoading || isAllowedQualificationTopic(topic, topicSuggestions);
   const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
   const poetrySelectionComplete = !isSelectedPoetryCluster || !!poemOne;
-  const canGenerate = topic.trim().length >= 3 && topicIsAllowed && !topicsLoading && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
+  const topicIsReady = topic.trim().length === 0 || topic.trim().length >= 3;
+  const canGenerate = topicIsReady && topicIsAllowed && !topicsLoading && poetrySelectionComplete && !!selectedSubject && subjectSpecComplete && !isGenerating;
   const validationMessage = subjectsError
     || errorMessage
     || (!selectedSubject ? 'Choose one of your saved subjects.' : '')
     || (!subjectSpecComplete ? 'Update this subject on the Subjects page with its specification and tier.' : '')
     || (!poetrySelectionComplete ? 'Choose the first poem for this poetry cluster.' : '')
     || (topicsLoading ? 'Loading topics for this qualification...' : '')
-    || (topic.trim().length < 3 ? 'Add a clear topic to generate notes.' : '')
+    || (!topicIsReady ? 'Topic must be at least 3 characters, or leave it blank to generalise.' : '')
     || (!topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
 
   const generateNotes = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedSubject || topic.trim().length < 3 || !subjectSpecComplete) return;
+    if (!selectedSubject || !topicIsReady || !subjectSpecComplete) return;
 
     if (!poetrySelectionComplete) return;
 
     const specification = getSelectedSpecLabel(selectedSubject, effectiveCreationOption);
-    const topicError = getQualificationTopicError(topic.trim(), topicSuggestions);
-    if (topicError) {
-      setErrorMessage('');
-      return;
-    }
-    const relevanceError = getTopicRelevanceError({
-      topic: topic.trim(),
-      subject: selectedSubject.subject,
-      examBoard: selectedSubject.exam_board,
-      examType: selectedSubject.exam_type,
-      specification,
-    });
-    if (relevanceError) {
-      setErrorMessage(relevanceError);
-      return;
+    if (topic.trim()) {
+      const topicError = getQualificationTopicError(topic.trim(), topicSuggestions);
+      if (topicError) {
+        setErrorMessage('');
+        return;
+      }
+      const relevanceError = getTopicRelevanceError({
+        topic: topic.trim(),
+        subject: selectedSubject.subject,
+        examBoard: selectedSubject.exam_board,
+        examType: selectedSubject.exam_type,
+        specification,
+      });
+      if (relevanceError) {
+        setErrorMessage(relevanceError);
+        return;
+      }
     }
 
     setIsGenerating(true);
@@ -276,6 +285,8 @@ export default function NotesPage() {
         body: JSON.stringify({
           concept: topic.trim(),
           subtopic: subtopic.trim() || undefined,
+          learningObjective: learningObjective || undefined,
+          paper: paper || undefined,
           subject: selectedSubject.subject,
           examBoard: selectedSubject.exam_board,
           examType: selectedSubject.exam_type,
@@ -289,7 +300,7 @@ export default function NotesPage() {
         setErrorMessage(body.error || 'Failed to generate notes.');
         return;
       }
-      setActiveTopic(topic.trim());
+      setActiveTopic(topic.trim() || 'General revision');
       setActiveSubject(selectedSubject);
       setNotes(body.script || '');
       setChatMessages([]);
@@ -351,6 +362,8 @@ export default function NotesPage() {
                 setPoemTwo('');
                 setTopic('');
                 setSubtopic('');
+                setLearningObjective('');
+                setPaper('');
               }}
             />
 
@@ -415,7 +428,7 @@ export default function NotesPage() {
             ) : null}
 
             <TopicInput
-              label="Topic / concept"
+              label="Topic / concept (optional)"
               value={topic}
               onChange={(value) => {
                 setTopic(value);
@@ -424,7 +437,7 @@ export default function NotesPage() {
               }}
               suggestions={topicSuggestions}
               isValidSelection={topicIsAllowed}
-              placeholder="Start typing a topic from this qualification"
+              placeholder="Start typing a topic, or leave blank to generalise"
             />
 
             {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
@@ -435,6 +448,38 @@ export default function NotesPage() {
                 suggestions={subtopicSuggestions}
                 placeholder="Narrow the focus within this topic"
               />
+            ) : null}
+
+            {learningObjectiveOptions.length > 0 ? (
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Learning objective (optional)
+                <select
+                  value={learningObjective}
+                  onChange={(event) => setLearningObjective(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                >
+                  <option value="">No specific focus</option>
+                  {learningObjectiveOptions.map((objective) => (
+                    <option key={objective} value={objective}>{objective}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            {paperOptions.length > 0 ? (
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                Paper (optional)
+                <select
+                  value={paper}
+                  onChange={(event) => setPaper(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                >
+                  <option value="">General (any paper)</option>
+                  {paperOptions.map((paperOption) => (
+                    <option key={paperOption} value={paperOption}>{paperOption}</option>
+                  ))}
+                </select>
+              </label>
             ) : null}
 
             {validationMessage ? (

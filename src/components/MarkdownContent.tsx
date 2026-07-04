@@ -212,6 +212,76 @@ function markdownToInlineHtml(markdown: string): string {
   return applyInlineMarkdown(text, state);
 }
 
+const TABLE_SEPARATOR_ROW = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+function isTableRow(line: string): boolean {
+  return line.includes('|');
+}
+
+function parseTableRow(line: string): string[] {
+  let trimmed = line.trim();
+  if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
+
+  const cells: string[] = [];
+  let current = '';
+  for (let i = 0; i < trimmed.length; i += 1) {
+    const char = trimmed[i];
+    if (char === '\\' && trimmed[i + 1] === '|') {
+      current += '|';
+      i += 1;
+      continue;
+    }
+    if (char === '|') {
+      cells.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+type TableAlignment = 'left' | 'center' | 'right' | null;
+
+function parseTableAlignments(separatorRow: string): TableAlignment[] {
+  return parseTableRow(separatorRow).map((cell) => {
+    const left = cell.startsWith(':');
+    const right = cell.endsWith(':');
+    if (left && right) return 'center';
+    if (right) return 'right';
+    if (left) return 'left';
+    return null;
+  });
+}
+
+function buildTableHtml(headerRow: string, separatorRow: string, bodyRows: string[], state: MathTokenState): string {
+  const headerCells = parseTableRow(headerRow);
+  const alignments = parseTableAlignments(separatorRow);
+  const alignStyle = (index: number) => {
+    const align = alignments[index];
+    return align ? ` style="text-align:${align}"` : '';
+  };
+
+  const theadHtml = `<thead><tr>${headerCells
+    .map((cell, index) => `<th${alignStyle(index)}>${applyInlineMarkdown(cell, state)}</th>`)
+    .join('')}</tr></thead>`;
+
+  const tbodyHtml = bodyRows.length
+    ? `<tbody>${bodyRows
+        .map(
+          (row) =>
+            `<tr>${parseTableRow(row)
+              .map((cell, index) => `<td${alignStyle(index)}>${applyInlineMarkdown(cell, state)}</td>`)
+              .join('')}</tr>`
+        )
+        .join('')}</tbody>`
+    : '';
+
+  return `<div class="markdown-table-wrapper"><table>${theadHtml}${tbodyHtml}</table></div>`;
+}
+
 function markdownToHtml(markdown: string): string {
   const normalized = normalizeEducationalMarkup(markdown);
   const protectedMarkdown = protectMathSegments(normalized.replace(/\r\n/g, '\n'));
@@ -259,7 +329,8 @@ function markdownToHtml(markdown: string): string {
     openList = type;
   };
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
     const trimmed = line.trim();
     const fence = trimmed.match(/^```([^\s`]*)?.*$/);
 
@@ -285,6 +356,22 @@ function markdownToHtml(markdown: string): string {
       closeParagraph();
       closeQuote();
       closeList();
+      continue;
+    }
+
+    const nextLine = lines[i + 1];
+    if (isTableRow(trimmed) && nextLine !== undefined && isTableRow(nextLine) && TABLE_SEPARATOR_ROW.test(nextLine)) {
+      closeParagraph();
+      closeQuote();
+      closeList();
+      const bodyRows: string[] = [];
+      let j = i + 2;
+      while (j < lines.length && lines[j].trim() && isTableRow(lines[j])) {
+        bodyRows.push(lines[j]);
+        j += 1;
+      }
+      html.push(buildTableHtml(line, nextLine, bodyRows, state));
+      i = j - 1;
       continue;
     }
 

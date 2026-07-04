@@ -51,7 +51,7 @@ export const mapStudentSubjectRow = (row: StudentSubjectRow): UserSubject => {
 
 /** Resolves the subjects.id for an exact (qualification, exam board, subject) combination by
  * walking down the seeded curriculum tree. Returns null if no match exists. */
-const resolveSubjectId = async (
+export const resolveSubjectId = async (
   supabase: SupabaseClient,
   params: { qualificationLabel: string; boardLabel: string; subjectLabel: string }
 ): Promise<string | null> => {
@@ -60,7 +60,7 @@ const resolveSubjectId = async (
   const { data: examBoard } = await supabase
     .from('exam_boards')
     .select('id, qualifications!inner(name)')
-    .eq('name', boardLabel)
+    .ilike('name', boardLabel)
     .eq('qualifications.name', qualificationLabel)
     .maybeSingle();
   if (!examBoard) return null;
