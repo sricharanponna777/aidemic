@@ -10,7 +10,8 @@ import {
 } from '@/lib/ai/json';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { normalizeMathNotation } from '@/lib/ai/math';
-import { cleanText, dedupe, extractFigureUrls, isDataAnalysisObjective, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
+import { cleanText, dedupe, extractFigureUrls, isChartPlottingTopic, isDataAnalysisObjective, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
+import { normalizePlotSpec, PLOT_SPEC_JSON_SCHEMA } from '@/lib/ai/plotSpec';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import {
   clampCount,
@@ -21,8 +22,9 @@ import {
   SUPPORTED_SUBJECTS,
   type SupportedSubject,
 } from '@/lib/ai/validation';
+import type { PlotSpec } from '@/types';
 
-type QuestionType = 'open' | 'mcq';
+type QuestionType = 'open' | 'mcq' | 'plot';
 type CorrectOption = '' | 'A' | 'B' | 'C' | 'D';
 
 interface GenerateQuestionsPayload {
@@ -39,6 +41,7 @@ interface GenerateQuestionsPayload {
   questionCount?: number;
   allowMcq?: boolean;
   allowCalculation?: boolean;
+  allowPlot?: boolean;
   useOnlineResources?: boolean;
 }
 
@@ -56,6 +59,7 @@ export type ExamQuestion = {
   figureUrl?: string;
   sourceTitle: string;
   sourceUrl: string;
+  plotSpec: PlotSpec | null;
 };
 
 type SourceReference = {
@@ -107,9 +111,10 @@ const SCHEMA = {
           'figureUrl',
           'sourceTitle',
           'sourceUrl',
+          'plotSpec',
         ],
         properties: {
-          questionType: { type: 'string', enum: ['open', 'mcq'] },
+          questionType: { type: 'string', enum: ['open', 'mcq', 'plot'] },
           question: { type: 'string' },
           marks: { type: 'number' },
           commandWord: { type: 'string' },
@@ -131,6 +136,7 @@ const SCHEMA = {
           figureUrl: { type: 'string' },
           sourceTitle: { type: 'string' },
           sourceUrl: { type: 'string' },
+          plotSpec: PLOT_SPEC_JSON_SCHEMA,
         },
       },
     },
@@ -224,22 +230,33 @@ const logInvalidQuestionJson = (source: string, payload: unknown) => {
   }
 };
 
-const normalizePayload = (raw: GenerateQuestionsPayload) => ({
-  topic: txt(raw.topic || '', 200),
-  subtopic: txt(raw.subtopic || '', 200),
-  learningObjective: txt(raw.learningObjective || '', 300),
-  paper: txt(raw.paper || '', 30),
-  subject: txt((raw.subject || '').toLowerCase(), 60),
-  prompt: txt(raw.prompt || '', 2000),
-  examBoard: normalizeBoard(raw.examBoard),
-  examType: normalizeExamType(raw.examType),
-  specification: txt(raw.specification || '', 280),
-  figureUrl: sanitizeFigureUrl(raw.figureUrl || ''),
-  questionCount: clampQuestions(raw.questionCount),
-  allowMcq: raw.allowMcq !== false,
-  allowCalculation: Boolean(raw.allowCalculation),
-  useOnlineResources: raw.useOnlineResources !== false,
-});
+const normalizePayload = (raw: GenerateQuestionsPayload) => {
+  const topic = txt(raw.topic || '', 200);
+  const subtopic = txt(raw.subtopic || '', 200);
+  const learningObjective = txt(raw.learningObjective || '', 300);
+  const subject = txt((raw.subject || '').toLowerCase(), 60);
+  const requestedAllowPlot = raw.allowPlot !== false;
+
+  return {
+    topic,
+    subtopic,
+    learningObjective,
+    paper: txt(raw.paper || '', 30),
+    subject,
+    prompt: txt(raw.prompt || '', 2000),
+    examBoard: normalizeBoard(raw.examBoard),
+    examType: normalizeExamType(raw.examType),
+    specification: txt(raw.specification || '', 280),
+    figureUrl: sanitizeFigureUrl(raw.figureUrl || ''),
+    questionCount: clampQuestions(raw.questionCount),
+    allowMcq: raw.allowMcq !== false,
+    allowCalculation: Boolean(raw.allowCalculation),
+    // Gated server-side: the client flag is a request, not authority — only relevant
+    // subject/topic/subtopic/learningObjective combinations may ever request plot questions.
+    allowPlot: requestedAllowPlot && isChartPlottingTopic(subject, topic, subtopic, learningObjective),
+    useOnlineResources: raw.useOnlineResources !== false,
+  };
+};
 
 const textFromUnknown = (value: unknown) => {
   if (typeof value === 'string') return value;
@@ -304,8 +321,9 @@ const inferCommandWord = (question: string, fallback: string) => {
   return firstWord || 'Answer';
 };
 
-const normalizeQuestionType = (value: unknown, allowMcq: boolean, options: string[], answerLike: unknown): QuestionType => {
+const normalizeQuestionType = (value: unknown, allowMcq: boolean, allowPlot: boolean, options: string[], answerLike: unknown): QuestionType => {
   const cleaned = String(value || '').toLowerCase();
+  if (allowPlot && /\bplot\b/.test(cleaned)) return 'plot';
   if (allowMcq && /\b(mcq|multiple[-\s]?choice|multiple_choice|choice)\b/.test(cleaned)) return 'mcq';
   if (allowMcq && options.length >= 3 && options.length <= 4 && normalizeCorrectOption(answerLike, options)) return 'mcq';
   return 'open';
@@ -374,7 +392,8 @@ const normalizeQuestion = (
   const rawAnswer = readString(record, ['modelAnswer', 'model_answer', 'answer', 'correctAnswer', 'correct_answer', 'explanation', 'rationale']);
   const tentativeOptions = normalizeOptions(readUnknown(record, ['options', 'choices', 'answers']), payload.subject, record);
   const answerLike = readUnknown(record, ['correctOption', 'correct_option', 'answer', 'correctAnswer', 'correct_answer']);
-  const questionType = normalizeQuestionType(readUnknown(record, ['questionType', 'question_type', 'type', 'format']), payload.allowMcq, tentativeOptions, answerLike);
+  const questionType = normalizeQuestionType(readUnknown(record, ['questionType', 'question_type', 'type', 'format']), payload.allowMcq, payload.allowPlot, tentativeOptions, answerLike);
+  const plotSpec = questionType === 'plot' ? normalizePlotSpec(readUnknown(record, ['plotSpec', 'plot_spec'])) : null;
   const marks = inferMarks(record, questionText, questionType);
   const markScheme = normalizeStringList(
     readUnknown(record, ['markScheme', 'mark_scheme', 'markingPoints', 'marking_points', 'markSchemePoints', 'mark_scheme_points']),
@@ -424,10 +443,23 @@ const normalizeQuestion = (
     })(),
     sourceTitle: cleanText(readString(record, ['sourceTitle', 'source_title', 'source', 'citationTitle', 'citation_title']), 160),
     sourceUrl: sanitizeFigureUrl(readString(record, ['sourceUrl', 'source_url', 'url', 'citationUrl', 'citation_url'])),
+    plotSpec,
   };
 
   if (!normalized.question || !normalized.commandWord || normalized.markScheme.length === 0 || !normalized.modelAnswer) {
     return null;
+  }
+
+  if (normalized.questionType === 'plot' && !normalized.plotSpec) {
+    return {
+      ...normalized,
+      questionType: 'open',
+      question: txt(
+        `${normalized.question}\n\n(Chart data could not be structured for interactive plotting; describe/sketch the answer instead.)`,
+        payload.subject === 'english language' ? 9000 : 2600
+      ),
+      plotSpec: null,
+    };
   }
 
   if (normalized.questionType === 'mcq') {
@@ -519,16 +551,33 @@ const buildPrompt = (
   const calcInstruction = payload.allowCalculation
     ? 'Calculation questions allowed where realistic.'
     : 'No calculations. isCalculation=false on every question.';
+  const plotInstructions = payload.allowPlot
+    ? [
+        'plot: when (and only when) a question requires the student to physically draw/plot a chart, set questionType="plot" and populate plotSpec with exactly one non-null sub-object matching chartType; for every other question set plotSpec=null (all 8 sub-objects null).',
+        'plot chartType="pie": give 2-8 categories with raw values; correctAngles = each value/total*360 rounded to the nearest whole degree, summing to exactly 360 (adjust the largest sector by the rounding remainder).',
+        'plot chartType="bar": give 2-10 category labels with realistic correctValues; set yAxisMax comfortably above the largest value and yAxisStep to a clean gridline interval (1,2,5,10,20...).',
+        'plot chartType="line": use ONLY for continuous data with a natural sequence x-axis (e.g. distance-time, temperature-time) that is read by joining consecutive points directly. NEVER use "line" for cumulative frequency -- that is always chartType="scatter" (see below), even though it is called a "cumulative frequency graph". For GCSE Science subjects (Physics/Chemistry/Biology) where the practical skill is plotting points then drawing a line/curve of best fit (e.g. cooling curves, extension-vs-force, rate-of-reaction, potential-difference-vs-current): set requiresBestFit=true and choose fitShape genuinely from the relationship (e.g. Hooke\'s law extension-vs-force → "line"; cooling curve or rate of reaction → "curve"), explaining why in fitDescription. For GCSE Maths or any other line graph with no fit judgement: set requiresBestFit=false, fitShape="none", fitDescription="".',
+        'plot chartType="scatter": decide from the underlying relationship whether it is genuinely linear or inherently curved (many Biology rate/growth/enzyme-activity data curve; simple proportional relationships are linear) and set fitShape accordingly, stating why in fitDescription. Cumulative frequency graphs/diagrams/curves are ALWAYS chartType="scatter" (never "line"): connectPoints=true, fitShape="curve" (cumulative frequency curves are smooth, never straight segments), givenPoints = the (upper class boundary, cumulative frequency) pairs, xAxisMax/yAxisMax comfortably above the largest boundary/cumulative frequency.',
+        'plot chartType="histogram": ALWAYS use unequal class widths (the specific GCSE skill being tested); correctFrequencyDensity = frequency / (classEnd-classStart) for every bar, never plain frequency.',
+        'plot chartType="frequencyPolygon": give class boundaries and frequencies (not density); the correct point per class is (midpoint, frequency), joined by straight lines between consecutive midpoints.',
+        'plot chartType="stemLeaf": give 5-30 raw values for one stem-and-leaf plot; correctRows leaves sorted ascending within each stem; key reads like "5 | 2 means 52".',
+        'plot chartType="boxPlot": give raw data or a description the student can compute from; correctValues must be a valid 5-number summary (min ≤ lowerQuartile ≤ median ≤ upperQuartile ≤ max).',
+        'Every plot question: state clearly in the question text (markdown, with a table for raw data) what must be plotted, and set marks to the number of gradeable features (e.g. box plot = 5, scatter = points + 1 for the fit-shape judgement).',
+        'markScheme for a plot question: one bullet per gradeable feature. modelAnswer: describe the fully-correct chart in words, since it cannot contain an image.',
+      ].join(' ')
+    : 'Never set questionType="plot"; leave plotSpec=null on every question.';
 
   const system = [
     `Generate ${englishLanguageInstructions ? 'the required fixed-paper set' : payload.questionCount} exam practice questions as strict JSON. Board:${payload.examBoard} Type:${payload.examType} Subject:${payload.subject}.`,
     payload.specification ? `Spec: ${payload.specification}` : '',
+    payload.allowPlot ? plotInstructions : '',
     englishLanguageInstructions,
     resourceInstruction,
     formatInstruction,
     calcInstruction,
     'MCQ: questionType="mcq", 3 or 4 options (no letters in text), correctOption=A/B/C/D as applicable, modelAnswer explains correct option.',
     'Open: questionType="open", options=[], correctOption="".',
+    payload.allowPlot ? '' : plotInstructions,
     'commandWord: the exact exam command word (e.g. Calculate/Explain/Evaluate/State). Never empty.',
     'isCalculation: true only if numeric calculation required.',
     'modelAnswer: full response earning full marks. Never empty.',
@@ -554,6 +603,9 @@ const buildPrompt = (
     payload.learningObjective ? `Learning objective: ${payload.learningObjective}` : '',
     payload.learningObjective && isDataAnalysisObjective(payload.learningObjective)
       ? 'This is a data-analysis focused session: at least half of the generated questions must present a small, realistic data set as a markdown table (| col | col |) that the student must read, calculate from, or interpret (e.g. rates, means, percentages, trends). Do not make every question purely descriptive or recall-based.'
+      : '',
+    payload.allowPlot
+      ? `MANDATORY: exactly ${Math.max(1, Math.min(2, Math.round(payload.questionCount * 0.2)))} of the ${payload.questionCount} questions in this set MUST have questionType="plot" with a fully populated plotSpec — this is a hard requirement, not optional. Choose the chart type genuinely implied by the topic/subtopic (e.g. "Scatter graphs and lines of best fit" → chartType="scatter"; "histograms with unequal class widths" → chartType="histogram"; "box plots" → chartType="boxPlot"). Do not skip this requirement.`
       : '',
     payload.paper ? `${payload.paper}. Only include content that is assessed on this paper of the specification, not content exclusive to another paper.` : '',
     payload.prompt ? `Prompt requirements: ${payload.prompt}` : '',

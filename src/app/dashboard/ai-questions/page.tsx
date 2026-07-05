@@ -18,6 +18,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
+import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
 import { TopicInput } from '@/components/TopicInput';
@@ -38,6 +39,7 @@ import { createClient } from '@/lib/supabase-client';
 import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { gradeBadgeTone } from '@/lib/gradeTone';
+import type { PlotSpec } from '@/types';
 
 
 type Subject =
@@ -59,7 +61,7 @@ type ExamBoard = 'aqa' | 'edexcel' | 'ocr';
 type ExamType = 'gcse' | 'a-level';
 
 type ExamQuestion = {
-  questionType: 'open' | 'mcq';
+  questionType: 'open' | 'mcq' | 'plot';
   question: string;
   marks: number;
   commandWord: string;
@@ -72,6 +74,7 @@ type ExamQuestion = {
   figureUrl?: string;
   sourceTitle: string;
   sourceUrl: string;
+  plotSpec: PlotSpec | null;
 };
 
 type MarkedAnswer = {
@@ -968,6 +971,15 @@ export default function AIQuestionsPage() {
                       );
                     })}
                   </div>
+                ) : question.questionType === 'plot' && question.plotSpec ? (
+                  <div className="mt-4">
+                    <PlotAnswerInput
+                      plotSpec={question.plotSpec}
+                      value={answers[index] || ''}
+                      onChange={(value) => updateAnswer(index, value)}
+                      mode="answer"
+                    />
+                  </div>
                 ) : question.isCalculation ? (
                   <CalculationAnswerEditor
                     value={answers[index] || ''}
@@ -1089,7 +1101,23 @@ export default function AIQuestionsPage() {
 
                   <MarkdownContent className="mt-3 text-slate-900 dark:text-slate-100" content={question.question} />
 
-                  {question.questionType === 'mcq' ? (
+                  {question.questionType === 'plot' && question.plotSpec ? (
+                    <div className="mt-3">
+                      <PlotAnswerInput
+                        plotSpec={question.plotSpec}
+                        value=""
+                        onChange={() => {}}
+                        mode="review"
+                        studentSubmission={(() => {
+                          try {
+                            return JSON.parse(answers[marked.questionIndex] || '');
+                          } catch {
+                            return null;
+                          }
+                        })()}
+                      />
+                    </div>
+                  ) : question.questionType === 'mcq' ? (
                     <div className="mt-3 grid gap-2">
                       {question.options.map((option, optionIndex) => {
                         const letter = optionLetters[optionIndex];

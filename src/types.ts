@@ -11,8 +11,83 @@ export interface UserProfile {
   country?: 'uk' | 'india' | 'us' | 'international';
   theme?: 'light' | 'dark';
   notifications_enabled?: boolean;
+  role?: 'student' | 'teacher';
   created_at?: string;
   updated_at?: string;
+}
+
+export interface Teacher {
+  id: string;
+  user_id: string;
+  school_name?: string;
+  department?: string;
+  qualification_level?: string;
+  school_id?: string;
+  is_school_admin?: boolean;
+  verification_status: 'pending' | 'approved' | 'rejected';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface School {
+  id: string;
+  name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Class {
+  id: string;
+  teacher_id: string;
+  name: string;
+  description?: string;
+  specification_id?: string;
+  academic_year?: string;
+  invite_code: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ClassStudent {
+  id: string;
+  class_id: string;
+  student_id: string;
+  joined_at?: string;
+  status: 'active' | 'inactive';
+}
+
+export type AssignmentType = 'mock' | 'practice' | 'flashcard';
+
+export interface Assignment {
+  id: string;
+  class_id: string;
+  teacher_id: string;
+  title: string;
+  description?: string;
+  topic_id?: string;
+  subtopic_id?: string;
+  learning_objective_id?: string;
+  assignment_type: AssignmentType;
+  due_date?: string;
+  questions_payload?: unknown[];
+  source_material?: string;
+  created_at?: string;
+}
+
+export interface AssignmentAttempt {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  started_at?: string;
+  completed_at?: string;
+  answers_payload?: unknown[];
+  score?: number;
+  percentage?: number;
+  predicted_grade?: string;
+  ai_feedback?: unknown;
+  status: 'not_started' | 'in_progress' | 'completed';
 }
 
 export interface FlashcardDeck {
@@ -134,4 +209,136 @@ export interface StudyGoal {
   is_completed?: boolean;
   created_at?: string;
   completed_at?: string;
+}
+
+// Interactive chart-plotting question types (shared between generate-questions,
+// mark-answers, and the ai-questions client page)
+
+export type PlotChartType =
+  | 'pie'
+  | 'bar'
+  | 'line'
+  | 'scatter'
+  | 'histogram'
+  | 'frequencyPolygon'
+  | 'stemLeaf'
+  | 'boxPlot';
+
+export interface PlotCategoryValue {
+  label: string;
+  value: number;
+}
+
+export interface PlotPieData {
+  categories: PlotCategoryValue[];
+  correctAngles: number[]; // parallel to categories, degrees, sums to 360
+}
+
+export interface PlotBarData {
+  categories: string[];
+  correctValues: number[]; // parallel to categories
+  yAxisLabel: string;
+  yAxisMax: number;
+  yAxisStep: number;
+}
+
+export interface PlotLineData {
+  xLabel: string;
+  yLabel: string;
+  points: { x: number; y: number }[];
+  correctYValues: number[]; // parallel to points
+  yAxisMax: number;
+  yAxisStep: number;
+  requiresBestFit: boolean; // true for GCSE Science practical graphs (plot points, then fit a line/curve)
+  fitShape: 'line' | 'curve' | 'none'; // 'none' when requiresBestFit is false
+  fitDescription: string;
+}
+
+export interface PlotScatterData {
+  xLabel: string;
+  yLabel: string;
+  givenPoints: { x: number; y: number }[];
+  fitShape: 'line' | 'curve' | 'none';
+  fitDescription: string;
+  connectPoints: boolean; // true for cumulative frequency graphs
+  xAxisMax: number;
+  yAxisMax: number;
+}
+
+export interface PlotHistogramBar {
+  classStart: number;
+  classEnd: number;
+  frequency: number;
+  correctFrequencyDensity: number; // frequency / (classEnd - classStart)
+}
+
+export interface PlotHistogramData {
+  bars: PlotHistogramBar[];
+  xLabel: string;
+  yLabel: string;
+}
+
+export interface PlotFrequencyPolygonData {
+  classStart: number[];
+  classEnd: number[];
+  frequency: number[]; // parallel arrays; correct point = ((start+end)/2, frequency)
+  xLabel: string;
+  yLabel: string;
+}
+
+export interface PlotStemLeafData {
+  stemUnit: number;
+  leafUnit: number;
+  rawValues: number[];
+  correctRows: { stem: number; leaves: number[] }[]; // leaves sorted ascending
+  key: string; // e.g. "5 | 2 means 52"
+}
+
+export interface PlotBoxPlotData {
+  axisLabel: string;
+  axisMin: number;
+  axisMax: number;
+  correctValues: {
+    min: number;
+    lowerQuartile: number;
+    median: number;
+    upperQuartile: number;
+    max: number;
+  };
+  rawDataOrDescription: string;
+}
+
+export interface PlotSpec {
+  chartType: PlotChartType;
+  pie: PlotPieData | null;
+  bar: PlotBarData | null;
+  line: PlotLineData | null;
+  scatter: PlotScatterData | null;
+  histogram: PlotHistogramData | null;
+  frequencyPolygon: PlotFrequencyPolygonData | null;
+  stemLeaf: PlotStemLeafData | null;
+  boxPlot: PlotBoxPlotData | null;
+}
+
+export interface PlotSubmission {
+  chartType: PlotChartType;
+  pieAngles?: number[];
+  barValues?: number[];
+  barAxisChoice?: { max: number; step: number };
+  lineYValues?: number[];
+  lineFitShape?: 'line' | 'curve' | 'none';
+  lineYAxisChoice?: { max: number; step: number };
+  lineXAxisChoice?: { max: number; step: number };
+  scatterPoints?: { x: number; y: number }[];
+  scatterFitShape?: 'line' | 'curve' | 'none';
+  histogramHeights?: number[];
+  frequencyPolygonPoints?: { x: number; y: number }[];
+  stemLeafRows?: { stem: number; leaves: number[] }[];
+  boxPlotValues?: {
+    min: number;
+    lowerQuartile: number;
+    median: number;
+    upperQuartile: number;
+    max: number;
+  };
 }

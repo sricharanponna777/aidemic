@@ -10,6 +10,7 @@ import {
   type OpenAIResponseBody,
 } from '@/lib/ai/json';
 import { normalizeMathNotation } from '@/lib/ai/math';
+import { normalizePlotSpec } from '@/lib/ai/plotSpec';
 import { MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
 import {
   normalizeBoard,
@@ -19,9 +20,11 @@ import {
   SUPPORTED_SUBJECTS,
   type SupportedSubject,
 } from '@/lib/ai/validation';
+import { markPlotAnswer } from '@/lib/plotMarking';
+import type { PlotSpec } from '@/types';
 
 type MarkingQuestion = {
-  questionType: 'open' | 'mcq';
+  questionType: 'open' | 'mcq' | 'plot';
   question: string;
   marks: number;
   commandWord: string;
@@ -34,6 +37,7 @@ type MarkingQuestion = {
   figureUrl?: string;
   sourceTitle: string;
   sourceUrl: string;
+  plotSpec: PlotSpec | null;
 };
 
 type MarkedAnswer = {
@@ -68,7 +72,12 @@ interface MarkAnswersPayload {
 
 const MAX_QUESTIONS = 20;
 const MAX_MARK_VALUE = 40;
-const MARKING_MAX_OUTPUT_TOKENS = 2000;
+// A full attempt can have up to MAX_QUESTIONS (20) questions, each needing a feedback/
+// strengths/improvements/weaknessTags/exemplarAnswer entry -- 2000 was tuned for a single
+// question and was silently truncating (finish_reason: "length") on realistic multi-question
+// attempts, especially with reasoning models that also spend part of this budget on
+// (otherwise-invisible) reasoning tokens before writing the visible JSON.
+const MARKING_MAX_OUTPUT_TOKENS = 8000;
 const MAX_AI_RESPONSE_LOG_TEXT = 12000;
 
 const truncateForLog = (value: string) =>
@@ -204,12 +213,13 @@ const normalizeQuestion = (value: unknown, subject: string): MarkingQuestion | n
   const question = value as Partial<MarkingQuestion>;
   const marks = parseMarks(question.marks);
   if (marks === null) return null;
-  const questionType = question.questionType === 'mcq' ? 'mcq' : 'open';
+  const questionType = question.questionType === 'mcq' ? 'mcq' : question.questionType === 'plot' ? 'plot' : 'open';
   const options = questionType === 'mcq' ? normalizeOptions(question.options, subject) : [];
   const correctOption = txt((question.correctOption || '').toUpperCase(), 1) as MarkingQuestion['correctOption'];
+  const plotSpec = questionType === 'plot' ? normalizePlotSpec(question.plotSpec) : null;
 
   const normalized: MarkingQuestion = {
-    questionType,
+    questionType: questionType === 'plot' && !plotSpec ? 'open' : questionType,
     question: txt(normalizeMathNotation(safe(question.question || ''), subject), 900),
     marks,
     commandWord: txt(safe(question.commandWord || ''), 80),
@@ -222,6 +232,7 @@ const normalizeQuestion = (value: unknown, subject: string): MarkingQuestion | n
     figureUrl: sanitizeFigureUrl(question.figureUrl || ''),
     sourceTitle: txt(safe(question.sourceTitle || ''), 160),
     sourceUrl: sanitizeFigureUrl(question.sourceUrl || ''),
+    plotSpec,
   };
 
   if (!normalized.question || normalized.markScheme.length === 0 || !normalized.modelAnswer) return null;
@@ -362,6 +373,31 @@ const normalizeMarkedAnswers = (aiReport: AIMarkingReport | null, questions: Mar
   const aiAnswers = Array.isArray(aiReport?.markedAnswers) ? aiReport.markedAnswers : [];
 
   return questions.map((question, index) => {
+    if (question.questionType === 'plot') {
+      if (!question.plotSpec) {
+        return {
+          questionIndex: index,
+          marksAwarded: 0,
+          maxMarks: question.marks,
+          band: 'No answer',
+          feedback: 'This plot question could not be marked (missing chart data).',
+          strengths: [],
+          improvements: [],
+          weaknessTags: [],
+          exemplarAnswer: question.modelAnswer,
+        };
+      }
+      const parsedSubmission = (() => {
+        try {
+          return JSON.parse(answers[index] || '');
+        } catch {
+          return null;
+        }
+      })();
+      const result = markPlotAnswer(question.plotSpec, parsedSubmission, question.marks);
+      return { questionIndex: index, ...result };
+    }
+
     if (question.questionType === 'mcq') {
       const selectedOption = answers[index]?.trim().toUpperCase();
       const isCorrect = selectedOption === question.correctOption;
@@ -484,6 +520,9 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
     payload.specification ? `Spec:${payload.specification}` : '',
     'Award integer marks 0–maxMarks per question. Blank/irrelevant=0.',
     'MCQs marked by server; include in summary/weaknessAnalysis/gradeBoostAdvice only.',
+    payload.questions.some((question) => question.questionType === 'plot')
+      ? 'Some questions were chart-plotting questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference chart-drawing skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
+      : '',
     'If a question earns full marks, leave its improvements and weaknessTags empty.',
     'Calculations: credit correct method+working+answer+units; wording not required.',
     'Open: reward knowledge, application, analysis, evaluation per mark value.',
@@ -497,20 +536,22 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
     .filter(Boolean)
     .join(' ');
 
-  const attempt = payload.questions.map((question, index) => ({
-    questionIndex: index,
-    questionType: question.questionType,
-    question: question.question,
-    maxMarks: question.marks,
-    commandWord: question.commandWord,
-    isCalculation: question.isCalculation,
-    options: question.options,
-    correctOption: question.correctOption,
-    skillsAssessed: question.skillsAssessed,
-    markScheme: question.markScheme,
-    modelAnswer: question.modelAnswer,
-    studentAnswer: payload.answers[index] || '',
-  }));
+  const attempt = payload.questions
+    .map((question, index) => ({
+      questionIndex: index,
+      questionType: question.questionType,
+      question: question.question,
+      maxMarks: question.marks,
+      commandWord: question.commandWord,
+      isCalculation: question.isCalculation,
+      options: question.options,
+      correctOption: question.correctOption,
+      skillsAssessed: question.skillsAssessed,
+      markScheme: question.markScheme,
+      modelAnswer: question.modelAnswer,
+      studentAnswer: payload.answers[index] || '',
+    }))
+    .filter((item) => item.questionType !== 'plot');
 
   const user = [
     `Topic: ${payload.topic}`,
@@ -582,6 +623,8 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
   const parsed = extractJson(chatText);
   if (!parsed) {
     logInvalidMarkingJson('/chat/completions', {
+      finishReason: chatBody.choices?.[0]?.finish_reason,
+      usage: chatBody.usage,
       parsed: chatMessage?.parsed,
       content: chatText,
       rawMessage: chatMessage,

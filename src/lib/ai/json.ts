@@ -5,11 +5,13 @@ export type OpenAIResponseBody = {
 
 export type ChatCompletionsResponseBody = {
   choices?: Array<{
+    finish_reason?: string;
     message?: {
       content?: string | Array<{ type?: string; text?: string }>;
       parsed?: unknown;
     };
   }>;
+  usage?: unknown;
 };
 
 type Coercer<T> = (value: unknown) => T | null;

@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Globe2, LogOut, Zap } from 'lucide-react';
+import { GraduationCap, Globe2, LogOut, Zap } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
@@ -11,6 +11,11 @@ import { useState } from 'react';
 
 const isCountry = (value: string | null): value is Country =>
   !!value && COUNTRIES.includes(value as Country);
+
+type Role = 'student' | 'teacher';
+
+const isRole = (value: string | null): value is Role =>
+  value === 'student' || value === 'teacher';
 
 function OnboardingContent() {
   const router = useRouter();
@@ -23,6 +28,10 @@ function OnboardingContent() {
   const countryFromUrl = searchParams.get('country');
   const savedCountry = isCountry(profile?.country ?? null) ? profile?.country : null;
   const country = countryOverride ?? savedCountry ?? (isCountry(countryFromUrl) ? countryFromUrl : 'uk');
+
+  const roleFromUrl = searchParams.get('role');
+  const savedRole = isRole(profile?.role ?? null) ? profile?.role : null;
+  const role: Role = savedRole ?? (isRole(roleFromUrl) ? roleFromUrl : 'student');
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -40,6 +49,7 @@ function OnboardingContent() {
         id: session.user.id,
         email: session.user.email ?? '',
         country,
+        role,
       });
 
     setIsSaving(false);
@@ -49,7 +59,7 @@ function OnboardingContent() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push(role === 'teacher' ? '/onboarding/teacher' : '/dashboard');
   };
 
   if (isLoading) {
@@ -88,7 +98,12 @@ function OnboardingContent() {
             </button>
           </div>
 
-          <div className="mt-8 space-y-2">
+          <div className="mt-8 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
+            <GraduationCap className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            Signing up as: <span className="font-semibold capitalize text-slate-900 dark:text-slate-100">{role}</span>
+          </div>
+
+          <div className="mt-4 space-y-2">
             <label htmlFor="country" className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
               <Globe2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               Where are you studying?

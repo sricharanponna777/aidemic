@@ -3,6 +3,16 @@ export const MAX_AI_ERROR_TEXT = 2400;
 export const isDataAnalysisObjective = (learningObjective: string) =>
   /graphs,\s*tables,\s*and\s*data\s*sets/i.test(learningObjective);
 
+const CHART_PLOTTING_SUBJECTS = new Set(['mathematics', 'biology', 'chemistry', 'physics']);
+
+const CHART_PLOTTING_KEYWORDS =
+  /\b(pie\s*charts?|bar\s*charts?|line\s*graphs?|scatter\s*graphs?|scatter(?:plot)?s?|correlations?|lines?\s+of\s+best\s*fit|curves?\s+of\s+best\s*fit|histograms?|frequency\s+polygons?|stem[\s-]and[\s-]leaf(?:\s*diagrams?|\s*plots?)?|box\s*plots?|box[\s-]and[\s-]whiskers?|cumulative\s+frequenc(?:y|ies)|data\s+representations?|drawing\s+graphs?|constructing\s+graphs?)\b/i;
+
+export const isChartPlottingTopic = (subject: string, topic: string, subtopic: string, learningObjective: string) => {
+  if (!CHART_PLOTTING_SUBJECTS.has(subject.toLowerCase())) return false;
+  return CHART_PLOTTING_KEYWORDS.test(`${topic} ${subtopic} ${learningObjective}`);
+};
+
 export const txt = (value: string, length: number) =>
   value
     .replace(/\r\n/g, '\n')

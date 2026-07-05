@@ -14,6 +14,7 @@ export default function LoginPage() {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('mode') === 'signup';
   });
+  const [role, setRole] = useState<'student' | 'teacher'>('student');
   const router = useRouter();
 
   const envError =
@@ -31,7 +32,7 @@ export default function LoginPage() {
 
       if (isSignUp) {
         const origin = 'https://aidemic725.vercel.app';
-        const onboardingPath = '/onboarding';
+        const onboardingPath = `/onboarding?role=${role}`;
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -120,6 +121,31 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
+          {isSignUp && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                I am a...
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['student', 'teacher'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setRole(option)}
+                    disabled={isLoading || !!envError}
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition-colors ${
+                      role === option
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email

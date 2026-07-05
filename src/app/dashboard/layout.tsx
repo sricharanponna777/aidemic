@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { createClient } from "@/lib/supabase-client";
@@ -14,32 +15,70 @@ import {
   LogOut,
   Moon,
   Settings,
+  ShieldAlert,
+  ShieldCheck,
   Sun,
   Target,
+  Users,
   Zap,
 } from "lucide-react";
 
-const navItems = [
+const STUDENT_NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
   { href: "/dashboard/notes", label: "Learn", icon: BookOpen },
   { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
   { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
   { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
+  { href: "/dashboard/classes", label: "My Classes", icon: Users },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-function isActiveRoute(item: (typeof navItems)[number], pathname: string) {
+const TEACHER_NAV_ITEMS = [
+  { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+];
+
+function isActiveRoute(item: { href: string; exact?: boolean }, pathname: string) {
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { session, isLoading } = useAuth();
+  const { session, profile, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
   const { theme, toggleTheme } = useTheme();
+  const isTeacher = profile?.role === "teacher";
+  const homeHref = isTeacher ? "/dashboard/teacher" : "/dashboard";
+
+  const [isSchoolAdmin, setIsSchoolAdmin] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    const load = async () => {
+      const [{ data: teacherRow }, { data: adminRow }] = await Promise.all([
+        supabase.from("teachers").select("is_school_admin").eq("user_id", session.user.id).maybeSingle(),
+        supabase.from("platform_admins").select("user_id").eq("user_id", session.user.id).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setIsSchoolAdmin(!!teacherRow?.is_school_admin);
+      setIsPlatformAdmin(!!adminRow);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [session, supabase]);
+
+  const navItems = [
+    ...(isTeacher ? TEACHER_NAV_ITEMS : STUDENT_NAV_ITEMS),
+    ...(isTeacher && isSchoolAdmin ? [{ href: "/dashboard/teacher/school", label: "School", icon: ShieldCheck }] : []),
+    ...(isPlatformAdmin ? [{ href: "/dashboard/admin/schools", label: "Admin", icon: ShieldAlert }] : []),
+  ];
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -70,7 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Brand */}
         <div className="border-b border-slate-200 dark:border-white/6 px-5 py-5">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
+          <Link href={homeHref} className="flex items-center gap-3 group">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 transition-shadow dark:animate-glow-pulse">
               <Zap className="h-5 w-5 text-white" />
             </div>
@@ -142,7 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Mobile top bar */}
       <div className="lg:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-slate-200 dark:border-white/6 bg-white/90 dark:bg-[#0D1324]/90 backdrop-blur-xl px-4 py-3">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
+        <Link href={homeHref} className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-indigo-500 to-purple-600">
             <Zap className="h-4 w-4 text-white" />
           </div>

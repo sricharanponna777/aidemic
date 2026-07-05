@@ -18,10 +18,14 @@ export const getAIConfig = () => {
   const openRouterSiteUrl = txt(process.env.OPENROUTER_SITE_URL || '', 200);
   const openRouterAppName = txt(process.env.OPENROUTER_APP_NAME || '', 100);
   const isGemini = /gemini/i.test(model);
+  // GPT models routed through OpenRouter (e.g. "openai/gpt-5-mini") still hit OpenAI's real
+  // Structured Outputs support -- checking only the hostname missed this, silently downgrading
+  // those requests to loose json_object mode with no schema enforcement at all.
+  const isOpenAIModel = /gpt-|(^|\/)o[1-9]([-.]|$)/i.test(model);
   // Models known to support strict json_schema response_format
-  const supportsJsonSchema = isOpenAIHosted || isGemini;
+  const supportsJsonSchema = isOpenAIHosted || isGemini || isOpenAIModel;
 
-  return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName, isGemini, supportsJsonSchema };
+  return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName, isGemini, isOpenAIModel, supportsJsonSchema };
 };
 
 export const buildAIHeaders = (config: AIConfig) => {
