@@ -223,7 +223,7 @@ export default function AttemptDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">
                     Source Extract
                   </p>
-                  <MarkdownContent className="mt-3 max-h-[34rem] overflow-y-auto pr-2 text-sm leading-7 text-slate-900 dark:text-slate-100" content={detail.report.sourceMaterial} />
+                  <MarkdownContent className="mt-3 max-h-136 overflow-y-auto pr-2 text-sm leading-7 text-slate-900 dark:text-slate-100" content={detail.report.sourceMaterial} />
                 </section>
               ) : null}
 

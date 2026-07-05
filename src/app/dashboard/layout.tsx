@@ -99,7 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }`}
               >
                 <Icon
-                  className={`h-[17px] w-[17px] shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                  className={`h-4.25 w-w-4.25hrink-0 transition-transform duration-200 group-hover:scale-105 ${
                     active ? "text-white" : "text-slate-500 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white"
                   }`}
                 />
