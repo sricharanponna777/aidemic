@@ -64,28 +64,31 @@ CREATE POLICY "Users can view their own platform admin row"
   ON platform_admins FOR SELECT USING (auth.uid() = user_id);
 
 -- School admins can view and approve/reject pending teachers at their own school.
+-- Uses a SECURITY DEFINER function rather than a plain self-join subquery so
+-- the policy doesn't re-trigger itself on "teachers" (infinite recursion).
+CREATE OR REPLACE FUNCTION is_school_admin_for(p_school_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM teachers
+    WHERE user_id = auth.uid()
+    AND school_id = p_school_id
+    AND is_school_admin = true
+  );
+$$;
+
 DROP POLICY IF EXISTS "School admins can view teachers at their school" ON teachers;
 CREATE POLICY "School admins can view teachers at their school"
   ON teachers FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM teachers me
-      WHERE me.user_id = auth.uid()
-      AND me.school_id = teachers.school_id
-      AND me.is_school_admin = true
-    )
-  );
+  USING (is_school_admin_for(school_id));
 DROP POLICY IF EXISTS "School admins can update teachers at their school" ON teachers;
 CREATE POLICY "School admins can update teachers at their school"
   ON teachers FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM teachers me
-      WHERE me.user_id = auth.uid()
-      AND me.school_id = teachers.school_id
-      AND me.is_school_admin = true
-    )
-  );
+  USING (is_school_admin_for(school_id));
 
 -- ============================================================================
 -- STEP 5: Platform-admin RPCs to approve/reject a school (and its founding admin)

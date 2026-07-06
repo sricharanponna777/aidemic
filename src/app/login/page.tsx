@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { buttonStyles } from '@/components/ui/button';
 
+const SIGNUP_REDIRECT_ORIGIN = 'https://aidemic725.vercel.app';
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,13 +33,12 @@ export default function LoginPage() {
       const supabase = createClient();
 
       if (isSignUp) {
-        const origin = 'https://aidemic725.vercel.app';
         const onboardingPath = `/onboarding?role=${role}`;
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(onboardingPath)}`,
+            emailRedirectTo: `${SIGNUP_REDIRECT_ORIGIN}/auth/callback?next=${encodeURIComponent(onboardingPath)}`,
           },
         });
         if (error) {
