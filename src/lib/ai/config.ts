@@ -28,7 +28,7 @@ export const getAIConfig = () => {
   return { baseUrl, apiKey, model, isOpenAIHosted, isOpenRouter, openRouterSiteUrl, openRouterAppName, isGemini, isOpenAIModel, supportsJsonSchema };
 };
 
-export const buildAIHeaders = (config: AIConfig) => {
+export const buildAIHeaders = (config: Pick<AIConfig, 'apiKey' | 'isOpenRouter' | 'openRouterSiteUrl' | 'openRouterAppName'>) => {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
   if (config.apiKey) headers.Authorization = `Bearer ${config.apiKey}`;
@@ -42,3 +42,16 @@ export const buildAIHeaders = (config: AIConfig) => {
 
 export const getMissingHostedKeyError = (config: AIConfig) =>
   config.isOpenAIHosted && !config.apiKey ? 'OPENAI_API_KEY (or AI_API_KEY) is required for OpenAI hosted API.' : '';
+
+export const getTTSConfig = () => {
+  const baseUrl = normalizeBaseUrl(process.env.TTS_BASE_URL || 'https://openrouter.ai/api/v1');
+  const apiKey = txt(process.env.TTS_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '', 300);
+  const model = txt(process.env.TTS_MODEL || 'x-ai/grok-voice-tts-1.0', 120);
+  const voice = txt(process.env.TTS_VOICE || 'Eve', 60);
+  const secondaryVoice = txt(process.env.TTS_VOICE_SECONDARY || 'Leo', 60);
+  const isOpenRouter = /openrouter\.ai/i.test(baseUrl);
+  const openRouterSiteUrl = txt(process.env.OPENROUTER_SITE_URL || '', 200);
+  const openRouterAppName = txt(process.env.OPENROUTER_APP_NAME || '', 100);
+
+  return { baseUrl, apiKey, model, voice, secondaryVoice, isOpenRouter, openRouterSiteUrl, openRouterAppName };
+};

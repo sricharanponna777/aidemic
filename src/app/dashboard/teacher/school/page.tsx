@@ -103,7 +103,7 @@ export default function SchoolAdminPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/teacher" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100">
+      <Link href="/dashboard/teacher/classes" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100">
         <ArrowLeft className="h-3.5 w-3.5" />
         My Classes
       </Link>

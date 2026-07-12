@@ -1,27 +1,27 @@
 'use client';
 
 import { createClient } from '@/lib/supabase-client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { buttonStyles } from '@/components/ui/button';
 
-const SIGNUP_REDIRECT_ORIGIN = 'https://aidemic725.vercel.app';
-
-export default function LoginPage() {
+function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isSignUp, setIsSignUp] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return new URLSearchParams(window.location.search).get('mode') === 'signup';
-  });
+  const [isSignUpOverride, setIsSignUpOverride] = useState<boolean | null>(null);
   const [role, setRole] = useState<'student' | 'teacher'>('student');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSignUp = isSignUpOverride ?? searchParams.get('mode') === 'signup';
 
   const envError =
     !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      ? '⚠️ Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local'
+      ? 'Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local'
       : '';
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -37,32 +37,48 @@ export default function LoginPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${SIGNUP_REDIRECT_ORIGIN}/auth/callback?next=${encodeURIComponent(onboardingPath)}`,
-          },
         });
         if (error) {
           throw new Error(error.message);
         }
-        setError('✅ Check your email to confirm your account');
-        if (data.session) {
-          try {
-            await fetch('/api/auth', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                access_token: data.session.access_token,
-                refresh_token: data.session.refresh_token,
-              }),
-            });
-          } catch (syncErr) {
-            console.error('Failed to sync new signup session:', syncErr);
-          }
-          router.push(onboardingPath);
-          return;
+        if (!data.session) {
+          throw new Error(
+            'Account created, but Supabase email confirmation is still enabled. Disable Confirm Email in Supabase Authentication > Sign In / Providers > Email.'
+          );
         }
-        setEmail('');
-        setPassword('');
+
+        const trimmedFirstName = firstName.trim();
+        const trimmedLastName = lastName.trim();
+        const { error: profileError } = await supabase.from('user_profiles').upsert({
+          id: data.session.user.id,
+          email,
+          username: username.trim(),
+          first_name: trimmedFirstName,
+          last_name: trimmedLastName,
+          full_name: `${trimmedFirstName} ${trimmedLastName}`.trim(),
+        });
+        if (profileError) {
+          throw new Error(
+            profileError.code === '23505'
+              ? 'That username is already taken. Please choose another.'
+              : profileError.message
+          );
+        }
+
+        try {
+          await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              access_token: data.session.access_token,
+              refresh_token: data.session.refresh_token,
+            }),
+          });
+        } catch (syncErr) {
+          console.error('Failed to sync new signup session:', syncErr);
+        }
+        router.push(onboardingPath);
+        return;
       } else {
         const { error: signInError, data } = await supabase.auth.signInWithPassword({
           email,
@@ -71,7 +87,7 @@ export default function LoginPage() {
         if (signInError) {
           throw new Error(signInError.message);
         }
-        
+
         if (data?.session) {
           // Sync the browser session to Supabase SSR cookies before the
           // protected dashboard route runs its server-side auth guard.
@@ -92,7 +108,7 @@ export default function LoginPage() {
             console.error('Failed to sync session with server:', syncErr);
           }
 
-          const nextPath = new URLSearchParams(window.location.search).get('next') || '/dashboard';
+          const nextPath = searchParams.get('next') || '/dashboard';
           router.push(nextPath.startsWith('/') ? nextPath : '/dashboard');
         } else {
           throw new Error('No session created after login');
@@ -147,6 +163,58 @@ export default function LoginPage() {
             </div>
           )}
 
+          {isSignUp && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  First name
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="John"
+                  disabled={isLoading || !!envError}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Last name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Doe"
+                  disabled={isLoading || !!envError}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {isSignUp && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Username
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="john_doe"
+                disabled={isLoading || !!envError}
+                pattern="[a-zA-Z0-9_]{3,20}"
+                title="3-20 characters: letters, numbers, and underscores only"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                required
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Email
@@ -170,7 +238,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="********"
               disabled={isLoading || !!envError}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
               required
@@ -178,11 +246,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className={`p-3 rounded-lg text-sm ${
-              error.includes('✅')
-                ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 border border-green-300 dark:border-green-700'
-                : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-300 dark:border-red-700'
-            }`}>
+            <div className="p-3 rounded-lg text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-300 dark:border-red-700">
               {error}
             </div>
           )}
@@ -201,7 +265,7 @@ export default function LoginPage() {
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
             <button
               onClick={() => {
-                setIsSignUp(!isSignUp);
+                setIsSignUpOverride(!isSignUp);
                 setError('');
               }}
               className={buttonStyles({ variant: 'ghost', size: 'none', className: 'inline-flex px-2 py-1 align-baseline' })}
@@ -212,5 +276,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

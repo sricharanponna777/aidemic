@@ -1,450 +1,190 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Copy, Plus, Users } from 'lucide-react';
-import { buttonStyles } from '@/components/ui/button';
+import { AlertTriangle, ClipboardList, GraduationCap, Target, Users } from 'lucide-react';
 import { VerificationBanner } from '@/components/VerificationBanner';
-import { useAuth } from '@/hooks/useAuth';
-import { createClient } from '@/lib/supabase-client';
-import {
-  getExamBoardLabel,
-  getSpecEntries,
-  getSubjectLabel,
-  requiresTierSelection,
-  SELECTABLE_SUBJECTS,
-  type ExamBoard,
-  type SupportedSubject,
-  type UserSubject,
-} from '@/lib/ai/subjectConfig';
-import { getQualificationConfig, getQualifications, type Country } from '@/lib/ai/countryConfig';
-import { resolveSpecificationId } from '@/lib/ai/studentSubjects';
+import { useTeacherClassData } from '@/hooks/useTeacherClassData';
+import { atRiskStudents, average, buildClassStats, buildStudentStats } from '@/lib/teacherAnalytics';
+import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
 
-const selectClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
-
-const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars (0/O, 1/I/L)
-
-function generateInviteCode(length = 6) {
-  const bytes = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(bytes, (b) => INVITE_CODE_CHARS[b % INVITE_CODE_CHARS.length]).join('');
+function isToday(date: Date) {
+  const now = new Date();
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
 
-type ClassRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  academic_year: string | null;
-  invite_code: string;
-  specifications: {
-    name: string;
-    tier: string | null;
-    subjects: {
-      name: string;
-      exam_boards: { name: string; qualifications: { name: string } | null } | null;
-    } | null;
-  } | null;
-  class_students: { count: number }[];
-};
-
 export default function TeacherDashboardPage() {
-  const router = useRouter();
-  const { session, profile, isLoading } = useAuth();
-  const supabase = createClient();
+  const data = useTeacherClassData();
+  const { loading, verificationStatus, schoolStatus, classes, assignments, attempts, students } = data;
 
-  const [teacherId, setTeacherId] = useState<string | null>(null);
-  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
-  const [schoolStatus, setSchoolStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
-  const [classes, setClasses] = useState<ClassRow[]>([]);
-  const [classesLoading, setClassesLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const classStats = useMemo(() => (loading ? [] : buildClassStats(data)), [loading, data]);
+  const studentStats = useMemo(() => (loading ? [] : buildStudentStats(data)), [loading, data]);
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [academicYear, setAcademicYear] = useState('');
-  const [qualId, setQualId] = useState('gcse');
-  const [subject, setSubject] = useState<SupportedSubject>('biology');
-  const [board, setBoard] = useState<ExamBoard>('aqa');
-  const [specName, setSpecName] = useState('');
-  const [specTier, setSpecTier] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [formError, setFormError] = useState('');
+  const activeClassStats = useMemo(() => classStats.filter((c) => c.status !== 'archived'), [classStats]);
+  const activeClassIds = useMemo(() => new Set(activeClassStats.map((c) => c.class_id)), [activeClassStats]);
+  const studentCount = students.filter((s) => activeClassIds.has(s.class_id)).length;
+  const assignmentCount = assignments.filter((a) => activeClassIds.has(a.class_id)).length;
+  const avgCompletion = average(activeClassStats.map((c) => c.completionRate).filter((v): v is number => v !== null));
 
-  const userCountry: Country = profile?.country ?? 'uk';
-  const qualifications = getQualifications(userCountry);
-  const effectiveQualId = qualifications.some((q) => q.id === qualId) ? qualId : qualifications[0]?.id ?? '';
-  const qualConfig = getQualificationConfig(userCountry, effectiveQualId);
-  const isComingSoon = qualConfig?.comingSoon ?? false;
-  const examType = qualConfig?.examType ?? 'gcse';
-  const boardOptions: ExamBoard[] = subject === 'english language' ? ['aqa'] : qualConfig?.boards ?? ['aqa', 'edexcel', 'ocr'];
+  const needingHelp = useMemo(
+    () => atRiskStudents(studentStats.filter((s) => activeClassIds.has(s.class_id))).slice(0, 6),
+    [studentStats, activeClassIds]
+  );
 
-  const pendingSubject: UserSubject = { id: 'new', subject, exam_board: board, exam_type: examType, spec_name: specName, spec_tier: specTier };
-  const specEntries = getSpecEntries(pendingSubject);
-  const effectiveSpecName = specEntries.length === 1 ? specEntries[0].name : specName;
-  const selectedSpecEntry = specEntries.length === 1 ? specEntries[0] : specEntries.find((e) => e.name === specName) ?? null;
-  const tierRequired = requiresTierSelection(pendingSubject, effectiveSpecName);
+  const completedToday = useMemo(() => {
+    const rows = attempts
+      .filter((a) => a.status === 'completed' && a.completed_at && isToday(new Date(a.completed_at)))
+      .map((a) => {
+        const student = students.find((s) => s.student_id === a.student_id);
+        const assignment = assignments.find((as) => as.id === a.assignment_id);
+        return {
+          key: `${a.assignment_id}:${a.student_id}`,
+          name: student?.full_name || student?.email || 'Student',
+          assignmentTitle: assignment?.title ?? 'Assignment',
+          percentage: a.percentage,
+          at: new Date(a.completed_at as string),
+        };
+      })
+      .sort((a, b) => b.at.getTime() - a.at.getTime());
+    return rows;
+  }, [attempts, students, assignments]);
 
-  useEffect(() => {
-    if (isLoading) return;
-    if (!session) return;
-    if (profile && profile.role !== 'teacher') {
-      router.replace('/dashboard');
-      return;
-    }
-
-    let cancelled = false;
-    const load = async () => {
-      setClassesLoading(true);
-      const { data: teacherRow, error: teacherError } = await supabase
-        .from('teachers')
-        .select('id, verification_status, schools ( status )')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-      if (teacherError || !teacherRow) {
-        router.replace('/onboarding/teacher');
-        return;
-      }
-      const typedTeacherRow = teacherRow as unknown as {
-        id: string;
-        verification_status: 'pending' | 'approved' | 'rejected';
-        schools: { status: 'pending' | 'approved' | 'rejected' } | null;
-      };
-      setTeacherId(typedTeacherRow.id);
-      setVerificationStatus(typedTeacherRow.verification_status);
-      setSchoolStatus(typedTeacherRow.schools?.status ?? null);
-
-      const { data: classRows, error: classesError } = await supabase
-        .from('classes')
-        .select(
-          'id, name, description, academic_year, invite_code, specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ), class_students ( count )'
-        )
-        .eq('teacher_id', teacherRow.id)
-        .order('created_at', { ascending: false });
-
-      if (cancelled) return;
-      if (classesError) {
-        console.error('Failed to load classes:', classesError.message);
-      } else {
-        setClasses((classRows as unknown as ClassRow[]) ?? []);
-      }
-      setClassesLoading(false);
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoading, session, profile, router, supabase]);
-
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setAcademicYear('');
-    setSpecName('');
-    setSpecTier('');
-  };
-
-  const handleCreateClass = async () => {
-    if (!teacherId) return;
-    setFormError('');
-    if (!name.trim()) {
-      setFormError('Give the class a name.');
-      return;
-    }
-    if (specEntries.length > 1 && !effectiveSpecName) {
-      setFormError('Choose the specification for this class.');
-      return;
-    }
-    if (tierRequired && !specTier) {
-      setFormError('Choose Foundation or Higher for this class.');
-      return;
-    }
-
-    setIsSaving(true);
-    const specificationId = await resolveSpecificationId(supabase, {
-      qualificationLabel: qualConfig?.label ?? '',
-      boardLabel: getExamBoardLabel(board),
-      subjectLabel: getSubjectLabel(subject),
-      specName: effectiveSpecName,
-      specTier: specTier || null,
-    });
-
-    if (!specificationId) {
-      setFormError('Could not find that specification in the curriculum database.');
-      setIsSaving(false);
-      return;
-    }
-
-    let lastError: { code?: string; message: string } | null = null;
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const inviteCode = generateInviteCode();
-      const { data, error } = await supabase
-        .from('classes')
-        .insert({
-          teacher_id: teacherId,
-          name: name.trim(),
-          description: description.trim() || null,
-          academic_year: academicYear.trim() || null,
-          specification_id: specificationId,
-          invite_code: inviteCode,
-        })
-        .select(
-          'id, name, description, academic_year, invite_code, specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ), class_students ( count )'
-        )
-        .single();
-
-      if (!error) {
-        setClasses((prev) => [data as unknown as ClassRow, ...prev]);
-        resetForm();
-        setShowCreateForm(false);
-        setIsSaving(false);
-        return;
-      }
-
-      lastError = error;
-      if (error.code !== '23505') break;
-    }
-
-    setFormError(lastError?.message || 'Failed to create class.');
-    setIsSaving(false);
-  };
-
-  const handleCopyCode = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-    } catch {
-      // Clipboard access can fail silently (e.g. insecure context); no-op.
-    }
-  };
-
-  if (isLoading || classesLoading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading your classes...</p>;
+  if (loading) {
+    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading your dashboard...</p>;
   }
+
+  const stats = [
+    { label: 'Classes', value: String(activeClassStats.length), icon: GraduationCap, from: 'from-indigo-500', to: 'to-purple-600' },
+    { label: 'Students', value: String(studentCount), icon: Users, from: 'from-blue-500', to: 'to-cyan-500' },
+    { label: 'Assignments', value: String(assignmentCount), icon: ClipboardList, from: 'from-emerald-500', to: 'to-teal-500' },
+    { label: 'Avg. completion', value: avgCompletion === null ? '—' : `${avgCompletion}%`, icon: Target, from: 'from-amber-500', to: 'to-orange-500' },
+  ];
 
   return (
     <div className="space-y-6">
       <VerificationBanner verificationStatus={verificationStatus} schoolStatus={schoolStatus} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Classes</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Create classes, share invite codes, and set assignments.</p>
-        </div>
-        <button type="button" onClick={() => setShowCreateForm((v) => !v)} className={buttonStyles({ variant: 'primary' })}>
-          <Plus className="h-4 w-4" />
-          Create class
-        </button>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Your at-a-glance overview across every class.</p>
       </div>
 
-      {showCreateForm && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Class name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Year 11 Biology"
-                className={`${selectClass} w-full`}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Academic year</label>
-              <input
-                type="text"
-                value={academicYear}
-                onChange={(e) => setAcademicYear(e.target.value)}
-                placeholder="e.g. 2025/26"
-                className={`${selectClass} w-full`}
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-1">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Description (optional)</label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className={`${selectClass} w-full`}
-            />
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="flex items-center gap-2">
-              <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Qualification</label>
-              <select
-                value={effectiveQualId}
-                onChange={(e) => {
-                  setQualId(e.target.value);
-                  setSpecName('');
-                  setSpecTier('');
-                }}
-                className={selectClass}
-              >
-                {qualifications.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {!isComingSoon && (
-              <>
-                <div className="flex items-center gap-2">
-                  <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Exam Board</label>
-                  <select
-                    value={board}
-                    onChange={(e) => {
-                      setBoard(e.target.value as ExamBoard);
-                      setSpecName('');
-                      setSpecTier('');
-                    }}
-                    className={selectClass}
-                  >
-                    {boardOptions.map((b) => (
-                      <option key={b} value={b}>
-                        {getExamBoardLabel(b)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Subject</label>
-                  <select
-                    value={subject}
-                    onChange={(e) => {
-                      const next = e.target.value as SupportedSubject;
-                      setSubject(next);
-                      if (next === 'english language') setBoard('aqa');
-                      setSpecName('');
-                      setSpecTier('');
-                    }}
-                    className={selectClass}
-                  >
-                    {SELECTABLE_SUBJECTS.map((s) => (
-                      <option key={s} value={s}>
-                        {getSubjectLabel(s)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </>
-            )}
-          </div>
-
-          {isComingSoon ? (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-300">
-              {qualConfig?.label} support is coming soon.
-            </p>
-          ) : (
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {specEntries.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
-                  No specification options for this combination.
-                </div>
-              ) : specEntries.length === 1 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
-                  {specEntries[0].name}
-                </div>
-              ) : (
-                <select
-                  value={specName}
-                  onChange={(e) => {
-                    setSpecName(e.target.value);
-                    setSpecTier('');
-                  }}
-                  className={selectClass}
-                >
-                  <option value="">Select specification</option>
-                  {specEntries.map((entry) => (
-                    <option key={entry.name} value={entry.name}>
-                      {entry.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {selectedSpecEntry?.tiers?.length ? (
-                <select value={specTier} onChange={(e) => setSpecTier(e.target.value)} className={selectClass}>
-                  <option value="">Tier</option>
-                  {selectedSpecEntry.tiers.map((tier) => (
-                    <option key={tier} value={tier}>
-                      {tier}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-            </div>
-          )}
-
-          {formError ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{formError}</p> : null}
-
-          <div className="mt-4 flex justify-end gap-2">
-            <button type="button" onClick={() => setShowCreateForm(false)} className={buttonStyles({ variant: 'secondary' })}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateClass}
-              disabled={isSaving || isComingSoon || specEntries.length === 0}
-              className={buttonStyles({ variant: 'primary' })}
-            >
-              {isSaving ? 'Creating...' : 'Create class'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {classes.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
-          No classes yet. Create one to get started.
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {classes.map((cls) => {
-            const subjectChain = cls.specifications?.subjects;
-            const board = subjectChain?.exam_boards;
-            const qualification = board?.qualifications;
-            return (
-              <Link
-                key={cls.id}
-                href={`/dashboard/teacher/classes/${cls.id}`}
-                className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-300 dark:border-white/6 dark:bg-[#131B2E] dark:hover:border-indigo-500/40"
-              >
-                <h3 className="font-semibold text-slate-900 dark:text-slate-100">{cls.name}</h3>
-                <p className="mt-1 flex flex-wrap gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                  {qualification ? <span>{qualification.name}</span> : null}
-                  {board ? <span>· {board.name}</span> : null}
-                  {subjectChain ? <span>· {subjectChain.name}</span> : null}
-                </p>
-                <div className="mt-3 flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
-                  <Users className="h-4 w-4" />
-                  {cls.class_students?.[0]?.count ?? 0} students
-                </div>
-                <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/3">
-                  <span className="font-mono text-sm font-semibold tracking-widest text-slate-800 dark:text-slate-100">
-                    {cls.invite_code}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      void handleCopyCode(cls.invite_code);
-                    }}
-                    className="text-slate-400 transition hover:text-indigo-500"
-                    aria-label="Copy invite code"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-              </Link>
-            );
-          })}
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+          You haven&apos;t created a class yet.{' '}
+          <Link href="/dashboard/teacher/classes" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+            Create your first class
+          </Link>{' '}
+          to get started.
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.label} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${stat.from} ${stat.to} shadow-md`}>
+                  <stat.icon className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {/* Class summary */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] lg:col-span-2">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Class summary</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Completion and average score per active class.</p>
+              {activeClassStats.length === 0 ? (
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No active classes.</p>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  {activeClassStats.map((cls) => (
+                    <Link
+                      key={cls.class_id}
+                      href={`/dashboard/teacher/classes/${cls.class_id}`}
+                      className="block rounded-xl border border-slate-200 px-4 py-3 transition hover:border-indigo-300 dark:border-white/6 dark:hover:border-indigo-500/40"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{cls.name}</span>
+                        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                          <span>{cls.rosterSize} students</span>
+                          <span>{cls.assignmentCount} assignments</span>
+                          {cls.avgScore !== null && <span className={`font-semibold ${scoreTextTone(cls.avgScore)}`}>{cls.avgScore}% avg</span>}
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                          <div className={`h-full rounded-full ${scoreBarTone(cls.completionRate)}`} style={{ width: `${cls.completionRate ?? 0}%` }} />
+                        </div>
+                        <span className={`text-xs font-semibold ${scoreTextTone(cls.completionRate)}`}>
+                          {cls.completionRate === null ? '—' : `${cls.completionRate}%`}
+                        </span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Students needing help */}
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Students needing help</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Not started or averaging below 40%.</p>
+              {needingHelp.length === 0 ? (
+                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Everyone is keeping up. 🎉</p>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {needingHelp.map((student) => (
+                    <div key={`${student.class_id}:${student.student_id}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/6">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-800 dark:text-slate-200">{student.name}</p>
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{student.className}</p>
+                      </div>
+                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                        <AlertTriangle className="h-3 w-3" />
+                        {student.completedCount === 0 ? 'Not started' : `${student.avgScore}%`}
+                      </span>
+                    </div>
+                  ))}
+                  <Link href="/dashboard/teacher/ai-insights" className="mt-1 inline-block text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                    View all in AI Insights →
+                  </Link>
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Today's activity */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Today&apos;s activity</h2>
+              <span className="text-sm text-slate-500 dark:text-slate-400">{completedToday.length} completed today</span>
+            </div>
+            {completedToday.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No assignments completed yet today.</p>
+            ) : (
+              <div className="mt-4 space-y-2">
+                {completedToday.slice(0, 10).map((row) => (
+                  <div key={row.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm dark:border-white/6">
+                    <div>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{row.name}</span>
+                      <span className="text-slate-500 dark:text-slate-400"> completed </span>
+                      <span className="text-slate-700 dark:text-slate-300">{row.assignmentTitle}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                      {typeof row.percentage === 'number' && <span className={`font-semibold ${scoreTextTone(row.percentage)}`}>{row.percentage}%</span>}
+                      <span>{row.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
       )}
     </div>
   );

@@ -7,9 +7,12 @@ import { createClient } from "@/lib/supabase-client";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  BarChart3,
   BookOpen,
   Brain,
+  ClipboardList,
   GraduationCap,
+  Headphones,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -17,6 +20,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Sun,
   Target,
   Users,
@@ -27,6 +31,7 @@ const STUDENT_NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
   { href: "/dashboard/notes", label: "Learn", icon: BookOpen },
+  { href: "/dashboard/podcasts", label: "Podcasts", icon: Headphones },
   { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
   { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
   { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
@@ -36,6 +41,11 @@ const STUDENT_NAV_ITEMS = [
 
 const TEACHER_NAV_ITEMS = [
   { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/teacher/classes", label: "Classes", icon: Users },
+  { href: "/dashboard/teacher/assignments", label: "Assignments", icon: ClipboardList },
+  { href: "/dashboard/teacher/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard/teacher/ai-insights", label: "AI Insights", icon: Sparkles },
+  { href: "/dashboard/teacher/question-bank", label: "Question Bank", icon: Layers },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -210,7 +220,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <div className="lg:pl-64">
         <main className="mx-auto max-w-6xl px-4 pt-16 pb-10 sm:px-6 lg:pt-8">
-          <div key={pathname} className="animate-page-enter">
+          <div className="animate-page-enter">
             {children}
           </div>
         </main>

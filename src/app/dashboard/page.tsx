@@ -14,7 +14,8 @@ import {
   Trophy,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
 import { Flashcard, FlashcardDeck, StudySession } from "@/types";
 import { weightedPredictedGrade } from "@/lib/ai/gradeAverages";
@@ -209,14 +210,20 @@ const learningSteps = [
 ];
 
 export default function Dashboard() {
-  const { session } = useAuth();
+  const { session, profile, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
   const [metrics, setMetrics] = useState<DashboardMetrics>(emptyMetrics);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const isTeacher = profile?.role === "teacher";
+
+  useEffect(() => {
+    if (isTeacher) router.replace("/dashboard/teacher");
+  }, [isTeacher, router]);
 
   useEffect(() => {
     const loadDashboard = async () => {
-      if (!session?.user?.id) return;
+      if (!session?.user?.id || isTeacher) return;
       setIsLoading(true);
       setLoadError(null);
 
@@ -413,12 +420,12 @@ export default function Dashboard() {
     };
 
     void loadDashboard();
-  }, [session?.user?.id]);
+  }, [session?.user?.id, isTeacher]);
 
-  const displayName = useMemo(
-    () => session?.user.email?.split("@")[0] || "there",
-    [session?.user.email]
-  );
+  const displayName =
+    profile?.first_name || profile?.username || session?.user.email?.split("@")[0] || "there";
+
+  if (isAuthLoading || isTeacher) return null;
 
   return (
     <div className="space-y-6">

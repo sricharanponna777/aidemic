@@ -4,6 +4,9 @@ export interface UserProfile {
   id: string; // same as auth.users.id
   email: string;
   full_name?: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
   bio?: string;
   avatar_url?: string;
   preferred_study_time?: string;
@@ -46,6 +49,7 @@ export interface Class {
   specification_id?: string;
   academic_year?: string;
   invite_code: string;
+  status: 'active' | 'archived';
   created_at?: string;
   updated_at?: string;
 }
@@ -88,6 +92,19 @@ export interface AssignmentAttempt {
   predicted_grade?: string;
   ai_feedback?: unknown;
   status: 'not_started' | 'in_progress' | 'completed';
+}
+
+export interface GeneratedPodcast {
+  id: string;
+  user_id: string;
+  subject: string;
+  topic: string;
+  length: 'short' | 'medium' | 'long';
+  voice: string;
+  script_content: string;
+  audio_url: string;
+  character_count: number;
+  created_at: string;
 }
 
 export interface FlashcardDeck {

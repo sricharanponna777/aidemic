@@ -40,7 +40,7 @@ bun install
 2. Open the Supabase SQL editor.
 3. Run [queries.sql](./queries.sql) once to create the tables, indexes, and RLS policies.
    Warning: this script drops and recreates tables, so it will delete existing Supabase data. Use it only on a new/demo project or after backing up your data.
-4. In Authentication > URL Configuration, set Site URL to `https://aidemic725.vercel.app` and add `https://aidemic725.vercel.app/auth/callback` to the redirect URLs.
+4. In Authentication > Sign In / Providers > Email, disable Confirm Email so signups create a session immediately.
 5. Copy your project URL and anon key.
 
 ### 3. Configure Environment Variables

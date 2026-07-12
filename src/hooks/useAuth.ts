@@ -14,6 +14,14 @@ export function useAuth() {
   const supabase = createClient();
 
   useEffect(() => {
+    // Supabase re-fires onAuthStateChange with a freshly-allocated session
+    // object whenever the tab regains focus, even when nothing actually
+    // changed. Tracking the signed-in user id here lets us skip re-fetching
+    // the profile (and, via setSession's updater, skip handing consumers a
+    // new session reference) so pages don't reload every time the user
+    // clicks away and back.
+    let currentUserId: string | null = null;
+
     const loadProfile = async (userId: string) => {
       const { data: prof, error: profErr } = await supabase
         .from('user_profiles')
@@ -30,15 +38,26 @@ export function useAuth() {
       setProfile(prof);
     };
 
-    const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        setSession(data.session);
-        if (data.session?.user) {
-          await loadProfile(data.session.user.id);
+    const applySession = (nextSession: Session | null) => {
+      const nextUserId = nextSession?.user?.id ?? null;
+      setSession((prev) =>
+        prev?.access_token === nextSession?.access_token && (prev?.user?.id ?? null) === nextUserId ? prev : nextSession
+      );
+
+      if (nextUserId !== currentUserId) {
+        currentUserId = nextUserId;
+        if (nextUserId) {
+          void loadProfile(nextUserId);
         } else {
           setProfile(null);
         }
+      }
+    };
+
+    const checkSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        applySession(data.session);
       } catch (error) {
         console.error('Auth error:', error);
       } finally {
@@ -50,12 +69,7 @@ export function useAuth() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
-        setSession(session);
-        if (session?.user) {
-          void loadProfile(session.user.id);
-        } else {
-          setProfile(null);
-        }
+        applySession(session);
         if (!session) {
           router.push('/');
         }

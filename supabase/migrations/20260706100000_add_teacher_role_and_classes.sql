@@ -123,6 +123,43 @@ CREATE INDEX IF NOT EXISTS idx_assignment_attempts_student_id ON assignment_atte
 -- ============================================================================
 -- STEP 8: Row Level Security
 -- ============================================================================
+
+-- SECURITY DEFINER helpers for the classes <-> class_students cross-checks
+-- below. "classes" and "class_students" each need to query the other to
+-- decide visibility (a teacher's classes vs. a teacher's rosters); wrapping
+-- both lookups as SECURITY DEFINER (which bypasses RLS, running as the table
+-- owner) avoids the two tables' policies re-triggering each other, which
+-- Postgres would otherwise detect as infinite recursion.
+CREATE OR REPLACE FUNCTION is_teacher_of_class(p_class_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM classes
+    JOIN teachers ON teachers.id = classes.teacher_id
+    WHERE classes.id = p_class_id
+    AND teachers.user_id = auth.uid()
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION is_enrolled_in_class(p_class_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM class_students
+    WHERE class_id = p_class_id
+    AND student_id = auth.uid()
+    AND status = 'active'
+  );
+$$;
+
 ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_students ENABLE ROW LEVEL SECURITY;
@@ -154,14 +191,7 @@ CREATE POLICY "Teachers can view their own classes"
 DROP POLICY IF EXISTS "Students can view classes they belong to" ON classes;
 CREATE POLICY "Students can view classes they belong to"
   ON classes FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM class_students
-      WHERE class_students.class_id = classes.id
-      AND class_students.student_id = auth.uid()
-      AND class_students.status = 'active'
-    )
-  );
+  USING (is_enrolled_in_class(id));
 DROP POLICY IF EXISTS "Teachers can create their own classes" ON classes;
 CREATE POLICY "Teachers can create their own classes"
   ON classes FOR INSERT
@@ -203,14 +233,7 @@ CREATE POLICY "Students can view their own class membership"
 DROP POLICY IF EXISTS "Teachers can view their classes rosters" ON class_students;
 CREATE POLICY "Teachers can view their classes rosters"
   ON class_students FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM classes
-      JOIN teachers ON teachers.id = classes.teacher_id
-      WHERE classes.id = class_students.class_id
-      AND teachers.user_id = auth.uid()
-    )
-  );
+  USING (is_teacher_of_class(class_id));
 
 -- assignments: owning teacher has full access; enrolled students can view
 DROP POLICY IF EXISTS "Teachers can view their own assignments" ON assignments;
