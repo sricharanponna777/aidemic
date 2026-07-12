@@ -98,7 +98,7 @@ export default function TeacherReportsPage() {
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">All classes</h2>
                 <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[520px] text-sm">
+                  <table className="w-full min-w-130 text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/6 dark:text-slate-400">
                         <th className="pb-2 pr-4 font-medium">Class</th>
@@ -252,7 +252,7 @@ export default function TeacherReportsPage() {
                 <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No students have joined your classes yet.</p>
               ) : (
                 <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[520px] text-sm">
+                  <table className="w-full min-w-130 text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/6 dark:text-slate-400">
                         <th className="pb-2 pr-4 font-medium">Student</th>
