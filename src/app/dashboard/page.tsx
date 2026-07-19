@@ -1,22 +1,20 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { calculateStudyStreak } from "@/lib/spacedRepetition";
+import { calculateGoalProgress, calculateRetentionRate, calculateStudyStreak, getMotivationMessage } from "@/lib/spacedRepetition";
 import { createClient } from "@/lib/supabase-client";
 import {
   ArrowRight,
-  BookOpen,
   Brain,
   GraduationCap,
-  Layers,
   Sparkles,
-  Target,
   Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
+import { useToast } from "@/components/ToastProvider";
 import { Flashcard, FlashcardDeck, StudySession } from "@/types";
 import { weightedPredictedGrade } from "@/lib/ai/gradeAverages";
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/subjectConfig";
@@ -42,6 +40,7 @@ type RecentPracticeAttempt = {
   totalMarksAwarded: number | null;
   totalAvailableMarks: number | null;
   createdAt: string;
+  attemptMode: string | null;
 };
 
 type WeaknessEntry = {
@@ -80,6 +79,10 @@ type DashboardMetrics = {
   latestPracticePercentage: number | null;
   latestPracticeGrade: string | null;
   subjectPredictedGrades: SubjectPredictedGrade[];
+  retentionRate: number;
+  cardsStudiedToday: number;
+  goalProgress: { percentage: number; message: string; achieved: boolean };
+  motivationMessage: string;
 };
 
 type DashboardAttemptRow = {
@@ -95,6 +98,7 @@ type DashboardAttemptRow = {
   total_marks_awarded?: number | null;
   total_available_marks?: number | null;
   created_at?: string | null;
+  attempt_mode?: string | null;
 };
 
 type DashboardSubjectRow = {
@@ -106,10 +110,12 @@ type DashboardSubjectRow = {
 };
 
 type DashboardDeckRow = Pick<FlashcardDeck, "id" | "card_count">;
-type DashboardCardRow = Pick<Flashcard, "deck_id" | "next_review_date" | "times_studied">;
+type DashboardCardRow = Pick<Flashcard, "deck_id" | "next_review_date" | "times_studied" | "repetition_count" | "consecutive_correct">;
 type DashboardSessionRow = Pick<StudySession, "id" | "started_at" | "duration_minutes" | "cards_studied"> & {
   flashcard_decks?: { name?: string } | Array<{ name?: string }> | null;
 };
+
+const DEFAULT_DAILY_GOAL = 20;
 
 const emptyMetrics: DashboardMetrics = {
   deckCount: 0, totalCards: 0, dueCards: 0, reviewedCards: 0,
@@ -118,6 +124,9 @@ const emptyMetrics: DashboardMetrics = {
   recentSessions: [], recentPracticeAttempts: [], topWeaknesses: [], examAttemptsCount: 0,
   primaryExamType: null, latestPracticePercentage: null, latestPracticeGrade: null,
   subjectPredictedGrades: [],
+  retentionRate: 0, cardsStudiedToday: 0,
+  goalProgress: { percentage: 0, message: "", achieved: false },
+  motivationMessage: "",
 };
 
 const getDeckName = (value: unknown) => {
@@ -186,44 +195,26 @@ const normalizeInsightLabel = (value: string) =>
     .trim()
     .slice(0, 70);
 
-const learningSteps = [
-  {
-    step: 1, title: "Subjects", description: "Set your exam courses",
-    href: "/dashboard/subjects", icon: GraduationCap, from: "from-amber-500", to: "to-orange-500",
-  },
-  {
-    step: 2, title: "Notes", description: "Study notes with AI explanations",
-    href: "/dashboard/notes", icon: BookOpen, from: "from-blue-500", to: "to-cyan-500",
-  },
-  {
-    step: 3, title: "Flashcards", description: "Turn knowledge into flashcards",
-    href: "/dashboard/flashcards", icon: Layers, from: "from-violet-500", to: "to-purple-600",
-  },
-  {
-    step: 4, title: "Flashcard Reviews", description: "Review at optimal intervals",
-    href: "/dashboard/study-sessions", icon: Brain, from: "from-indigo-500", to: "to-blue-600",
-  },
-  {
-    step: 5, title: "Smart Practice", description: "Exam-style practice questions",
-    href: "/dashboard/ai-questions", icon: Target, from: "from-emerald-500", to: "to-teal-500",
-  },
-];
-
 export default function Dashboard() {
   const { session, profile, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
+  const { showToast } = useToast();
   const [metrics, setMetrics] = useState<DashboardMetrics>(emptyMetrics);
+  const [subjectLookup, setSubjectLookup] = useState<DashboardSubjectRow[]>([]);
+  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const isTeacher = profile?.role === "teacher";
+  const isParent = profile?.role === "parent";
 
   useEffect(() => {
     if (isTeacher) router.replace("/dashboard/teacher");
-  }, [isTeacher, router]);
+    else if (isParent) router.replace("/dashboard/parent");
+  }, [isTeacher, isParent, router]);
 
   useEffect(() => {
     const loadDashboard = async () => {
-      if (!session?.user?.id || isTeacher) return;
+      if (!session?.user?.id || isTeacher || isParent) return;
       setIsLoading(true);
       setLoadError(null);
 
@@ -244,7 +235,7 @@ export default function Dashboard() {
           deckIds.length > 0
             ? supabase
                 .from("flashcards")
-                .select("deck_id, next_review_date, times_studied")
+                .select("deck_id, next_review_date, times_studied, repetition_count, consecutive_correct")
                 .in("deck_id", deckIds)
             : Promise.resolve({ data: [], error: null }),
           supabase
@@ -254,7 +245,7 @@ export default function Dashboard() {
             .order("started_at", { ascending: false }),
           supabase
             .from("exam_practice_attempts")
-            .select("id, subject, topic, weakness_tags, weakness_analysis, exam_board, exam_type, percentage, predicted_grade, total_marks_awarded, total_available_marks, created_at")
+            .select("id, subject, topic, weakness_tags, weakness_analysis, exam_board, exam_type, percentage, predicted_grade, total_marks_awarded, total_available_marks, created_at, attempt_mode")
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: false })
             .limit(50),
@@ -324,6 +315,7 @@ export default function Dashboard() {
               ? attempt.total_available_marks
               : null,
           createdAt: attempt.created_at || "",
+          attemptMode: attempt.attempt_mode ?? null,
         }));
         const subjectGroups = new Map<string, DashboardAttemptRow[]>();
         for (const attempt of attempts) {
@@ -383,6 +375,20 @@ export default function Dashboard() {
           cardsStudied: item.cards_studied || 0,
         }));
 
+        const studyStreak = calculateStudyStreak(
+          sessions.map((s) => new Date(s.startedAt).getTime()).filter((t) => Number.isFinite(t))
+        );
+        const retentionRate = calculateRetentionRate(
+          cards.map((c) => ({ repetition_count: c.repetition_count || 0, consecutive_correct: c.consecutive_correct || 0 }))
+        );
+        const todayKey = now.toDateString();
+        const cardsStudiedToday = sessions
+          .filter((s) => s.startedAt && new Date(s.startedAt).toDateString() === todayKey)
+          .reduce((sum, s) => sum + s.cardsStudied, 0);
+        const goalProgress = calculateGoalProgress(cardsStudiedToday, DEFAULT_DAILY_GOAL, studyStreak);
+        const motivationMessage = getMotivationMessage(studyStreak, retentionRate);
+
+        setSubjectLookup(savedSubjects);
         setMetrics({
           deckCount: deckRows.length,
           totalCards: cards.length || deckRows.reduce((sum, d) => sum + (d.card_count || 0), 0),
@@ -395,14 +401,16 @@ export default function Dashboard() {
           sessionsCompleted: sessions.length,
           totalStudyMinutes: sessions.reduce((sum, s) => sum + s.durationMinutes, 0),
           cardsStudied: sessions.reduce((sum, s) => sum + s.cardsStudied, 0),
-          studyStreak: calculateStudyStreak(
-            sessions.map((s) => new Date(s.startedAt).getTime()).filter((t) => Number.isFinite(t))
-          ),
+          studyStreak,
           recentSessions: sessions.slice(0, 3),
           recentPracticeAttempts,
           topWeaknesses,
           examAttemptsCount: attempts.length,
           primaryExamType,
+          retentionRate,
+          cardsStudiedToday,
+          goalProgress,
+          motivationMessage,
           latestPracticePercentage:
             typeof latestAttempt?.percentage === "number" && Number.isFinite(latestAttempt.percentage)
               ? latestAttempt.percentage
@@ -420,12 +428,53 @@ export default function Dashboard() {
     };
 
     void loadDashboard();
-  }, [session?.user?.id, isTeacher]);
+  }, [session?.user?.id, isTeacher, isParent]);
+
+  const handlePracticeWeakness = (weakness: WeaknessEntry) => {
+    const subject = subjectLookup.find((s) => weakness.subjects.includes(s.subject));
+    const params = new URLSearchParams();
+    if (subject) params.set("subjectId", subject.id);
+    params.set("topic", weakness.tag);
+    router.push(`/dashboard/ai-questions?${params.toString()}`);
+  };
+
+  const handleGenerateWeaknessFlashcards = async (weakness: WeaknessEntry) => {
+    const subject = subjectLookup.find((s) => weakness.subjects.includes(s.subject));
+    if (!subject?.exam_board || !subject?.exam_type) {
+      showToast("error", "Add this subject with its exam board and type on the Subjects page first.");
+      return;
+    }
+    setIsGeneratingFlashcards(true);
+    try {
+      const response = await fetch("/api/ai/generate-flashcards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `Fix: ${weakness.tag}`.slice(0, 120),
+          subject: subject.subject,
+          examBoard: subject.exam_board,
+          examType: subject.exam_type,
+          prompt: `The student keeps losing marks on this recurring exam-practice weakness: "${weakness.tag}". Create flashcards that directly target and help fix this specific weakness, not general subject revision.`,
+          cardCount: 12,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        showToast("error", body.error || "Could not generate flashcards for this weakness.");
+        return;
+      }
+      showToast("success", `Created ${body.created} flashcards to fix this weakness. Check your Flashcards page.`);
+    } catch {
+      showToast("error", "Could not generate flashcards due to a network error.");
+    } finally {
+      setIsGeneratingFlashcards(false);
+    }
+  };
 
   const displayName =
     profile?.first_name || profile?.username || session?.user.email?.split("@")[0] || "there";
 
-  if (isAuthLoading || isTeacher) return null;
+  if (isAuthLoading || isTeacher || isParent) return null;
 
   return (
     <div className="space-y-6">
@@ -601,7 +650,14 @@ export default function Dashboard() {
                   className="grid gap-3 px-5 py-4 transition hover:bg-indigo-50/50 dark:hover:bg-indigo-500/8 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{attempt.topic}</p>
+                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                      {attempt.topic}
+                      {attempt.attemptMode === "mock" ? (
+                        <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
+                          Mock
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                       {capitalize(attempt.subject)} - {attempt.examType === "a-level" ? "A-Level" : "GCSE"} - {formatDate(attempt.createdAt)}
                     </p>
@@ -629,59 +685,97 @@ export default function Dashboard() {
       {/* ── Learning Journey + Recent Sessions ─────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
 
-        {/* AI Learning Journey */}
+        {/* Recommended Next Step (fed by weakness_tags + due reviews, not a static checklist) */}
         <section className="flex flex-col">
           <div className="mb-4 flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-blue-500 to-cyan-500">
-              <BookOpen className="h-4 w-4 text-white" />
+              <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">AI Learning Journey</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recommended Next Step</h2>
           </div>
 
           <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
-            <p className="mb-6 text-sm text-slate-600 dark:text-slate-400">
-              Follow this AI-optimised study cycle to maximise your exam readiness.
-            </p>
+            {isLoading ? (
+              <div className="space-y-3">
+                <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
+                <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+              </div>
+            ) : (
+              <>
+                {metrics.motivationMessage ? (
+                  <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">{metrics.motivationMessage}</p>
+                ) : null}
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-              {learningSteps.map((step) => {
-                const Icon = step.icon;
-                return (
-                  <Link
-                    key={step.step}
-                    href={step.href}
-                    className="group relative flex flex-col items-center rounded-xl border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/3 p-4 text-center shadow-sm dark:shadow-none transition-all hover:border-indigo-200 dark:hover:border-indigo-500/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-500/5 hover:-translate-y-0.5 hover:shadow-md dark:hover:shadow-indigo-500/5"
-                  >
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br ${step.from} ${step.to} shadow-md group-hover:scale-110 transition-transform`}>
-                      <Icon className="h-5 w-5 text-white" />
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center dark:border-white/6 dark:bg-white/3">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Retention</p>
+                    <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{Math.round(metrics.retentionRate)}%</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center dark:border-white/6 dark:bg-white/3">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Today&apos;s goal</p>
+                    <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{metrics.cardsStudiedToday}/{DEFAULT_DAILY_GOAL}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center dark:border-white/6 dark:bg-white/3">
+                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Streak</p>
+                    <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{metrics.studyStreak}d</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex-1">
+                  {metrics.topWeaknesses[0] ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
+                      <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        Your most common weak area: &ldquo;{metrics.topWeaknesses[0].tag}&rdquo;
+                      </p>
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                        {metrics.topWeaknesses[0].subjects.map(getSubjectLabel).join(", ")} · seen {metrics.topWeaknesses[0].count}×
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePracticeWeakness(metrics.topWeaknesses[0])}
+                          className={buttonStyles({ variant: "primary", size: "sm" })}
+                        >
+                          Practice this topic
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateWeaknessFlashcards(metrics.topWeaknesses[0])}
+                          disabled={isGeneratingFlashcards}
+                          className={buttonStyles({ variant: "secondary", size: "sm" })}
+                        >
+                          {isGeneratingFlashcards ? "Generating..." : "Generate flashcards"}
+                        </button>
+                      </div>
                     </div>
-                    <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 dark:bg-white/10 text-[9px] font-bold text-slate-600 dark:text-slate-400">
-                      {step.step}
-                    </span>
-                    <p className="mt-2.5 text-xs font-bold text-slate-900 dark:text-white">{step.title}</p>
-                    <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 leading-snug">{step.description}</p>
-                  </Link>
-                );
-              })}
-            </div>
-
-            <div className="mt-auto pt-5 flex flex-wrap items-center gap-3">
-              <Link
-                href="/dashboard/notes"
-                className={buttonStyles({ variant: 'primary' })}
-              >
-                Begin Journey
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              {metrics.dueCards > 0 && (
-                <p className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-500/20 text-[10px] font-bold text-amber-700 dark:text-amber-400">
-                    {metrics.dueCards}
-                  </span>
-                  cards due for Flashcard Revision
-                </p>
-              )}
-            </div>
+                  ) : metrics.dueCards > 0 ? (
+                    <Link
+                      href="/dashboard/study-sessions"
+                      className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm font-semibold text-indigo-900 transition hover:bg-indigo-100 dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-indigo-100"
+                    >
+                      {metrics.dueCards} cards are due for review
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  ) : metrics.examAttemptsCount === 0 ? (
+                    <Link
+                      href="/dashboard/ai-questions"
+                      className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100"
+                    >
+                      Take your first Smart Practice test to get personalised recommendations
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/dashboard/ai-questions"
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-white/6 dark:bg-white/3 dark:text-slate-200"
+                    >
+                      Keep practising to sharpen your predicted grades
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </section>
 

@@ -8,9 +8,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { useAuth } from '@/hooks/useAuth';
-import { createClient } from '@/lib/supabase-client';
-import { buildSpecString } from '@/lib/ai/subjectConfig';
-import { normalizeBoard, normalizeExamType } from '@/lib/ai/validation';
+import { PageLoader } from '@/components/PageLoader';
 import type { PlotSpec } from '@/types';
 
 type AssignmentQuestion = {
@@ -45,20 +43,13 @@ type AssignmentRow = {
   description: string | null;
   questions_payload: AssignmentQuestion[];
   source_material: string | null;
-  classes: {
-    specifications: {
-      name: string;
-      tier: string | null;
-      subjects: { name: string; exam_boards: { name: string; qualifications: { name: string } | null } | null } | null;
-    } | null;
-  } | null;
+  allow_reattempts: boolean;
 };
 
 export default function TakeAssignmentPage() {
   const { classId, assignmentId } = useParams<{ classId: string; assignmentId: string }>();
   const router = useRouter();
   const { session, isLoading } = useAuth();
-  const supabase = createClient();
 
   const [assignment, setAssignment] = useState<AssignmentRow | null>(null);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -74,33 +65,25 @@ export default function TakeAssignmentPage() {
     const load = async () => {
       setPageLoading(true);
 
-      const { data: assignmentRow, error: assignmentError } = await supabase
-        .from('assignments')
-        .select(
-          'id, title, description, questions_payload, source_material, classes ( specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
-        )
-        .eq('id', assignmentId)
-        .maybeSingle();
+      // The server strips answer-key fields (correctOption/markScheme/
+      // modelAnswer) unless this student has already completed the assignment.
+      const response = await fetch(`/api/assignments/${assignmentId}`);
+      const body = await response.json();
 
       if (cancelled) return;
-      if (assignmentError || !assignmentRow) {
+      if (!response.ok) {
         router.replace(`/dashboard/classes/${classId}`);
         return;
       }
-      const typedAssignment = assignmentRow as unknown as AssignmentRow;
+
+      const typedAssignment = body.assignment as AssignmentRow;
       setAssignment(typedAssignment);
       setAnswers(new Array(typedAssignment.questions_payload?.length ?? 0).fill(''));
 
-      const { data: attemptRow } = await supabase
-        .from('assignment_attempts')
-        .select('answers_payload, ai_feedback, status')
-        .eq('assignment_id', assignmentId)
-        .eq('student_id', session.user.id)
-        .maybeSingle();
-
-      if (!cancelled && attemptRow?.status === 'completed') {
-        setAnswers((attemptRow.answers_payload as string[]) ?? []);
-        setReport((attemptRow.ai_feedback as MarkingReport) ?? null);
+      const attemptRow = body.attempt as { answers_payload: string[] | null; ai_feedback: MarkingReport | null; status: string } | null;
+      if (attemptRow?.status === 'completed') {
+        setAnswers(attemptRow.answers_payload ?? []);
+        setReport(attemptRow.ai_feedback ?? null);
       }
 
       setPageLoading(false);
@@ -110,7 +93,7 @@ export default function TakeAssignmentPage() {
     return () => {
       cancelled = true;
     };
-  }, [isLoading, session, router, supabase, classId, assignmentId]);
+  }, [isLoading, session, router, classId, assignmentId]);
 
   const updateAnswer = (index: number, value: string) => {
     setAnswers((prev) => prev.map((a, i) => (i === index ? value : a)));
@@ -126,62 +109,29 @@ export default function TakeAssignmentPage() {
       return;
     }
 
-    const subjectChain = assignment.classes?.specifications?.subjects;
-    const board = subjectChain?.exam_boards;
-    const qualification = board?.qualifications;
-    const examBoard = normalizeBoard(board?.name);
-    const examType = normalizeExamType(qualification?.name);
-    if (!subjectChain || !examBoard || !examType) {
-      setError('This assignment is missing curriculum details.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
+      // The server fetches the stored questions and curriculum details for
+      // this assignment, marks the answers, and persists the attempt itself.
       const response = await fetch('/api/ai/mark-answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: assignment.title,
-          subject: subjectChain.name.toLowerCase(),
-          examBoard,
-          examType,
-          specification: buildSpecString(assignment.classes?.specifications?.name ?? '', assignment.classes?.specifications?.tier ?? '', ''),
-          sourceMaterial: assignment.source_material || '',
-          questions: assignment.questions_payload,
-          answers,
-        }),
+        body: JSON.stringify({ assignmentId, answers }),
       });
       const body = await response.json();
+      if (response.status === 409 && body.report) {
+        // Already submitted (e.g. from another tab) -- show the stored report.
+        setReport(body.report as MarkingReport);
+        setIsSubmitting(false);
+        return;
+      }
       if (!response.ok) {
         setError(body.error || 'Marking failed.');
         setIsSubmitting(false);
         return;
       }
 
-      const markedReport = body.report as MarkingReport;
-      const { error: saveError } = await supabase.from('assignment_attempts').upsert(
-        {
-          assignment_id: assignmentId,
-          student_id: session.user.id,
-          completed_at: new Date().toISOString(),
-          answers_payload: answers,
-          score: markedReport.totalMarksAwarded,
-          percentage: markedReport.percentage,
-          predicted_grade: markedReport.predictedGrade,
-          ai_feedback: markedReport,
-          status: 'completed',
-        },
-        { onConflict: 'assignment_id,student_id' }
-      );
-
-      if (saveError) {
-        setError('Marked, but could not save your attempt. Please try again.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      setReport(markedReport);
+      setReport(body.report as MarkingReport);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit answers.');
     } finally {
@@ -190,7 +140,7 @@ export default function TakeAssignmentPage() {
   };
 
   if (isLoading || pageLoading || !assignment) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading assignment...</p>;
+    return <PageLoader text="Loading assignment..." />;
   }
 
   const questions = assignment.questions_payload ?? [];
@@ -219,9 +169,16 @@ export default function TakeAssignmentPage() {
 
       {report ? (
         <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-500/30 dark:bg-indigo-500/10">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-            {Math.round(report.totalMarksAwarded)}/{Math.round(report.totalAvailableMarks)} marks · {Math.round(report.percentage)}% · Predicted grade {report.predictedGrade}
-          </h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {Math.round(report.totalMarksAwarded)}/{Math.round(report.totalAvailableMarks)} marks · {Math.round(report.percentage)}% · Predicted grade {report.predictedGrade}
+            </h2>
+            {assignment.allow_reattempts && (
+              <button type="button" onClick={() => setReport(null)} className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
+                Try again
+              </button>
+            )}
+          </div>
           <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">{report.summary}</p>
         </div>
       ) : null}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { extractChatMessageText, type ChatCompletionsResponseBody } from '@/lib/ai/json';
+import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { cleanText } from '@/lib/ai/text';
 
 type ChatRole = 'user' | 'assistant';
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
     if (authError || !authData.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.studyChat);
+    if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
 
     const rawBody = (await request.json()) as StudyChatPayload;
     const payload = {

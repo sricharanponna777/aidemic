@@ -165,14 +165,14 @@ export default function Flashcards() {
     : '';
 
   return (
-    <div className="space-y-8">
+    <main className="space-y-8" aria-labelledby="flashcards-title">
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 3 of 5</p>
             <div className="mt-2 flex items-center gap-3">
               <Layers className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="notes-title" className="text-3xl font-bold text-slate-900 dark:text-white">Flashcards</h1>
+              <h1 id="flashcards-title" className="text-3xl font-bold text-slate-900 dark:text-white">Flashcards</h1>
             </div>
             <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
               Build flashcards from what you learned.
@@ -235,11 +235,13 @@ export default function Flashcards() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search deck names or descriptions..."
+            aria-label="Search deck names or descriptions"
             className="min-w-55 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
           />
           <select
             value={sortBy}
             onChange={(event) => setSortBy(event.target.value as 'recent' | 'name' | 'cards')}
+            aria-label="Sort decks"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-200"
           >
             <option value="recent">Sort: Recently updated</option>
@@ -269,6 +271,7 @@ export default function Flashcards() {
                 onClick={() => handleDeleteDeck(deck.id)}
                 className={buttonStyles({ variant: 'danger-ghost', size: 'icon' })}
                 title="Delete deck"
+                aria-label={`Delete deck "${deck.name}"`}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -303,13 +306,19 @@ export default function Flashcards() {
       {showCreate ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-2xl">
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Create deck</h2>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-deck-title"
+            className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-2xl"
+          >
+            <h2 id="create-deck-title" className="text-xl font-semibold text-slate-900 dark:text-slate-100">Create deck</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Name your deck and start adding cards.</p>
             <input
               value={newDeckName}
               onChange={(event) => setNewDeckName(event.target.value)}
               placeholder="Example: Renal Physiology Midterm"
+              aria-label="Deck name"
               className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
             />
             <div className="mt-5 flex justify-end gap-2">
@@ -323,6 +332,6 @@ export default function Flashcards() {
           </div>
         </div>
       ) : null}
-    </div>
+    </main>
   );
 }

@@ -41,6 +41,29 @@ export async function proxy(request: NextRequest) {
       redirectUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(redirectUrl);
     }
+
+    // Defense-in-depth only: RLS is the real authorization backstop. These
+    // checks just stop an unauthorized user from ever rendering the page.
+    if (pathname.startsWith('/dashboard/teacher')) {
+      const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user!.id).maybeSingle();
+      if (profile?.role !== 'teacher') {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+    }
+
+    if (pathname.startsWith('/dashboard/parent')) {
+      const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user!.id).maybeSingle();
+      if (profile?.role !== 'parent') {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+    }
+
+    if (pathname.startsWith('/dashboard/admin')) {
+      const { data: adminRow } = await supabase.from('platform_admins').select('user_id').eq('user_id', user!.id).maybeSingle();
+      if (!adminRow) {
+        return NextResponse.redirect(new URL('/dashboard', request.url));
+      }
+    }
   }
 
   if (pathname === '/login' && isAuthenticated) {

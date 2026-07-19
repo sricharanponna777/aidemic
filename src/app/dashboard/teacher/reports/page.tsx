@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import { buildClassStats, buildStudentStats, buildTopicStats } from '@/lib/teacherAnalytics';
 import { scoreBadgeTone, scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
+import { PageLoader } from '@/components/PageLoader';
 
 type Tab = 'class' | 'individual' | 'predictions';
 
@@ -49,11 +50,37 @@ export default function TeacherReportsPage() {
               status: attempt?.status ?? 'not_started',
               percentage: attempt?.percentage ?? null,
               predictedGrade: attempt?.predicted_grade ?? null,
+              completedAt: attempt?.completed_at ?? null,
             };
           });
 
+  const topicMasteryTrend = useMemo(() => {
+    const byTopic = new Map<string, { completedAt: string; percentage: number }[]>();
+    for (const a of studentAssignments) {
+      if (a.percentage === null || !a.completedAt) continue;
+      const key = a.topic ?? 'General';
+      const entry = byTopic.get(key) ?? [];
+      entry.push({ completedAt: a.completedAt, percentage: a.percentage });
+      byTopic.set(key, entry);
+    }
+    return [...byTopic.entries()]
+      .map(([name, points]) => ({ name, points: points.sort((a, b) => a.completedAt.localeCompare(b.completedAt)) }))
+      .filter((t) => t.points.length > 1)
+      .sort((a, b) => a.points[a.points.length - 1].percentage - b.points[b.points.length - 1].percentage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveStudentId, effectiveClassId, assignments, attempts]);
+
+  const weaknessHeatmap = useMemo(() => {
+    if (loading) return { topics: [], classNames: [] as string[], cellByKey: new Map<string, number | null>() };
+    const allTopicStats = buildTopicStats(data);
+    const classNames = [...new Set(allTopicStats.map((t) => t.className))];
+    const topics = [...new Set(allTopicStats.map((t) => t.name))];
+    const cellByKey = new Map(allTopicStats.map((t) => [`${t.name}::${t.className}`, t.avgScore]));
+    return { topics, classNames, cellByKey };
+  }, [loading, data]);
+
   if (loading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading reports...</p>;
+    return <PageLoader text="Loading reports..." />;
   }
 
   const selectClass =
@@ -163,6 +190,46 @@ export default function TeacherReportsPage() {
                   </div>
                 )}
               </section>
+
+              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Weakness heatmap</h2>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Average score by topic across all your classes.</p>
+                {weaknessHeatmap.topics.length === 0 ? (
+                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No assignments yet.</p>
+                ) : (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full min-w-130 text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/6 dark:text-slate-400">
+                          <th className="pb-2 pr-4 font-medium">Topic</th>
+                          {weaknessHeatmap.classNames.map((className) => (
+                            <th key={className} className="pb-2 pr-4 text-center font-medium">
+                              {className}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weaknessHeatmap.topics.map((topicName) => (
+                          <tr key={topicName} className="border-b border-slate-100 last:border-0 dark:border-white/4">
+                            <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">{topicName}</td>
+                            {weaknessHeatmap.classNames.map((className) => {
+                              const avgScore = weaknessHeatmap.cellByKey.get(`${topicName}::${className}`) ?? null;
+                              return (
+                                <td key={className} className="py-2 pr-4 text-center">
+                                  <span className={`inline-block min-w-12 rounded-full px-2 py-0.5 text-xs font-semibold ${scoreBadgeTone(avgScore)}`}>
+                                    {avgScore === null ? '—' : `${avgScore}%`}
+                                  </span>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
             </div>
           )}
 
@@ -231,11 +298,41 @@ export default function TeacherReportsPage() {
                           ) : (
                             <span className="capitalize text-slate-400 dark:text-slate-500">{a.status.replace('_', ' ')}</span>
                           )}
+                          {a.status === 'completed' && (
+                            <Link
+                              href={`/dashboard/teacher/classes/${effectiveClassId}/assignments/${a.id}/students/${effectiveStudentId}`}
+                              className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                            >
+                              View answers
+                            </Link>
+                          )}
                         </div>
                       </div>
                     ))}
                     {studentAssignments.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">No assignments in this class yet.</p>}
                   </div>
+
+                  {topicMasteryTrend.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Topic mastery over time</h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Score progression across completed attempts on the same topic, oldest first.</p>
+                      <div className="mt-3 space-y-2">
+                        {topicMasteryTrend.map((topic) => (
+                          <div key={topic.name} className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="w-32 shrink-0 font-medium text-slate-700 dark:text-slate-300">{topic.name}</span>
+                            <div className="flex flex-wrap items-center gap-1">
+                              {topic.points.map((point, index) => (
+                                <span key={`${topic.name}-${index}`} className="flex items-center gap-1">
+                                  {index > 0 && <span className="text-slate-300 dark:text-slate-600">→</span>}
+                                  <span className={`rounded-full px-2 py-0.5 font-semibold ${scoreBadgeTone(point.percentage)}`}>{point.percentage}%</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </section>

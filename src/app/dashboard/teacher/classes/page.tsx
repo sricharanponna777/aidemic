@@ -9,6 +9,8 @@ import { VerificationBanner } from '@/components/VerificationBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
+import { PageLoader } from '@/components/PageLoader';
+import { useToast } from '@/components/ToastProvider';
 import {
   getExamBoardLabel,
   getSpecEntries,
@@ -60,6 +62,7 @@ export default function TeacherDashboardPage() {
   const router = useRouter();
   const { session, profile, isLoading } = useAuth();
   const supabase = createClient();
+  const { showToast } = useToast();
 
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -285,6 +288,8 @@ export default function TeacherDashboardPage() {
     const { error } = await supabase.from('classes').update({ name: trimmed }).eq('id', classId);
     if (!error) {
       setClasses((prev) => prev.map((c) => (c.id === classId ? { ...c, name: trimmed } : c)));
+    } else {
+      showToast('error', 'Failed to rename class. Please try again.');
     }
   };
 
@@ -293,6 +298,8 @@ export default function TeacherDashboardPage() {
     const { error } = await supabase.from('classes').update({ status: nextStatus }).eq('id', cls.id);
     if (!error) {
       setClasses((prev) => prev.map((c) => (c.id === cls.id ? { ...c, status: nextStatus } : c)));
+    } else {
+      showToast('error', `Failed to ${nextStatus === 'archived' ? 'archive' : 'restore'} class. Please try again.`);
     }
   };
 
@@ -301,11 +308,13 @@ export default function TeacherDashboardPage() {
     setPendingDeleteId(null);
     if (!error) {
       setClasses((prev) => prev.filter((c) => c.id !== classId));
+    } else {
+      showToast('error', 'Failed to delete class. Please try again.');
     }
   };
 
   if (isLoading || classesLoading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading your classes...</p>;
+    return <PageLoader text="Loading your classes..." />;
   }
 
   const activeClasses = classes.filter((c) => c.status !== 'archived');

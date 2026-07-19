@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
+import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { isDataAnalysisObjective } from '@/lib/ai/text';
 import { LATEX_COMMAND_PATTERN, normalizeLatexControlCharacters } from '@/lib/mathText';
@@ -93,6 +94,9 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.generateVideo);
+    if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
 
     const { script, slides } = await generateNotes(concept, subtopic, learningObjective, paper, subject, duration, examBoard, examType, specification);
 

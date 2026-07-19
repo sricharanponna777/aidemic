@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, useTheme } from "@/hooks/useTheme";
+import { useSfxMuted } from "@/hooks/useSfxMuted";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Moon, Sun } from "lucide-react";
+import { BookOpen, LogOut, Moon, Sun, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
 
@@ -16,6 +17,7 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isThemeSaving, setIsThemeSaving] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { muted, toggleMuted } = useSfxMuted();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -211,6 +213,24 @@ export default function Settings() {
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           {isThemeSaving ? "Saving preference..." : "Preference is saved to your profile."}
         </p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none sm:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Sound effects</h2>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Clicks and keystrokes make a subtle sound as you use AIDemic.</p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleMuted}
+            aria-pressed={!muted}
+            className={buttonStyles({ variant: muted ? "secondary" : "primary" })}
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            {muted ? "Muted" : "On"}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl bg-red-50 p-6 dark:bg-red-950/60 dark:ring-1 dark:ring-red-800/70 sm:p-8">

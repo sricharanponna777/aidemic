@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { sfx, preloadSfx } from '@/lib/sfx';
+import { useSfxMuted } from '@/hooks/useSfxMuted';
 
 const SKIP_KEYS = new Set([
   'Control', 'Alt', 'Shift', 'Meta', 'CapsLock', 'Tab', 'Escape',
@@ -12,10 +13,18 @@ const SKIP_KEYS = new Set([
 ]);
 
 export function SfxProvider({ children }: { children: React.ReactNode }) {
+  const { muted } = useSfxMuted();
+  const mutedRef = useRef(muted);
+
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
+
   useEffect(() => {
     preloadSfx();
 
     const onPointerDown = (e: PointerEvent) => {
+      if (mutedRef.current) return;
       const target = e.target as HTMLElement;
       if (target.closest('button:not([disabled])') || target.closest('a[href]')) {
         sfx.click();
@@ -23,6 +32,7 @@ export function SfxProvider({ children }: { children: React.ReactNode }) {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (mutedRef.current) return;
       if (e.repeat || SKIP_KEYS.has(e.key)) return;
       const target = e.target as HTMLElement;
       const isTyping =

@@ -21,7 +21,11 @@ AIDemic is an AI-powered study platform built on **Next.js 16 App Router** with 
 
 ### Route Protection
 
-Middleware in [src/proxy.ts](src/proxy.ts) guards `/dashboard/*` routes using `supabase.auth.getUser()`. Unauthenticated requests redirect to `/login`; authenticated users visiting `/login` redirect to `/dashboard`.
+Middleware in [src/proxy.ts](src/proxy.ts) guards `/dashboard/*` routes using `supabase.auth.getUser()`. Unauthenticated requests redirect to `/login`; authenticated users visiting `/login` redirect to `/dashboard`. Role gating for `/dashboard/teacher/*`, `/dashboard/admin/*`, and `/dashboard/parent/*` is also enforced here (defense-in-depth only — RLS is the real backstop).
+
+### Roles
+
+`user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student: a student generates an invite code on [src/app/dashboard/family/page.tsx](src/app/dashboard/family/page.tsx), a parent redeems it via the `redeem_parent_invite_code()` RPC (onboarding or [src/app/dashboard/parent/page.tsx](src/app/dashboard/parent/page.tsx)). The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper (migration `20260720100000`) drive every cross-role SELECT policy — parents never get a write policy on any table.
 
 ### Supabase Clients
 
@@ -60,6 +64,7 @@ Copy `.env.local.example` to `.env.local`. Required variables:
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY  # server-only; bypasses RLS; needed for assignment marking
 OPENAI_API_KEY          # or equivalent for OpenRouter/local LLM
 ```
 
@@ -67,7 +72,27 @@ See `.env.local.example` for the full list including OpenRouter and local LLM op
 
 ## Database
 
-The full schema lives in [queries.sql](queries.sql). **It contains destructive `DROP TABLE` statements** — always back up data before re-running it. Apply schema changes through the Supabase SQL editor or Supabase MCP tools.
+The core student schema lives in [queries.sql](queries.sql). **It contains destructive `DROP TABLE` statements** — always back up data before re-running it. It does not include the teacher/class/school/podcast tables — for those, the migrations in `supabase/migrations/` are the source of truth. Apply schema changes through the Supabase SQL editor or Supabase MCP tools.
+
+### Weekly parent digest (Resend + Edge Function + pg_cron)
+
+[supabase/functions/weekly-parent-digest/index.ts](supabase/functions/weekly-parent-digest/index.ts) emails each parent a weekly summary of their linked children (streak, assignments completed, weak topics, latest predicted grades). It is triggered by `trigger_weekly_parent_digest()`, a `pg_cron` job scheduled in migration `20260720100000` for Mondays at 08:00 UTC via `pg_net`. One-time setup after applying that migration:
+
+```bash
+supabase functions deploy weekly-parent-digest --no-verify-jwt
+supabase secrets set RESEND_API_KEY=re_xxx RESEND_FROM_EMAIL="AIDemic <digest@yourdomain.com>" CRON_SECRET=some-random-string
+```
+
+Then, in the Supabase SQL editor:
+
+```sql
+insert into app_config (key, value) values
+  ('weekly_digest_function_url', 'https://<project-ref>.functions.supabase.co/weekly-parent-digest'),
+  ('weekly_digest_cron_secret', 'some-random-string') -- must match CRON_SECRET above
+on conflict (key) do update set value = excluded.value;
+```
+
+`RESEND_FROM_EMAIL` must be a domain verified in Resend; until then it falls back to Resend's shared `onboarding@resend.dev` sender.
 
 ## Guidelines for changes
 

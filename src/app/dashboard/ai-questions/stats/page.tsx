@@ -24,6 +24,7 @@ type AttemptRow = {
   weakness_tags: string[] | null;
   weakness_analysis: string[] | null;
   created_at: string | null;
+  attempt_mode: string | null;
 };
 
 type SubjectRow = {
@@ -73,7 +74,7 @@ export default function SmartPracticeStatsPage() {
       const [attemptsResponse, subjectsResponse] = await Promise.all([
         supabase
           .from('exam_practice_attempts')
-          .select('id, subject, exam_board, exam_type, topic, total_marks_awarded, total_available_marks, percentage, predicted_grade, weakness_tags, weakness_analysis, created_at')
+          .select('id, subject, exam_board, exam_type, topic, total_marks_awarded, total_available_marks, percentage, predicted_grade, weakness_tags, weakness_analysis, created_at, attempt_mode')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false }),
         supabase
@@ -260,7 +261,14 @@ export default function SmartPracticeStatsPage() {
                   className="grid gap-3 px-5 py-4 transition hover:bg-indigo-50/50 dark:hover:bg-indigo-500/8 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{attempt.topic}</p>
+                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                      {attempt.topic}
+                      {attempt.attempt_mode === 'mock' ? (
+                        <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
+                          Mock
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                       {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {formatTieredExamLabel(
                         attempt.exam_type,

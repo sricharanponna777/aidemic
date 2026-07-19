@@ -132,40 +132,42 @@ export function useTeacherClassData(): TeacherClassData {
         return;
       }
 
-      const { data: assignmentRows } = await supabase
-        .from('assignments')
-        .select('id, title, class_id, assignment_type, topic_id, topics ( name ), due_date, created_at')
-        .in('class_id', classIds)
-        .order('created_at', { ascending: false });
-      if (cancelled) return;
-      const assignmentList = (assignmentRows as unknown as TeacherAssignment[]) ?? [];
-      setAssignments(assignmentList);
+      const assignmentsChain = async () => {
+        const { data: assignmentRows } = await supabase
+          .from('assignments')
+          .select('id, title, class_id, assignment_type, topic_id, topics ( name ), due_date, created_at')
+          .in('class_id', classIds)
+          .order('created_at', { ascending: false });
+        const assignmentList = (assignmentRows as unknown as TeacherAssignment[]) ?? [];
 
-      const assignmentIds = assignmentList.map((a) => a.id);
-      if (assignmentIds.length > 0) {
+        const assignmentIds = assignmentList.map((a) => a.id);
+        if (assignmentIds.length === 0) return { assignmentList, attemptList: [] as TeacherAttempt[] };
+
         const { data: attemptRows } = await supabase
           .from('assignment_attempts')
           .select('assignment_id, student_id, status, percentage, predicted_grade, completed_at, started_at')
           .in('assignment_id', assignmentIds);
-        if (cancelled) return;
-        setAttempts((attemptRows as TeacherAttempt[]) ?? []);
-      } else {
-        setAttempts([]);
-      }
+        return { assignmentList, attemptList: (attemptRows as TeacherAttempt[]) ?? [] };
+      };
 
-      const { data: rosterRows } = await supabase
-        .from('class_students')
-        .select('id, student_id, class_id, joined_at')
-        .in('class_id', classIds)
-        .eq('status', 'active');
-      const typedRoster = (rosterRows ?? []) as { id: string; student_id: string; class_id: string; joined_at: string | null }[];
-      const studentIds = [...new Set(typedRoster.map((r) => r.student_id))];
-      let profiles: { id: string; full_name: string | null; email: string | null }[] = [];
-      if (studentIds.length > 0) {
+      const rosterChain = async () => {
+        const { data: rosterRows } = await supabase
+          .from('class_students')
+          .select('id, student_id, class_id, joined_at')
+          .in('class_id', classIds)
+          .eq('status', 'active');
+        const typedRoster = (rosterRows ?? []) as { id: string; student_id: string; class_id: string; joined_at: string | null }[];
+        const studentIds = [...new Set(typedRoster.map((r) => r.student_id))];
+        if (studentIds.length === 0) return { typedRoster, profiles: [] as { id: string; full_name: string | null; email: string | null }[] };
+
         const { data: profileRows } = await supabase.from('user_profiles').select('id, full_name, email').in('id', studentIds);
-        profiles = profileRows ?? [];
-      }
+        return { typedRoster, profiles: (profileRows ?? []) as { id: string; full_name: string | null; email: string | null }[] };
+      };
+
+      const [{ assignmentList, attemptList }, { typedRoster, profiles }] = await Promise.all([assignmentsChain(), rosterChain()]);
       if (cancelled) return;
+      setAssignments(assignmentList);
+      setAttempts(attemptList);
       setStudents(
         typedRoster.map((r) => {
           const p = profiles.find((prof) => prof.id === r.student_id);

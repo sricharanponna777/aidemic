@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -163,6 +164,11 @@ const SS_REPORT = 'exam-report';
 const SS_SUBJECT_ID = 'exam-subject-id';
 const SS_FORM = 'exam-form';
 const SS_SESSION_META = 'exam-session-meta';
+const SS_MOCK_MODE = 'exam-mock-mode';
+const SS_MOCK_DURATION = 'exam-mock-duration';
+const SS_MOCK_DEADLINE = 'exam-mock-deadline';
+
+const MOCK_DURATION_OPTIONS = [30, 45, 60, 90] as const;
 
 type SessionMeta = {
   topic: string;
@@ -190,6 +196,26 @@ function ssWrite(key: string, value: unknown) {
     }
   } catch {}
 }
+
+// A "Practice this topic" action elsewhere in the app (e.g. the dashboard's weak-topic
+// recommendation) can link here with ?subjectId=...&topic=... to jump straight into a
+// pre-filled practice setup. Read once via lazy useState initializers below, so the
+// deep link overrides whatever was restored from sessionStorage without needing an effect.
+function readDeepLinkParams(): { subjectId: string; topic: string } {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return { subjectId: params.get('subjectId') || '', topic: params.get('topic') || '' };
+  } catch {
+    return { subjectId: '', topic: '' };
+  }
+}
+
+const formatCountdown = (seconds: number) => {
+  const safeSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${minutes}:${remainder.toString().padStart(2, '0')}`;
+};
 
 const reportTone = (percentage: number) => {
   if (percentage >= 75) return 'text-emerald-700 dark:text-emerald-300';
@@ -250,6 +276,7 @@ function CalculationAnswerEditor({
           <button
             type="button"
             title="Inline math"
+            aria-label="Insert inline math"
             onClick={() => insertSnippet('\\(x\\)', 3)}
             className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
           >
@@ -258,6 +285,7 @@ function CalculationAnswerEditor({
           <button
             type="button"
             title="Power"
+            aria-label="Insert power notation"
             onClick={() => insertSnippet('\\(x^{2}\\)', 3)}
             className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
           >
@@ -266,6 +294,7 @@ function CalculationAnswerEditor({
           <button
             type="button"
             title="Fraction"
+            aria-label="Insert fraction"
             onClick={() => insertSnippet('\\(\\frac{a}{b}\\)', 8)}
             className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
           >
@@ -274,6 +303,7 @@ function CalculationAnswerEditor({
           <button
             type="button"
             title="Square root"
+            aria-label="Insert square root"
             onClick={() => insertSnippet('\\(\\sqrt{x}\\)', 8)}
             className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
           >
@@ -305,18 +335,51 @@ function CalculationAnswerEditor({
 export default function AIQuestionsPage() {
   const { session } = useAuth();
   const supabase = createClient();
+  const router = useRouter();
 
-  const [form, setForm] = useState<AIGenerateForm>(() => ssRead<AIGenerateForm>(SS_FORM, defaultForm));
+  const [form, setForm] = useState<AIGenerateForm>(() => {
+    const deepLink = readDeepLinkParams();
+    const base = ssRead<AIGenerateForm>(SS_FORM, defaultForm);
+    return deepLink.topic ? { ...base, topic: deepLink.topic } : base;
+  });
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMarking, setIsMarking] = useState(false);
-  const [questions, setQuestions] = useState<ExamQuestion[]>(() => ssRead<ExamQuestion[]>(SS_QUESTIONS, []));
-  const [answers, setAnswers] = useState<string[]>(() => ssRead<string[]>(SS_ANSWERS, []));
-  const [sourceMaterial, setSourceMaterial] = useState(() => ssRead(SS_SOURCE, ''));
-  const [report, setReport] = useState<MarkingReport | null>(() => ssRead<MarkingReport | null>(SS_REPORT, null));
+  const [questions, setQuestions] = useState<ExamQuestion[]>(() => {
+    const deepLink = readDeepLinkParams();
+    return deepLink.subjectId || deepLink.topic ? [] : ssRead<ExamQuestion[]>(SS_QUESTIONS, []);
+  });
+  const [answers, setAnswers] = useState<string[]>(() => {
+    const deepLink = readDeepLinkParams();
+    return deepLink.subjectId || deepLink.topic ? [] : ssRead<string[]>(SS_ANSWERS, []);
+  });
+  const [sourceMaterial, setSourceMaterial] = useState(() => {
+    const deepLink = readDeepLinkParams();
+    return deepLink.subjectId || deepLink.topic ? '' : ssRead(SS_SOURCE, '');
+  });
+  const [report, setReport] = useState<MarkingReport | null>(() => {
+    const deepLink = readDeepLinkParams();
+    return deepLink.subjectId || deepLink.topic ? null : ssRead<MarkingReport | null>(SS_REPORT, null);
+  });
   const { subjects: userSubjects, isLoading: subjectsLoading, error: subjectsError } = useUserSubjects();
-  const [selectedSubjectId, setSelectedSubjectId] = useState(() => ssRead(SS_SUBJECT_ID, ''));
-  const [sessionMeta, setSessionMeta] = useState<SessionMeta | null>(() => ssRead<SessionMeta | null>(SS_SESSION_META, null));
+  const [selectedSubjectId, setSelectedSubjectId] = useState(() => {
+    const deepLink = readDeepLinkParams();
+    return deepLink.subjectId || ssRead(SS_SUBJECT_ID, '');
+  });
+  const [sessionMeta, setSessionMeta] = useState<SessionMeta | null>(() => {
+    const deepLink = readDeepLinkParams();
+    return deepLink.subjectId || deepLink.topic ? null : ssRead<SessionMeta | null>(SS_SESSION_META, null);
+  });
+  const [isMockExam, setIsMockExam] = useState(() => ssRead<boolean>(SS_MOCK_MODE, false));
+  const [mockDurationMinutes, setMockDurationMinutes] = useState<number>(() => ssRead<number>(SS_MOCK_DURATION, 45));
+  const [mockDeadline, setMockDeadline] = useState<number | null>(() => ssRead<number | null>(SS_MOCK_DEADLINE, null));
+  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number | null>(null);
+  const hasAutoSubmittedRef = useRef(false);
+
+  useEffect(() => {
+    const deepLink = readDeepLinkParams();
+    if (deepLink.subjectId || deepLink.topic) router.replace('/dashboard/ai-questions');
+  }, [router]);
 
   useEffect(() => { ssWrite(SS_QUESTIONS, questions); }, [questions]);
   useEffect(() => { ssWrite(SS_ANSWERS, answers); }, [answers]);
@@ -325,6 +388,9 @@ export default function AIQuestionsPage() {
   useEffect(() => { ssWrite(SS_SUBJECT_ID, selectedSubjectId); }, [selectedSubjectId]);
   useEffect(() => { ssWrite(SS_FORM, form); }, [form]);
   useEffect(() => { ssWrite(SS_SESSION_META, sessionMeta); }, [sessionMeta]);
+  useEffect(() => { ssWrite(SS_MOCK_MODE, isMockExam); }, [isMockExam]);
+  useEffect(() => { ssWrite(SS_MOCK_DURATION, mockDurationMinutes); }, [mockDurationMinutes]);
+  useEffect(() => { ssWrite(SS_MOCK_DEADLINE, mockDeadline); }, [mockDeadline]);
 
   const effectiveSubjectId = selectedSubjectId || userSubjects[0]?.id || '';
   const selectedSubject = userSubjects.find((subject) => subject.id === effectiveSubjectId) ?? null;
@@ -468,9 +534,13 @@ export default function AIQuestionsPage() {
       setSourceMaterial(nextSourceMaterial);
       setQuestions(cleanQuestions);
       setAnswers(Array.from({ length: cleanQuestions.length }, () => ''));
+      hasAutoSubmittedRef.current = false;
+      setMockDeadline(isMockExam ? Date.now() + mockDurationMinutes * 60000 : null);
       setStatus({
         tone: warnings.length > 0 ? 'warning' : 'success',
-        text: `Generated ${cleanQuestions.length} exam-practice questions.${warnings.length > 0 ? ` ${warnings.join(' ')}` : ''}`,
+        text: isMockExam
+          ? `Mock exam started: ${cleanQuestions.length} questions, ${mockDurationMinutes} minutes on the clock.`
+          : `Generated ${cleanQuestions.length} exam-practice questions.${warnings.length > 0 ? ` ${warnings.join(' ')}` : ''}`,
       });
     } catch (err) {
       console.error('Question generation failed', err);
@@ -558,6 +628,11 @@ export default function AIQuestionsPage() {
           questions_payload: questions,
           answers_payload: answers,
           marking_report: { ...markedReport, sourceMaterial },
+          attempt_mode: isMockExam ? 'mock' : 'practice',
+          duration_minutes: isMockExam ? mockDurationMinutes : null,
+          time_taken_seconds: isMockExam && mockDeadline
+            ? Math.max(0, mockDurationMinutes * 60 - Math.max(0, Math.round((mockDeadline - Date.now()) / 1000)))
+            : null,
         });
         if (saveError) {
           const { error: fallbackSaveError } = await supabase.from('exam_practice_attempts').insert(attemptRow);
@@ -580,16 +655,25 @@ export default function AIQuestionsPage() {
   const retrySameQuestions = () => {
     setAnswers(Array.from({ length: questions.length }, () => ''));
     setReport(null);
-    setStatus({ tone: 'info', text: 'Attempt reset with the same questions.' });
+    hasAutoSubmittedRef.current = false;
+    setMockDeadline(isMockExam ? Date.now() + mockDurationMinutes * 60000 : null);
+    setStatus({ tone: 'info', text: isMockExam ? 'Mock exam restarted with a fresh clock.' : 'Attempt reset with the same questions.' });
   };
 
   const resetToGenerator = () => {
+    if (inPractice && isMockExam && !report) {
+      const confirmAbandon = window.confirm('End this timed mock exam without submitting? Your progress will be lost.');
+      if (!confirmAbandon) return;
+    }
     setQuestions([]);
     setAnswers([]);
     setSourceMaterial('');
     setReport(null);
     setSessionMeta(null);
     setStatus(null);
+    setIsMockExam(false);
+    setMockDeadline(null);
+    hasAutoSubmittedRef.current = false;
     try {
       sessionStorage.removeItem(SS_QUESTIONS);
       sessionStorage.removeItem(SS_ANSWERS);
@@ -598,8 +682,37 @@ export default function AIQuestionsPage() {
       sessionStorage.removeItem(SS_SUBJECT_ID);
       sessionStorage.removeItem(SS_FORM);
       sessionStorage.removeItem(SS_SESSION_META);
+      sessionStorage.removeItem(SS_MOCK_MODE);
+      sessionStorage.removeItem(SS_MOCK_DURATION);
+      sessionStorage.removeItem(SS_MOCK_DEADLINE);
     } catch {}
   };
+
+  const handleMarkAnswersRef = useRef(handleMarkAnswers);
+  useEffect(() => {
+    handleMarkAnswersRef.current = handleMarkAnswers;
+  });
+
+  useEffect(() => {
+    if (!isMockExam || !mockDeadline || report) return;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const remaining = Math.round((mockDeadline - Date.now()) / 1000);
+      setTimeRemainingSeconds(Math.max(0, remaining));
+      if (remaining <= 0 && !hasAutoSubmittedRef.current) {
+        hasAutoSubmittedRef.current = true;
+        void handleMarkAnswersRef.current();
+      }
+    };
+    const interval = window.setInterval(tick, 1000);
+    const timeout = window.setTimeout(tick, 0);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [isMockExam, mockDeadline, report]);
 
   return (
     <main className="space-y-7" aria-labelledby="ai-questions-title">
@@ -629,7 +742,9 @@ export default function AIQuestionsPage() {
         </div>
       </section>
 
-      {status && (inPractice || !setupValidationMessage) ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusStyles[status.tone]}`}>{status.text}</div> : null}
+      {status && (inPractice || !setupValidationMessage) ? (
+        <div role="status" aria-live="polite" className={`rounded-xl border px-4 py-3 text-sm ${statusStyles[status.tone]}`}>{status.text}</div>
+      ) : null}
 
       {isGenerating ? (
         <>
@@ -663,6 +778,7 @@ export default function AIQuestionsPage() {
                       <button
                         key={paper}
                         type="button"
+                        aria-pressed={selected}
                         onClick={() => setForm((prev) => ({ ...prev, englishLanguagePaper: paper }))}
                         className={`rounded-lg border px-4 py-3 text-left transition ${
                           selected
@@ -822,6 +938,33 @@ export default function AIQuestionsPage() {
               </label>
             ) : null}
 
+            {!isEnglishLanguagePractice ? (
+              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={isMockExam}
+                  onChange={(event) => setIsMockExam(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                />
+                Timed mock exam (countdown, no feedback until submitted)
+              </label>
+            ) : null}
+
+            {!isEnglishLanguagePractice && isMockExam ? (
+              <label className="text-sm text-slate-700 dark:text-slate-300">
+                Duration
+                <select
+                  value={mockDurationMinutes}
+                  onChange={(event) => setMockDurationMinutes(Number(event.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                >
+                  {MOCK_DURATION_OPTIONS.map((mins) => (
+                    <option key={mins} value={mins}>{mins} minutes</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
           </div>
 
           {!isEnglishLanguagePractice ? (
@@ -878,16 +1021,33 @@ export default function AIQuestionsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-600 dark:text-indigo-400">
                 {questions.length} questions · {totalAvailableMarks} marks
               </p>
-              <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">Answer Practice</h2>
+              <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+                {isMockExam ? 'Timed Mock Exam' : 'Answer Practice'}
+              </h2>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={resetToGenerator} className={buttonStyles({ variant: 'secondary' })}>
-                New set
-              </button>
-              <button type="button" onClick={handleMarkAnswers} disabled={isMarking || answeredCount === 0} className={buttonStyles({ variant: 'primary' })}>
-                <CheckCircle2 className="h-4 w-4" />
-                {isMarking ? 'Marking...' : 'Mark responses'}
-              </button>
+            <div className="flex flex-wrap items-center gap-3">
+              {isMockExam && timeRemainingSeconds !== null ? (
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className={`rounded-lg px-3 py-2 text-sm font-black tabular-nums ${
+                    timeRemainingSeconds <= 60
+                      ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+                      : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
+                  }`}
+                >
+                  {formatCountdown(timeRemainingSeconds)}
+                </span>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={resetToGenerator} className={buttonStyles({ variant: 'secondary' })}>
+                  New set
+                </button>
+                <button type="button" onClick={handleMarkAnswers} disabled={isMarking || answeredCount === 0} className={buttonStyles({ variant: 'primary' })}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  {isMarking ? 'Marking...' : 'Mark responses'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -954,6 +1114,7 @@ export default function AIQuestionsPage() {
                         <button
                           key={letter}
                           type="button"
+                          aria-pressed={selected}
                           onClick={() => updateAnswer(index, letter)}
                           className={`flex w-full items-center justify-start gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
                             selected

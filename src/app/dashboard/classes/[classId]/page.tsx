@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, Circle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
+import { PageLoader } from '@/components/PageLoader';
 
 type ClassInfo = { id: string; name: string };
 type AssignmentRow = {
@@ -79,7 +80,7 @@ export default function StudentClassPage() {
   }, [isLoading, session, router, supabase, classId]);
 
   if (isLoading || pageLoading || !classInfo) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading class...</p>;
+    return <PageLoader text="Loading class..." />;
   }
 
   return (

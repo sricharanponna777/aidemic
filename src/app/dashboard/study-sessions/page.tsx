@@ -352,11 +352,7 @@ export default function StudySessions() {
       times_studied: card.times_studied || 0,
       times_correct: card.times_correct || 0,
     };
-    const updated = {
-      ...updateSpacedRepetition(prev, quality),
-      consecutive_correct: prev.consecutive_correct,
-      times_correct: prev.times_correct,
-    };
+    const updated = updateSpacedRepetition(prev, quality);
     const supabase = createClient();
     await supabase.from('flashcards').update(updated).eq('id', card.id).eq('deck_id', selectedDeckId);
 

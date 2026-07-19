@@ -7,6 +7,7 @@ import { LogIn, Users } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
+import { PageLoader } from '@/components/PageLoader';
 
 type JoinedClass = {
   class_id: string;
@@ -57,6 +58,10 @@ export default function StudentClassesPage() {
       router.replace('/dashboard/teacher');
       return;
     }
+    if (profile && profile.role === 'parent') {
+      router.replace('/dashboard/parent');
+      return;
+    }
     if (!session) return;
 
     let cancelled = false;
@@ -104,7 +109,7 @@ export default function StudentClassesPage() {
   };
 
   if (isLoading || classesLoading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading your classes...</p>;
+    return <PageLoader text="Loading your classes..." />;
   }
 
   return (

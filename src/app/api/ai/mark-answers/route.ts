@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { createAdminClient } from '@/lib/supabase-admin';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { estimateGrade, getGcseTier, type GcseTier } from '@/lib/ai/gradeEstimate';
+import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
+import { buildSpecString } from '@/lib/ai/subjectConfig';
 import {
   extractChatMessageText,
   extractFromResponsesBody,
@@ -60,6 +64,7 @@ type AIMarkingReport = {
 };
 
 interface MarkAnswersPayload {
+  assignmentId?: string;
   topic?: string;
   subject?: string;
   examBoard?: string;
@@ -69,6 +74,24 @@ interface MarkAnswersPayload {
   questions?: unknown;
   answers?: unknown;
 }
+
+// Shape of the assignment row + curriculum chain fetched for assignment-mode
+// marking. Matches the nested select the take-assignment page uses.
+type AssignmentJoinRow = {
+  id: string;
+  title: string;
+  class_id: string;
+  questions_payload: unknown;
+  source_material: string | null;
+  allow_reattempts: boolean;
+  classes: {
+    specifications: {
+      name: string;
+      tier: string | null;
+      subjects: { name: string; exam_boards: { name: string; qualifications: { name: string } | null } | null } | null;
+    } | null;
+  } | null;
+};
 
 const MAX_QUESTIONS = 20;
 const MAX_MARK_VALUE = 40;
@@ -263,68 +286,6 @@ const normalizePayload = (raw: MarkAnswersPayload) => {
     questions,
     answers,
   };
-};
-
-type GcseTier = 'foundation' | 'higher' | null;
-
-const getGcseTier = (specification: string): GcseTier => {
-  const normalized = specification.toLowerCase();
-  if (/\bfoundation\b/.test(normalized)) return 'foundation';
-  if (/\bhigher\b/.test(normalized)) return 'higher';
-  return null;
-};
-
-const estimateGrade = (
-  percentage: number,
-  examType: 'gcse' | 'a-level',
-  board: 'aqa' | 'edexcel' | 'ocr' | null,
-  gcseTier: GcseTier
-) => {
-  const adjustment = board === 'edexcel' ? -2 : board === 'ocr' ? -1 : 0;
-  const boundaries =
-    examType === 'a-level'
-      ? [
-          ['A*', 85],
-          ['A', 75],
-          ['B', 65],
-          ['C', 55],
-          ['D', 45],
-          ['E', 35],
-        ]
-      : gcseTier === 'foundation'
-      ? [
-          ['5', 70],
-          ['4', 55],
-          ['3', 40],
-          ['2', 25],
-          ['1', 10],
-        ]
-      : gcseTier === 'higher'
-      ? [
-          ['9', 85],
-          ['8', 78],
-          ['7', 70],
-          ['6', 60],
-          ['5', 50],
-          ['4', 40],
-          ['3', 30],
-        ]
-      : [
-          ['9', 85],
-          ['8', 78],
-          ['7', 70],
-          ['6', 60],
-          ['5', 50],
-          ['4', 40],
-          ['3', 30],
-          ['2', 20],
-          ['1', 10],
-        ];
-
-  for (const [grade, boundary] of boundaries) {
-    if (percentage >= Number(boundary) + adjustment) return String(grade);
-  }
-  return 'U';
 };
 
 const getNextGrade = (grade: string, examType: 'gcse' | 'a-level', gcseTier: GcseTier) => {
@@ -640,8 +601,74 @@ export async function POST(request: Request) {
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.markAnswers);
+    if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
+
     const rawBody = (await request.json()) as MarkAnswersPayload;
-    const payload = normalizePayload(rawBody);
+    const assignmentId = typeof rawBody.assignmentId === 'string' ? txt(rawBody.assignmentId, 64) : '';
+
+    let payload: ReturnType<typeof normalizePayload>;
+    let adminClient: ReturnType<typeof createAdminClient> | null = null;
+
+    if (assignmentId) {
+      // Assignment mode: questions and curriculum details come from the stored
+      // assignment, never from the client, and the graded attempt is persisted
+      // here with the service-role client (students have no write access to
+      // assignment_attempts). Create the admin client first so a missing
+      // service key fails before any AI spend.
+      adminClient = createAdminClient();
+
+      const { data: assignmentRow, error: assignmentError } = await supabase
+        .from('assignments')
+        .select(
+          'id, title, class_id, questions_payload, source_material, allow_reattempts, classes ( specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
+        )
+        .eq('id', assignmentId)
+        .maybeSingle();
+      if (assignmentError || !assignmentRow) {
+        return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 });
+      }
+      const assignment = assignmentRow as unknown as AssignmentJoinRow;
+
+      const { data: enrollment } = await supabase
+        .from('class_students')
+        .select('id')
+        .eq('class_id', assignment.class_id)
+        .eq('student_id', authData.user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (!enrollment) {
+        return NextResponse.json({ error: 'You are not enrolled in this class.' }, { status: 403 });
+      }
+
+      const { data: existingAttempt } = await supabase
+        .from('assignment_attempts')
+        .select('status, ai_feedback')
+        .eq('assignment_id', assignmentId)
+        .eq('student_id', authData.user.id)
+        .maybeSingle();
+      if (existingAttempt?.status === 'completed' && !assignment.allow_reattempts) {
+        return NextResponse.json(
+          { error: 'This assignment has already been submitted.', report: existingAttempt.ai_feedback },
+          { status: 409 }
+        );
+      }
+
+      const spec = assignment.classes?.specifications;
+      const subjectChain = spec?.subjects;
+      payload = normalizePayload({
+        topic: assignment.title,
+        subject: subjectChain?.name,
+        examBoard: subjectChain?.exam_boards?.name,
+        examType: subjectChain?.exam_boards?.qualifications?.name,
+        specification: buildSpecString(spec?.name ?? '', spec?.tier ?? '', ''),
+        sourceMaterial: assignment.source_material || '',
+        questions: assignment.questions_payload,
+        answers: rawBody.answers,
+      });
+    } else {
+      payload = normalizePayload(rawBody);
+    }
 
     if (!payload.topic) return NextResponse.json({ error: 'Topic is required.' }, { status: 400 });
     if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
@@ -668,6 +695,32 @@ export async function POST(request: Request) {
 
     const aiReport = await aiMarkAnswers(payload);
     const report = buildFinalReport(aiReport, payload);
+
+    if (assignmentId && adminClient) {
+      const { error: saveError } = await adminClient.from('assignment_attempts').upsert(
+        {
+          assignment_id: assignmentId,
+          student_id: authData.user.id,
+          completed_at: new Date().toISOString(),
+          answers_payload: payload.answers,
+          score: report.totalMarksAwarded,
+          percentage: report.percentage,
+          predicted_grade: report.predictedGrade,
+          ai_feedback: report,
+          status: 'completed',
+        },
+        { onConflict: 'assignment_id,student_id' }
+      );
+      if (saveError) {
+        console.error('[mark-answers] Failed to save assignment attempt', saveError);
+        // Don't return the report: nothing was persisted, so the student
+        // should resubmit (the upsert is idempotent).
+        return NextResponse.json(
+          { error: 'Marking succeeded but saving your attempt failed. Please resubmit.' },
+          { status: 500 }
+        );
+      }
+    }
 
     return NextResponse.json({
       success: true,

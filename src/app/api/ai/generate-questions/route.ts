@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { OPENAI_DEFAULT_BASE_URL, buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import {
   extractFromResponsesBody,
   extractJsonWithCoercer,
@@ -144,6 +145,51 @@ const SCHEMA = {
 };
 
 const clampQuestions = (n?: number) => clampCount(n, MIN_QUESTIONS, MAX_QUESTIONS, 6);
+
+const DIFFICULTY_MIN_ATTEMPTS = 2;
+const DIFFICULTY_LOOKBACK = 5;
+const FOUNDATIONAL_THRESHOLD = 45;
+const STRETCH_THRESHOLD = 80;
+
+/** Looks back at the student's recent exam_practice_attempts on this subject/topic and, when
+ * there's enough signal, returns a prompt note nudging question difficulty up or down to match
+ * recent performance. Returns '' when there isn't enough data or performance is mid-range. */
+async function getDifficultyNote(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  payload: ReturnType<typeof normalizePayload>
+): Promise<string> {
+  let query = supabase
+    .from('exam_practice_attempts')
+    .select('percentage')
+    .eq('user_id', userId)
+    .eq('subject', payload.subject)
+    .order('created_at', { ascending: false })
+    .limit(DIFFICULTY_LOOKBACK);
+
+  if (payload.topic) {
+    query = query.ilike('topic', payload.topic);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) return '';
+
+  const percentages = (data as { percentage: number | null }[])
+    .map((row) => Number(row.percentage))
+    .filter((value) => Number.isFinite(value));
+  if (percentages.length < DIFFICULTY_MIN_ATTEMPTS) return '';
+
+  const avg = Math.round(percentages.reduce((sum, value) => sum + value, 0) / percentages.length);
+  const scope = payload.topic ? 'topic' : 'subject';
+
+  if (avg <= FOUNDATIONAL_THRESHOLD) {
+    return `Student context: this student has averaged ${avg}% over their last ${percentages.length} attempts on this ${scope}. Scaffold slightly: favour clearer command words, avoid stacking multiple difficult skills in one question, and include at least one more accessible question.`;
+  }
+  if (avg >= STRETCH_THRESHOLD) {
+    return `Student context: this student has averaged ${avg}% over their last ${percentages.length} attempts on this ${scope}. Raise the ceiling: include at least one higher-order/stretch question (e.g. evaluate, synthesise across sub-topics, multi-step reasoning) so they remain appropriately challenged.`;
+  }
+  return '';
+}
 
 const parseMarkValue = (value: unknown) => {
   const numberValue =
@@ -539,7 +585,8 @@ const getEnglishLanguageInstructions = (payload: ReturnType<typeof normalizePayl
 const buildPrompt = (
   payload: ReturnType<typeof normalizePayload>,
   figureUrls: string[],
-  useWebSearch: boolean
+  useWebSearch: boolean,
+  difficultyNote: string = ''
 ) => {
   const englishLanguageInstructions = getEnglishLanguageInstructions(payload);
   const resourceInstruction = useWebSearch
@@ -585,6 +632,7 @@ const buildPrompt = (
     'markScheme: string array, ≥1 item, one mark point per element. Clear enough for AI marking.',
     'figureUrl: use provided URLs where relevant, else "".',
     figureUrls.length > 0 ? '' : 'Do not invent figureUrls.',
+    difficultyNote,
     'Use GFM Markdown in strings. No raw HTML.',
     'Math: inline \\\\(...\\\\), display \\\\[...\\\\]. Double-escape backslashes in JSON. Always group: x^{2} not x^2.',
     'sourceMaterial: use only for separate extracts/sources needed to answer the questions. Empty string for ordinary practice.',
@@ -766,13 +814,14 @@ const requestChatFallback = async (
 
 const aiGenerate = async (
   payload: ReturnType<typeof normalizePayload>,
-  figureUrls: string[]
+  figureUrls: string[],
+  difficultyNote: string = ''
 ): Promise<AIQuestionResult> => {
   const config = getAIConfig();
   const canUseWebSearch =
     payload.useOnlineResources &&
     ((config.isOpenAIHosted && config.baseUrl === OPENAI_DEFAULT_BASE_URL) || config.isOpenRouter);
-  const { system, user } = buildPrompt(payload, figureUrls, canUseWebSearch);
+  const { system, user } = buildPrompt(payload, figureUrls, canUseWebSearch, difficultyNote);
 
   // OpenRouter: skip /responses (unsupported) and go straight to chat
   if (config.isOpenRouter) {
@@ -781,7 +830,7 @@ const aiGenerate = async (
         const generated = await requestChatFallback(config, system, user, '', true);
         return { generated, usedOnlineResources: true, onlineLookupFailed: false, onlineLookupReason: '' };
       } catch {
-        const fallbackPrompt = buildPrompt(payload, figureUrls, false);
+        const fallbackPrompt = buildPrompt(payload, figureUrls, false, difficultyNote);
         const generated = await requestChatFallback(config, fallbackPrompt.system, fallbackPrompt.user, '', false);
         return { generated, usedOnlineResources: false, onlineLookupFailed: true, onlineLookupReason: 'Web search failed.' };
       }
@@ -795,7 +844,7 @@ const aiGenerate = async (
     if (webResponse.parsed) {
       return { generated: webResponse.parsed, usedOnlineResources: true, onlineLookupFailed: false, onlineLookupReason: '' };
     }
-    const fallbackPrompt = buildPrompt(payload, figureUrls, false);
+    const fallbackPrompt = buildPrompt(payload, figureUrls, false, difficultyNote);
     const fallbackResponse = await requestResponses(config, fallbackPrompt.system, fallbackPrompt.user, false);
     if (fallbackResponse.parsed) {
       return { generated: fallbackResponse.parsed, usedOnlineResources: false, onlineLookupFailed: true, onlineLookupReason: txt(webResponse.errorText || 'Provider rejected web search.', 300) };
@@ -816,11 +865,12 @@ const aiBackfillQuestions = async (
   payload: ReturnType<typeof normalizePayload>,
   figureUrls: string[],
   existingQuestions: ExamQuestion[],
-  missingCount: number
+  missingCount: number,
+  difficultyNote: string = ''
 ) => {
   const config = getAIConfig();
   const backfillPayload = { ...payload, questionCount: missingCount, useOnlineResources: false };
-  const { system, user } = buildPrompt(backfillPayload, figureUrls, false);
+  const { system, user } = buildPrompt(backfillPayload, figureUrls, false, difficultyNote);
   const avoidList = existingQuestions.map((question, index) => ({
     index: index + 1,
     question: txt(question.question, 220),
@@ -948,6 +998,9 @@ export async function POST(request: Request) {
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.generateQuestions);
+    if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
+
     const rawBody = (await request.json()) as GenerateQuestionsPayload;
     const payload = normalizePayload(rawBody);
 
@@ -1012,7 +1065,8 @@ export async function POST(request: Request) {
     const figureUrls = dedupe([payload.figureUrl, ...extractFigureUrls(payload.prompt)].filter(Boolean)).slice(0, 8);
     const warnings: string[] = [];
 
-    const aiResult = await aiGenerate(payload, figureUrls);
+    const difficultyNote = await getDifficultyNote(supabase, authData.user.id, payload);
+    const aiResult = await aiGenerate(payload, figureUrls, difficultyNote);
     if (aiResult.onlineLookupFailed) {
       warnings.push(
         `Online resource lookup was unavailable, so marks were chosen without live source lookup.${aiResult.onlineLookupReason ? ` ${aiResult.onlineLookupReason}` : ''}`
@@ -1029,7 +1083,7 @@ export async function POST(request: Request) {
     if (uniqueQuestions.length < payload.questionCount) {
       try {
         const missingCount = payload.questionCount - uniqueQuestions.length;
-        const backfillRaw = await aiBackfillQuestions(payload, figureUrls, uniqueQuestions, missingCount);
+        const backfillRaw = await aiBackfillQuestions(payload, figureUrls, uniqueQuestions, missingCount, difficultyNote);
         const backfillQuestions = Array.isArray(backfillRaw.questions) ? backfillRaw.questions : [];
         totalRawQuestions += backfillQuestions.length;
         malformedCount += appendUniqueQuestions(uniqueQuestions, seen, backfillQuestions, payload, sourceMaterialItems, figureUrls);

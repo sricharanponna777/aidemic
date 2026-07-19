@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
+import { PageLoader } from '@/components/PageLoader';
 
 type PendingSchool = {
   id: string;
@@ -79,7 +80,7 @@ export default function AdminSchoolsPage() {
   };
 
   if (isLoading || pageLoading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>;
+    return <PageLoader />;
   }
 
   return (

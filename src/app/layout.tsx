@@ -3,6 +3,7 @@ import { Space_Grotesk, Geist_Mono } from "next/font/google";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import { SfxProvider } from "@/components/SfxProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
@@ -42,7 +43,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitializer }} />
       </head>
       <body className={`${spaceGrotesk.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}>
-        <SfxProvider>{children}</SfxProvider>
+        <SfxProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </SfxProvider>
       </body>
     </html>
   );

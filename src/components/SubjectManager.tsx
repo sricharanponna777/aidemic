@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageLoader } from '@/components/PageLoader';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import {
@@ -177,7 +178,7 @@ export function SubjectManager() {
 
       <div className="mt-5 space-y-2">
         {subjectsLoading ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Loading subjects...</p>
+          <PageLoader text="Loading subjects..." />
         ) : subjects.length === 0 ? (
           <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
             No subjects added yet.

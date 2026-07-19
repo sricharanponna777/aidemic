@@ -32,6 +32,19 @@ export const getSupabaseEnv = () => {
   return { supabaseUrl, supabaseAnonKey };
 };
 
+export const getSupabaseAdminEnv = () => {
+  const { supabaseUrl } = getSupabaseEnv();
+  const serviceRoleKey = stripWrappingQuotes(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+
+  if (!serviceRoleKey) {
+    throw new Error('Supabase admin is not configured. Set SUPABASE_SERVICE_ROLE_KEY (server-only).');
+  }
+
+  assertFetchHeaderSafe('SUPABASE_SERVICE_ROLE_KEY', serviceRoleKey);
+
+  return { supabaseUrl, serviceRoleKey };
+};
+
 export const getOptionalSupabaseEnv = () => {
   try {
     return getSupabaseEnv();

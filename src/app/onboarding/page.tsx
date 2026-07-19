@@ -12,10 +12,10 @@ import { useState } from 'react';
 const isCountry = (value: string | null): value is Country =>
   !!value && COUNTRIES.includes(value as Country);
 
-type Role = 'student' | 'teacher';
+type Role = 'student' | 'teacher' | 'parent';
 
 const isRole = (value: string | null): value is Role =>
-  value === 'student' || value === 'teacher';
+  value === 'student' || value === 'teacher' || value === 'parent';
 
 function OnboardingContent() {
   const router = useRouter();
@@ -59,7 +59,7 @@ function OnboardingContent() {
       return;
     }
 
-    router.push(role === 'teacher' ? '/onboarding/teacher' : '/dashboard');
+    router.push(role === 'teacher' ? '/onboarding/teacher' : role === 'parent' ? '/onboarding/parent' : '/dashboard');
   };
 
   if (isLoading) {

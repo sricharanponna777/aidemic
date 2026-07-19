@@ -7,9 +7,10 @@ import { ChevronDown, ChevronUp, ClipboardList, Plus } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
-import { buildSpecString } from '@/lib/ai/subjectConfig';
-import { normalizeBoard, normalizeExamType } from '@/lib/ai/validation';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
+import { PageLoader } from '@/components/PageLoader';
+import { AssignmentForm, type CreatedAssignment } from '@/components/teacher/AssignmentForm';
+import { buildAssignmentStats } from '@/lib/teacherAnalytics';
 
 const selectClass =
   'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
@@ -30,9 +31,6 @@ type ClassOption = {
   } | null;
 };
 
-type TopicOption = { id: string; name: string };
-type LearningObjectiveOption = { id: string; objective: string };
-
 type AssignmentRow = {
   id: string;
   title: string;
@@ -44,8 +42,16 @@ type AssignmentRow = {
   topics: { name: string } | null;
 };
 
-type AttemptRow = { assignment_id: string; student_id: string; status: string; percentage: number | null };
-type RosterRow = { id: string; student_id: string; class_id: string; full_name: string | null; email: string | null };
+type AttemptRow = {
+  assignment_id: string;
+  student_id: string;
+  status: string;
+  percentage: number | null;
+  predicted_grade: string | null;
+  completed_at: string | null;
+  started_at: string | null;
+};
+type RosterRow = { id: string; student_id: string; class_id: string; joined_at: string | null; full_name: string | null; email: string | null };
 
 export default function TeacherAssignmentsPage() {
   const router = useRouter();
@@ -63,19 +69,6 @@ export default function TeacherAssignmentsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [topics, setTopics] = useState<TopicOption[]>([]);
-  const [subtopics, setSubtopics] = useState<TopicOption[]>([]);
-  const [objectives, setObjectives] = useState<LearningObjectiveOption[]>([]);
-  const [topicId, setTopicId] = useState('');
-  const [subtopicId, setSubtopicId] = useState('');
-  const [learningObjectiveId, setLearningObjectiveId] = useState('');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [questionCount, setQuestionCount] = useState(6);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [formError, setFormError] = useState('');
 
   useEffect(() => {
     if (isLoading || !session) return;
@@ -127,17 +120,17 @@ export default function TeacherAssignmentsPage() {
       if (assignmentIds.length > 0) {
         const { data: attemptRows } = await supabase
           .from('assignment_attempts')
-          .select('assignment_id, student_id, status, percentage')
+          .select('assignment_id, student_id, status, percentage, predicted_grade, completed_at, started_at')
           .in('assignment_id', assignmentIds);
         if (!cancelled) setAttempts((attemptRows as AttemptRow[]) ?? []);
       }
 
       const { data: rosterRows } = await supabase
         .from('class_students')
-        .select('id, student_id, class_id')
+        .select('id, student_id, class_id, joined_at')
         .in('class_id', classIds)
         .eq('status', 'active');
-      const typedRosterRows = (rosterRows ?? []) as { id: string; student_id: string; class_id: string }[];
+      const typedRosterRows = (rosterRows ?? []) as { id: string; student_id: string; class_id: string; joined_at: string | null }[];
       const studentIds = [...new Set(typedRosterRows.map((r) => r.student_id))];
       let profiles: { id: string; full_name: string | null; email: string | null }[] = [];
       if (studentIds.length > 0) {
@@ -148,7 +141,14 @@ export default function TeacherAssignmentsPage() {
         setRoster(
           typedRosterRows.map((r) => {
             const p = profiles.find((prof) => prof.id === r.student_id);
-            return { id: r.id, student_id: r.student_id, class_id: r.class_id, full_name: p?.full_name ?? null, email: p?.email ?? null };
+            return {
+              id: r.id,
+              student_id: r.student_id,
+              class_id: r.class_id,
+              joined_at: r.joined_at,
+              full_name: p?.full_name ?? null,
+              email: p?.email ?? null,
+            };
           })
         );
       }
@@ -161,52 +161,6 @@ export default function TeacherAssignmentsPage() {
       cancelled = true;
     };
   }, [isLoading, session, profile, router, supabase]);
-
-  useEffect(() => {
-    if (!selectedClassId) return;
-    const cls = classes.find((c) => c.id === selectedClassId);
-    if (!cls) return;
-
-    let cancelled = false;
-    const load = async () => {
-      if (cls.specification_id) {
-        const { data } = await supabase
-          .from('topics')
-          .select('id, name')
-          .eq('specification_id', cls.specification_id)
-          .order('order_index', { ascending: true });
-        if (!cancelled) setTopics((data as TopicOption[]) ?? []);
-      }
-      const subjectId = cls.specifications?.subjects?.id;
-      if (subjectId) {
-        const { data } = await supabase
-          .from('learning_objectives')
-          .select('id, objective, applies_to')
-          .eq('subject_id', subjectId)
-          .contains('applies_to', ['exam_practice']);
-        if (!cancelled) {
-          setObjectives(((data ?? []) as { id: string; objective: string }[]).map((o) => ({ id: o.id, objective: o.objective })));
-        }
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedClassId, classes, supabase]);
-
-  useEffect(() => {
-    if (!topicId) return;
-    let cancelled = false;
-    const load = async () => {
-      const { data } = await supabase.from('subtopics').select('id, name').eq('topic_id', topicId).order('order_index', { ascending: true });
-      if (!cancelled) setSubtopics((data as TopicOption[]) ?? []);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [topicId, supabase]);
 
   const classById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
   const rosterByClass = useMemo(() => {
@@ -228,130 +182,21 @@ export default function TeacherAssignmentsPage() {
     return map;
   }, [attempts]);
 
-  const average = (values: number[]) => (values.length > 0 ? Math.round(values.reduce((sum, v) => sum + v, 0) / values.length) : null);
-
-  const assignmentStats = useMemo(() => {
-    const stats = new Map<string, { completionRate: number | null; avgScore: number | null; completed: number; rosterSize: number }>();
-    for (const a of assignments) {
-      const rosterSize = rosterByClass.get(a.class_id)?.length ?? 0;
-      const classAttempts = (attemptsByAssignment.get(a.id) ?? []).filter((att) => att.status === 'completed');
-      stats.set(a.id, {
-        completionRate: rosterSize > 0 ? Math.round((classAttempts.length / rosterSize) * 100) : null,
-        avgScore: average(classAttempts.filter((att) => typeof att.percentage === 'number').map((att) => att.percentage as number)),
-        completed: classAttempts.length,
-        rosterSize,
-      });
-    }
-    return stats;
-  }, [assignments, rosterByClass, attemptsByAssignment]);
+  const assignmentStats = useMemo(
+    () => buildAssignmentStats({ classes, assignments, attempts, students: roster }),
+    [classes, assignments, attempts, roster]
+  );
 
   const visibleAssignments = filterClassId === 'all' ? assignments : assignments.filter((a) => a.class_id === filterClassId);
-  const effectiveTopics = selectedClassId ? topics : [];
-  const effectiveObjectives = selectedClassId ? objectives : [];
-  const effectiveSubtopics = topicId ? subtopics : [];
   const activeClasses = classes.filter((c) => c.status !== 'archived');
 
-  const resetForm = () => {
-    setSelectedClassId('');
-    setTopicId('');
-    setSubtopicId('');
-    setLearningObjectiveId('');
-    setTitle('');
-    setDescription('');
-    setDueDate('');
-    setQuestionCount(6);
-    setFormError('');
-  };
-
-  const handleCreateAssignment = async () => {
-    const classInfo = classes.find((c) => c.id === selectedClassId);
-    if (!teacherId || !classInfo) {
-      setFormError('Choose a class for this assignment.');
-      return;
-    }
-    setFormError('');
-
-    const topic = topics.find((t) => t.id === topicId);
-    if (!topic) {
-      setFormError('Choose a topic for this assignment.');
-      return;
-    }
-    const subtopic = subtopics.find((s) => s.id === subtopicId);
-    const objective = objectives.find((o) => o.id === learningObjectiveId);
-    const subjectChain = classInfo.specifications?.subjects;
-    const board = subjectChain?.exam_boards;
-    const qualification = board?.qualifications;
-    if (!subjectChain || !board || !qualification) {
-      setFormError('This class is missing curriculum details.');
-      return;
-    }
-
-    const examBoard = normalizeBoard(board.name);
-    const examType = normalizeExamType(qualification.name);
-    if (!examBoard || !examType) {
-      setFormError('Could not resolve this class exam board/type.');
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const response = await fetch('/api/ai/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: topic.name,
-          subtopic: subtopic?.name || '',
-          learningObjective: objective?.objective || '',
-          subject: subjectChain.name.toLowerCase(),
-          examBoard,
-          examType,
-          specification: buildSpecString(classInfo.specifications?.name ?? '', classInfo.specifications?.tier ?? '', ''),
-          questionCount,
-        }),
-      });
-      const body = await response.json();
-      if (!response.ok) {
-        setFormError(body.error || 'Failed to generate questions.');
-        setIsGenerating(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('assignments')
-        .insert({
-          class_id: classInfo.id,
-          teacher_id: teacherId,
-          title: title.trim() || `${topic.name}${subtopic ? ` - ${subtopic.name}` : ''}`,
-          description: description.trim() || null,
-          topic_id: topic.id,
-          subtopic_id: subtopic?.id ?? null,
-          learning_objective_id: objective?.id ?? null,
-          assignment_type: 'practice',
-          due_date: dueDate ? new Date(dueDate).toISOString() : null,
-          questions_payload: body.questions,
-          source_material: body.sourceMaterial || null,
-        })
-        .select('id, title, assignment_type, due_date, created_at, class_id, topic_id, topics ( name )')
-        .single();
-
-      if (error) {
-        setFormError(error.message);
-        setIsGenerating(false);
-        return;
-      }
-
-      setAssignments((prev) => [data as unknown as AssignmentRow, ...prev]);
-      resetForm();
-      setShowForm(false);
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Failed to create assignment.');
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleAssignmentCreated = (row: CreatedAssignment) => {
+    setAssignments((prev) => [row, ...prev]);
+    setShowForm(false);
   };
 
   if (isLoading || pageLoading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading assignments...</p>;
+    return <PageLoader text="Loading assignments..." />;
   }
 
   return (
@@ -381,140 +226,14 @@ export default function TeacherAssignmentsPage() {
         </div>
       ) : (
         <>
-          {showForm && (
+          {showForm && teacherId && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                AIDemic will write a set of practice questions for your students based on what you pick below. Mock tests and flashcard
-                assignments are coming in a future update.
-              </p>
-
-              <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">1. Which class?</p>
-              <div className="mt-2">
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => {
-                    setSelectedClassId(e.target.value);
-                    setTopicId('');
-                    setSubtopicId('');
-                    setLearningObjectiveId('');
-                  }}
-                  className={`${selectClass} w-full sm:w-auto`}
-                >
-                  <option value="">Select class</option>
-                  {activeClasses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                2. What should students practice?
-              </p>
-              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Topic</label>
-                  <select
-                    value={topicId}
-                    onChange={(e) => {
-                      setTopicId(e.target.value);
-                      setSubtopicId('');
-                    }}
-                    disabled={!selectedClassId}
-                    className={`${selectClass} w-full`}
-                  >
-                    <option value="">Select topic</option>
-                    {effectiveTopics.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Subtopic (optional)</label>
-                  <select
-                    value={subtopicId}
-                    onChange={(e) => setSubtopicId(e.target.value)}
-                    disabled={!topicId || effectiveSubtopics.length === 0}
-                    className={`${selectClass} w-full`}
-                  >
-                    <option value="">Whole topic</option>
-                    {effectiveSubtopics.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400" title="Narrows the questions to one specific exam skill within the topic.">
-                    Focus on a specific skill (optional)
-                  </label>
-                  <select
-                    value={learningObjectiveId}
-                    onChange={(e) => setLearningObjectiveId(e.target.value)}
-                    disabled={!selectedClassId}
-                    className={`${selectClass} w-full`}
-                  >
-                    <option value="">No specific focus — cover the whole topic</option>
-                    {effectiveObjectives.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.objective}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">3. Assignment details</p>
-              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Title (optional — we&apos;ll name it after the topic if left blank)</label>
-                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={`${selectClass} w-full`} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Due date (optional — schedules the assignment)</label>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={`${selectClass} w-full`} />
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Notes for students (optional)</label>
-                  <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className={`${selectClass} w-full`} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Number of questions</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Math.min(20, Math.max(1, Number(e.target.value) || 1)))}
-                    className={`${selectClass} w-full`}
-                  />
-                </div>
-              </div>
-
-              {formError ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{formError}</p> : null}
-
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetForm();
-                    setShowForm(false);
-                  }}
-                  className={buttonStyles({ variant: 'secondary' })}
-                >
-                  Cancel
-                </button>
-                <button type="button" onClick={handleCreateAssignment} disabled={isGenerating} className={buttonStyles({ variant: 'primary' })}>
-                  {isGenerating ? 'Generating questions...' : 'Generate & assign'}
-                </button>
-              </div>
+              <AssignmentForm
+                teacherId={teacherId}
+                classes={activeClasses}
+                onCreated={handleAssignmentCreated}
+                onCancel={() => setShowForm(false)}
+              />
             </div>
           )}
 
@@ -560,7 +279,7 @@ export default function TeacherAssignmentsPage() {
                         </div>
                         <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                           <span>
-                            {stats?.completed ?? 0}/{stats?.rosterSize ?? 0} completed
+                            {stats?.completedCount ?? 0}/{stats?.rosterSize ?? 0} completed
                           </span>
                           {stats?.avgScore !== null && stats?.avgScore !== undefined && (
                             <span className={`font-semibold ${scoreTextTone(stats.avgScore)}`}>{stats.avgScore}% avg</span>

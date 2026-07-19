@@ -14,7 +14,17 @@ export interface UserProfile {
   country?: 'uk' | 'india' | 'us' | 'international';
   theme?: 'light' | 'dark';
   notifications_enabled?: boolean;
-  role?: 'student' | 'teacher';
+  role?: 'student' | 'teacher' | 'parent';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ParentLink {
+  id: string;
+  student_id: string;
+  parent_id: string | null;
+  invite_code: string;
+  status: 'pending' | 'active' | 'revoked';
   created_at?: string;
   updated_at?: string;
 }

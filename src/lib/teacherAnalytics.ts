@@ -181,6 +181,41 @@ export function buildTopicStats(data: Data, classId?: string): TopicStat[] {
     .sort((a, b) => (a.avgScore ?? 101) - (b.avgScore ?? 101));
 }
 
+export type AssignmentStat = {
+  assignment_id: string;
+  completedCount: number;
+  rosterSize: number;
+  completionRate: number | null;
+  avgScore: number | null;
+};
+
+/** Completion rate + average score per assignment, keyed by assignment id. */
+export function buildAssignmentStats(data: Data): Map<string, AssignmentStat> {
+  const rosterByClass = new Map<string, number>();
+  for (const s of data.students) rosterByClass.set(s.class_id, (rosterByClass.get(s.class_id) ?? 0) + 1);
+
+  const attemptsByAssignment = new Map<string, TeacherAttempt[]>();
+  for (const att of data.attempts) {
+    const entry = attemptsByAssignment.get(att.assignment_id) ?? [];
+    entry.push(att);
+    attemptsByAssignment.set(att.assignment_id, entry);
+  }
+
+  const stats = new Map<string, AssignmentStat>();
+  for (const a of data.assignments) {
+    const rosterSize = rosterByClass.get(a.class_id) ?? 0;
+    const completed = (attemptsByAssignment.get(a.id) ?? []).filter((att) => att.status === 'completed');
+    stats.set(a.id, {
+      assignment_id: a.id,
+      completedCount: completed.length,
+      rosterSize,
+      completionRate: rosterSize > 0 ? Math.round((completed.length / rosterSize) * 100) : null,
+      avgScore: average(completed.filter((att) => typeof att.percentage === 'number').map((att) => att.percentage as number)),
+    });
+  }
+  return stats;
+}
+
 /** A student is "at risk" if they've completed nothing despite having assignments,
  *  or their average score is below the pass line. Ordered most-urgent first. */
 export function atRiskStudents(stats: StudentStat[]): StudentStat[] {

@@ -1,20 +1,27 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Lightbulb, TrendingDown } from 'lucide-react';
+import { AlertTriangle, Lightbulb, Sparkles, TrendingDown } from 'lucide-react';
+import { buttonStyles } from '@/components/ui/button';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
-import { atRiskStudents, buildStudentStats, buildTopicStats } from '@/lib/teacherAnalytics';
+import { atRiskStudents, buildClassStats, buildStudentStats, buildTopicStats } from '@/lib/teacherAnalytics';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
 
 type Intervention = { key: string; text: string; href?: string };
+type ClassSummary = { headline: string; priorities: string[]; classNotes: { className: string; note: string }[] };
 
 export default function TeacherAiInsightsPage() {
   const data = useTeacherClassData();
   const { loading, classes } = data;
 
+  const [summary, setSummary] = useState<ClassSummary | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+
   const topicStats = useMemo(() => (loading ? [] : buildTopicStats(data)), [loading, data]);
   const studentStats = useMemo(() => (loading ? [] : buildStudentStats(data)), [loading, data]);
+  const classStats = useMemo(() => (loading ? [] : buildClassStats(data)), [loading, data]);
 
   const activeClassIds = useMemo(() => new Set(classes.filter((c) => c.status !== 'archived').map((c) => c.id)), [classes]);
 
@@ -28,6 +35,48 @@ export default function TeacherAiInsightsPage() {
     () => atRiskStudents(studentStats.filter((s) => activeClassIds.has(s.class_id))),
     [studentStats, activeClassIds]
   );
+
+  const classSummaryInput = useMemo(
+    () =>
+      classStats
+        .filter((c) => activeClassIds.has(c.class_id))
+        .map((c) => {
+          const classAtRisk = atRisk.filter((s) => s.class_id === c.class_id);
+          return {
+            className: c.name,
+            avgScore: c.avgScore,
+            completionRate: c.completionRate,
+            weakTopics: topicStats
+              .filter((t) => t.className === c.name && t.avgScore !== null && t.avgScore < 60)
+              .map((t) => ({ name: t.name, avgScore: t.avgScore as number })),
+            atRiskCount: classAtRisk.filter((s) => s.completedCount > 0).length,
+            notStartedCount: classAtRisk.filter((s) => s.completedCount === 0).length,
+          };
+        }),
+    [classStats, activeClassIds, topicStats, atRisk]
+  );
+
+  const handleGenerateSummary = async () => {
+    setSummaryError('');
+    setIsGeneratingSummary(true);
+    try {
+      const response = await fetch('/api/ai/generate-class-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classes: classSummaryInput }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        setSummaryError(body.error || 'Failed to generate summary.');
+        return;
+      }
+      setSummary(body as ClassSummary);
+    } catch (err) {
+      setSummaryError(err instanceof Error ? err.message : 'Failed to generate summary.');
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
 
   const interventions = useMemo<Intervention[]>(() => {
     const items: Intervention[] = [];
@@ -80,11 +129,60 @@ export default function TeacherAiInsightsPage() {
         </div>
       ) : (
         <>
+          {/* AI-generated class summary */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">AI-generated summary</h2>
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                  AI-generated
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleGenerateSummary()}
+                disabled={isGeneratingSummary}
+                className={buttonStyles({ variant: 'primary', size: 'sm' })}
+              >
+                {isGeneratingSummary ? 'Generating...' : summary ? 'Regenerate summary' : 'Generate AI summary'}
+              </button>
+            </div>
+            {summaryError ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{summaryError}</p> : null}
+            {!summary && !summaryError ? (
+              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                Generate a &ldquo;what to reteach this week&rdquo; summary written by AI from your classes&apos; current performance data.
+              </p>
+            ) : null}
+            {summary && (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{summary.headline}</p>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
+                  {summary.priorities.map((priority, index) => (
+                    <li key={index}>{priority}</li>
+                  ))}
+                </ul>
+                {summary.classNotes.length > 0 && (
+                  <div className="space-y-1.5 border-t border-slate-100 pt-3 dark:border-white/6">
+                    {summary.classNotes.map((note) => (
+                      <p key={note.className} className="text-xs text-slate-600 dark:text-slate-400">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{note.className}:</span> {note.note}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Suggested interventions */}
           <section className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-6 shadow-sm dark:border-indigo-500/20 dark:bg-indigo-500/5">
             <div className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Suggested interventions</h2>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                Rules-based
+              </span>
             </div>
             <div className="mt-4 space-y-2">
               {interventions.map((item) => (
@@ -106,6 +204,9 @@ export default function TeacherAiInsightsPage() {
               <div className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-amber-500" />
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Weak topics</h2>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                  Rules-based
+                </span>
               </div>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Topics scoring below 60% across your classes.</p>
               {weakTopics.length === 0 ? (
@@ -134,6 +235,9 @@ export default function TeacherAiInsightsPage() {
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Students at risk</h2>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                  Rules-based
+                </span>
               </div>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Not started, or averaging below 40%.</p>
               {atRisk.length === 0 ? (

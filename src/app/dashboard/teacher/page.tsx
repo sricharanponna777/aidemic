@@ -7,6 +7,7 @@ import { VerificationBanner } from '@/components/VerificationBanner';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import { atRiskStudents, average, buildClassStats, buildStudentStats } from '@/lib/teacherAnalytics';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
+import { PageLoader } from '@/components/PageLoader';
 
 function isToday(date: Date) {
   const now = new Date();
@@ -50,7 +51,7 @@ export default function TeacherDashboardPage() {
   }, [attempts, students, assignments]);
 
   if (loading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading your dashboard...</p>;
+    return <PageLoader text="Loading your dashboard..." />;
   }
 
   const stats = [

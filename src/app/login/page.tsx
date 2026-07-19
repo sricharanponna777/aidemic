@@ -14,7 +14,7 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isSignUpOverride, setIsSignUpOverride] = useState<boolean | null>(null);
-  const [role, setRole] = useState<'student' | 'teacher'>('student');
+  const [role, setRole] = useState<'student' | 'teacher' | 'parent'>('student');
   const router = useRouter();
   const searchParams = useSearchParams();
   const isSignUp = isSignUpOverride ?? searchParams.get('mode') === 'signup';
@@ -143,8 +143,8 @@ function LoginContent() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 I am a...
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['student', 'teacher'] as const).map((option) => (
+              <div className="grid grid-cols-3 gap-2">
+                {(['student', 'teacher', 'parent'] as const).map((option) => (
                   <button
                     key={option}
                     type="button"

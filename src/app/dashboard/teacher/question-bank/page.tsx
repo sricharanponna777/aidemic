@@ -8,6 +8,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { MathContent } from '@/components/MathContent';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
+import { PageLoader } from '@/components/PageLoader';
 import { buildSpecString } from '@/lib/ai/subjectConfig';
 import { normalizeBoard, normalizeExamType } from '@/lib/ai/validation';
 import type { ExamQuestion } from '@/app/api/ai/generate-questions/route';
@@ -226,7 +227,7 @@ export default function TeacherQuestionBankPage() {
     });
 
   if (isLoading || pageLoading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading question bank...</p>;
+    return <PageLoader text="Loading question bank..." />;
   }
 
   return (

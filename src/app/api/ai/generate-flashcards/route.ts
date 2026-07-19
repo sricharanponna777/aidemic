@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { extractFromResponsesBody, extractJsonWithCoercer, tryExtractWithCoercer, type OpenAIResponseBody, type ChatCompletionsResponseBody } from '@/lib/ai/json';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { normalizeMathNotation } from '@/lib/ai/math';
@@ -254,6 +255,9 @@ export async function POST(request: Request) {
     if (authError || !authData.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.generateFlashcards);
+    if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
 
     const rawBody = (await request.json()) as FlashcardPayload;
     const payload = normalizePayload(rawBody);
