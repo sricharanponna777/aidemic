@@ -94,6 +94,24 @@ on conflict (key) do update set value = excluded.value;
 
 `RESEND_FROM_EMAIL` must be a domain verified in Resend; until then it falls back to Resend's shared `onboarding@resend.dev` sender.
 
+### Parent-link notification (Resend + Edge Function + pg_net trigger)
+
+[supabase/functions/parent-link-notification/index.ts](supabase/functions/parent-link-notification/index.ts) emails a student as soon as a parent redeems their invite code. It is triggered by `notify_parent_link_activated()`, an `AFTER UPDATE` trigger on `parent_links` added in migration `20260722000000`, fired the instant `redeem_parent_invite_code()` flips a link's status to `'active'` (via `pg_net`, no cron involved). One-time setup after applying that migration:
+
+```bash
+supabase functions deploy parent-link-notification --no-verify-jwt
+supabase secrets set PARENT_LINK_NOTIFICATION_SECRET=some-random-string
+```
+
+`RESEND_API_KEY` / `RESEND_FROM_EMAIL` are reused from the weekly digest setup above — no need to set them again. Then, in the Supabase SQL editor:
+
+```sql
+insert into app_config (key, value) values
+  ('parent_link_notification_function_url', 'https://<project-ref>.functions.supabase.co/parent-link-notification'),
+  ('parent_link_notification_secret', 'some-random-string') -- must match PARENT_LINK_NOTIFICATION_SECRET above
+on conflict (key) do update set value = excluded.value;
+```
+
 ## Guidelines for changes
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

@@ -56,6 +56,7 @@ function LoginContent() {
           first_name: trimmedFirstName,
           last_name: trimmedLastName,
           full_name: `${trimmedFirstName} ${trimmedLastName}`.trim(),
+          role,
         });
         if (profileError) {
           throw new Error(

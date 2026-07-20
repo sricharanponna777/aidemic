@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Bot, Plus, Sparkles, Trash2, Brain, ShieldPlus, 
 import { Flashcard, FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 import { Button, buttonStyles } from '@/components/ui/button';
+import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
 
 type Deck = Pick<FlashcardDeck, 'id' | 'name' | 'card_count' | 'ai_generated' | 'updated_at' | 'created_at' | 'description'> & {
   due_count?: number;
@@ -166,6 +167,8 @@ export default function Flashcards() {
 
   return (
     <main className="space-y-8" aria-labelledby="flashcards-title">
+      <RevisionCycleStepper current="learn" />
+
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

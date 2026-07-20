@@ -13,6 +13,7 @@ import {
 } from '@/lib/ai/majorTopics';
 import { getSubjectLabel, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
+import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
 import type { GeneratedPodcast } from '@/types';
 
 type PodcastLength = 'short' | 'medium' | 'long';
@@ -139,6 +140,8 @@ export default function PodcastsPage() {
 
   return (
     <main className="space-y-7" aria-labelledby="podcasts-title">
+      <RevisionCycleStepper current="learn" />
+
       <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
         <div className="flex items-center gap-3">
           <Headphones className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />

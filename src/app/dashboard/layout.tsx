@@ -32,20 +32,57 @@ import {
   Zap,
 } from "lucide-react";
 
-const STUDENT_NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
-  { href: "/dashboard/notes", label: "Learn", icon: BookOpen },
-  { href: "/dashboard/podcasts", label: "Podcasts", icon: Headphones },
-  { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
-  { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
-  { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
-  { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
-  { href: "/dashboard/exam-coach", label: "Exam Coach", icon: Compass },
-  { href: "/dashboard/classes", label: "My Classes", icon: Users },
-  { href: "/dashboard/family", label: "Family", icon: Heart },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+const STUDENT_NAV_GROUPS = [
+  {
+    label: null,
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Learn",
+    items: [
+      { href: "/dashboard/notes", label: "Notes", icon: BookOpen },
+      { href: "/dashboard/podcasts", label: "Podcasts", icon: Headphones },
+      { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
+    ],
+  },
+  {
+    label: "Recall",
+    items: [
+      { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
+    ],
+  },
+  {
+    label: "Review",
+    items: [
+      { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
+    ],
+  },
+  {
+    label: "Practice",
+    items: [
+      { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
+    ],
+  },
+  {
+    label: "Improve",
+    items: [
+      { href: "/dashboard/exam-coach", label: "Exam Coach", icon: Compass },
+    ],
+  },
+  {
+    label: null,
+    items: [
+      { href: "/dashboard/classes", label: "My Classes", icon: Users },
+      { href: "/dashboard/family", label: "Family", icon: Heart },
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
+
+type StudentNavItem = (typeof STUDENT_NAV_GROUPS)[number]["items"][number];
 
 const TEACHER_NAV_ITEMS = [
   { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -99,11 +136,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [session, supabase]);
 
-  const navItems = [
-    ...(isTeacher ? TEACHER_NAV_ITEMS : isParent ? PARENT_NAV_ITEMS : STUDENT_NAV_ITEMS),
-    ...(isTeacher && isSchoolAdmin ? [{ href: "/dashboard/teacher/school", label: "School", icon: ShieldCheck }] : []),
-    ...(isPlatformAdmin ? [{ href: "/dashboard/admin/schools", label: "Admin", icon: ShieldAlert }] : []),
-  ];
+  const baseNavGroups: { label: string | null; items: StudentNavItem[] }[] = isTeacher
+    ? [
+        {
+          label: null,
+          items: [
+            ...TEACHER_NAV_ITEMS,
+            ...(isSchoolAdmin ? [{ href: "/dashboard/teacher/school", label: "School", icon: ShieldCheck }] : []),
+          ],
+        },
+      ]
+    : isParent
+    ? [{ label: null, items: PARENT_NAV_ITEMS }]
+    : STUDENT_NAV_GROUPS;
+
+  const navGroups = isPlatformAdmin
+    ? [...baseNavGroups, { label: null, items: [{ href: "/dashboard/admin/schools", label: "Admin", icon: ShieldAlert }] }]
+    : baseNavGroups;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -111,30 +160,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const renderNavLinks = (onNavigate?: () => void) =>
-    navItems.map((item) => {
-      const Icon = item.icon;
-      const active = isActiveRoute(item, pathname);
-      return (
-        <Link
-          key={item.href + item.label}
-          href={item.href}
-          onClick={onNavigate}
-          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group ${
-            active
-              ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 dark:shadow-indigo-500/40 dark:ring-1 dark:ring-indigo-400/30"
-              : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 hover:text-slate-900 dark:hover:text-white"
-          }`}
-        >
-          <Icon
-            className={`h-4.25 w-4.25 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-              active ? "text-white" : "text-slate-500 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white"
-            }`}
-          />
-          {item.label}
-          {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/70" />}
-        </Link>
-      );
-    });
+    navGroups.map((group, groupIndex) => (
+      <div key={group.label ?? `group-${groupIndex}`} className={groupIndex === 0 ? undefined : "mt-2.5"}>
+        {group.label && (
+          <p className="px-2.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+            {group.label}
+          </p>
+        )}
+        <div className="space-y-0.5">
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            const active = isActiveRoute(item, pathname);
+            return (
+              <Link
+                key={item.href + item.label}
+                href={item.href}
+                onClick={onNavigate}
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-all duration-200 group ${
+                  active
+                    ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 dark:shadow-indigo-500/40 dark:ring-1 dark:ring-indigo-400/30"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                <Icon
+                  className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                    active ? "text-white" : "text-slate-500 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white"
+                  }`}
+                />
+                {item.label}
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/70" />}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    ));
 
   if (isLoading) {
     return (

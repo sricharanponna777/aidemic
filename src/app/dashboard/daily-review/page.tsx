@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ListChecks, RotateCcw, Sparkles, Target } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
+import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useToast } from '@/components/ToastProvider';
@@ -381,6 +382,8 @@ export default function DailyReviewPage() {
 
   return (
     <main className="space-y-6" aria-labelledby="daily-review-title">
+      <RevisionCycleStepper current="review" />
+
       <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>

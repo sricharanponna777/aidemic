@@ -33,7 +33,7 @@ export default function FamilyPage() {
   const fetchLinks = async (studentId: string) => {
     const { data, error } = await supabase
       .from('parent_links')
-      .select('id, student_id, parent_id, invite_code, status, created_at')
+      .select('id, student_id, parent_id, invite_code, status, link_source, created_by, revocation_requested_at, created_at')
       .eq('student_id', studentId)
       .order('created_at', { ascending: false });
 
@@ -110,6 +110,17 @@ export default function FamilyPage() {
     setLinks(await fetchLinks(session.user.id));
   };
 
+  const handleRequestRemoval = async (linkId: string) => {
+    if (!session) return;
+    const { error } = await supabase.rpc('request_parent_link_revocation', { p_link_id: linkId });
+    if (error) {
+      showToast('error', 'Could not request removal. Please try again.');
+      return;
+    }
+    showToast('success', 'Removal requested. Your teacher needs to approve it.');
+    setLinks(await fetchLinks(session.user.id));
+  };
+
   const handleCopy = async (link: LinkRow) => {
     await navigator.clipboard.writeText(link.invite_code);
     setCopiedId(link.id);
@@ -150,9 +161,14 @@ export default function FamilyPage() {
                 key={link.id}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/6 dark:bg-white/3"
               >
-                <span className="font-mono text-sm font-semibold uppercase tracking-widest text-slate-900 dark:text-slate-100">
-                  {link.invite_code}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-mono text-sm font-semibold uppercase tracking-widest text-slate-900 dark:text-slate-100">
+                    {link.invite_code}
+                  </span>
+                  {link.link_source === 'teacher' ? (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Created by your teacher</span>
+                  ) : null}
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -162,13 +178,15 @@ export default function FamilyPage() {
                     {copiedId === link.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                     {copiedId === link.id ? 'Copied' : 'Copy'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRevoke(link.id)}
-                    className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {link.link_source === 'student' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRevoke(link.id)}
+                      className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -191,18 +209,35 @@ export default function FamilyPage() {
               >
                 <div className="flex items-center gap-2.5">
                   <Users className="h-4 w-4 text-indigo-500" />
-                  <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    {link.parent_profile?.full_name || link.parent_profile?.email || 'Linked parent'}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {link.parent_profile?.full_name || link.parent_profile?.email || 'Linked parent'}
+                    </span>
+                    {link.link_source === 'teacher' ? (
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Linked by your teacher</span>
+                    ) : null}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleRevoke(link.id)}
-                  className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Revoke access
-                </button>
+                {link.link_source === 'student' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleRevoke(link.id)}
+                    className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Revoke access
+                  </button>
+                ) : link.revocation_requested_at ? (
+                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Removal requested — awaiting teacher approval</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleRequestRemoval(link.id)}
+                    className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
+                  >
+                    Request removal
+                  </button>
+                )}
               </div>
             ))}
           </div>

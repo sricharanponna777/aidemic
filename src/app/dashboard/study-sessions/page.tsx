@@ -9,6 +9,7 @@ import { updateSpacedRepetition, formatInterval, previewNextReview } from '@/lib
 import { useAuth } from '@/hooks/useAuth';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
+import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
 
 type Session = Pick<
   StudySession,
@@ -385,6 +386,8 @@ export default function StudySessions() {
 
   return (
     <main className="space-y-6" aria-labelledby="study-sessions-title">
+      <RevisionCycleStepper current="recall" />
+
       <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>

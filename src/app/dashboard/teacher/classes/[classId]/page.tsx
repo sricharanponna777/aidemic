@@ -18,6 +18,7 @@ import {
   Share2,
   Target,
   Trash2,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import { createClient } from '@/lib/supabase-client';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
 import { AssignmentForm, type CreatedAssignment } from '@/components/teacher/AssignmentForm';
 import { buildStudentStats, buildClassStats, buildTopicStats, buildAssignmentStats } from '@/lib/teacherAnalytics';
+import { ParentLinksPanel } from '@/components/teacher/ParentLinksPanel';
 import type { TeacherClass, TeacherAssignment, TeacherAttempt, TeacherStudent } from '@/hooks/useTeacherClassData';
 
 type ClassInfo = {
@@ -98,6 +100,7 @@ export default function TeacherClassPage() {
   const [pendingDelete, setPendingDelete] = useState(false);
   const [selectedRosterIds, setSelectedRosterIds] = useState<Set<string>>(new Set());
   const [pendingRemoveSelected, setPendingRemoveSelected] = useState(false);
+  const [expandedParentStudentId, setExpandedParentStudentId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
 
@@ -519,28 +522,44 @@ export default function TeacherClassPage() {
               const stats = studentStatsById.get(student.student_id);
               const completedCount = stats?.completedCount ?? 0;
               const flagged = assignments.length > 0 && completedCount === 0;
+              const isExpanded = expandedParentStudentId === student.student_id;
               return (
-                <div key={student.student_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm dark:border-white/6">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedRosterIds.has(student.id)}
-                      onChange={() => toggleRosterSelection(student.id)}
-                      className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600"
-                    />
-                    <span className="font-medium text-slate-900 dark:text-slate-100">{student.full_name || student.email || 'Student'}</span>
-                    {flagged && (
-                      <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
-                        <AlertTriangle className="h-3 w-3" />
-                        Needs attention
-                      </span>
-                    )}
+                <div key={student.student_id} className="rounded-lg border border-slate-200 dark:border-white/6">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedRosterIds.has(student.id)}
+                        onChange={() => toggleRosterSelection(student.id)}
+                        className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600"
+                      />
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{student.full_name || student.email || 'Student'}</span>
+                      {flagged && (
+                        <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                          <AlertTriangle className="h-3 w-3" />
+                          Needs attention
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                      {assignments.length > 0 && <span>{completedCount}/{assignments.length} completed</span>}
+                      {stats?.avgScore != null && <span className={`font-semibold ${scoreTextTone(stats.avgScore)}`}>{stats.avgScore}% avg</span>}
+                      <span>{student.email}</span>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedParentStudentId(isExpanded ? null : student.student_id)}
+                        className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Parent
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                    {assignments.length > 0 && <span>{completedCount}/{assignments.length} completed</span>}
-                    {stats?.avgScore != null && <span className={`font-semibold ${scoreTextTone(stats.avgScore)}`}>{stats.avgScore}% avg</span>}
-                    <span>{student.email}</span>
-                  </div>
+                  {isExpanded && (
+                    <div className="border-t border-slate-200 p-3 dark:border-white/6">
+                      <ParentLinksPanel studentId={student.student_id} />
+                    </div>
+                  )}
                 </div>
               );
             })}

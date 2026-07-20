@@ -20,6 +20,7 @@ import { weightedPredictedGrade } from "@/lib/ai/gradeAverages";
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/subjectConfig";
 import { gcseTierLabelForGrade, gradeBadgeTone } from "@/lib/gradeTone";
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from "@/lib/ai/studentSubjects";
+import { RevisionCycleStepper } from "@/components/RevisionCycleStepper";
 
 type RecentSession = {
   id: string;
@@ -478,6 +479,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+
+      <RevisionCycleStepper />
 
       {/* ── Hero ───────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden rounded-2xl border border-indigo-100 dark:border-indigo-500/20 bg-linear-to-br from-indigo-50 via-white to-purple-50 dark:from-[#131B2E] dark:via-[#111829] dark:to-[#0e1525] p-6 sm:p-8">

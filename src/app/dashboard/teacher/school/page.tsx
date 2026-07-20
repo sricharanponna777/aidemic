@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { ArrowLeft, Check, UserPlus, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
+import { buttonStyles } from '@/components/ui/button';
+import { ParentLinksPanel } from '@/components/teacher/ParentLinksPanel';
 
 type PendingTeacher = {
   id: string;
@@ -17,6 +19,13 @@ type PendingTeacher = {
   email: string | null;
 };
 
+type SchoolStudent = {
+  student_id: string;
+  full_name: string | null;
+  email: string | null;
+  class_name: string;
+};
+
 export default function SchoolAdminPage() {
   const router = useRouter();
   const { session, profile, isLoading } = useAuth();
@@ -24,6 +33,8 @@ export default function SchoolAdminPage() {
 
   const [schoolName, setSchoolName] = useState('');
   const [pendingTeachers, setPendingTeachers] = useState<PendingTeacher[]>([]);
+  const [students, setStudents] = useState<SchoolStudent[]>([]);
+  const [expandedParentStudentId, setExpandedParentStudentId] = useState<string | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [actionError, setActionError] = useState('');
 
@@ -79,6 +90,54 @@ export default function SchoolAdminPage() {
           return { ...t, full_name: p?.full_name ?? null, email: p?.email ?? null };
         })
       );
+
+      const { data: classRows } = await supabase
+        .from('classes')
+        .select('id, name, teachers!inner(school_id)')
+        .eq('teachers.school_id', typedTeacherRow.school_id);
+      const typedClassRows = (classRows ?? []) as unknown as { id: string; name: string }[];
+      const classNameById = new Map(typedClassRows.map((c) => [c.id, c.name]));
+      const classIds = typedClassRows.map((c) => c.id);
+
+      if (classIds.length > 0) {
+        const { data: rosterRows } = await supabase
+          .from('class_students')
+          .select('student_id, class_id')
+          .in('class_id', classIds)
+          .eq('status', 'active');
+        const typedRosterRows = (rosterRows ?? []) as { student_id: string; class_id: string }[];
+        const studentUserIds = [...new Set(typedRosterRows.map((r) => r.student_id))];
+        let studentProfiles: { id: string; full_name: string | null; email: string | null }[] = [];
+        if (studentUserIds.length > 0) {
+          const { data: studentProfileRows } = await supabase.from('user_profiles').select('id, full_name, email').in('id', studentUserIds);
+          studentProfiles = studentProfileRows ?? [];
+        }
+        if (!cancelled) {
+          // Dedupe by student: a student enrolled in several classes at the
+          // school must appear once, with their classes combined (otherwise
+          // duplicate React keys and the parent expander opens every copy).
+          const byStudent = new Map<string, SchoolStudent>();
+          for (const r of typedRosterRows) {
+            const className = classNameById.get(r.class_id) ?? '';
+            const existing = byStudent.get(r.student_id);
+            if (existing) {
+              if (className && !existing.class_name.split(', ').includes(className)) {
+                existing.class_name = existing.class_name ? `${existing.class_name}, ${className}` : className;
+              }
+              continue;
+            }
+            const p = studentProfiles.find((prof) => prof.id === r.student_id);
+            byStudent.set(r.student_id, {
+              student_id: r.student_id,
+              full_name: p?.full_name ?? null,
+              email: p?.email ?? null,
+              class_name: className,
+            });
+          }
+          setStudents([...byStudent.values()]);
+        }
+      }
+
       setPageLoading(false);
     };
 
@@ -154,6 +213,45 @@ export default function SchoolAdminPage() {
           ))}
         </div>
       )}
+
+      <div>
+        <h2 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">School roster</h2>
+        <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">Link a parent to any student at your school.</p>
+        {students.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+            No students enrolled yet.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {students.map((student) => {
+              const isExpanded = expandedParentStudentId === student.student_id;
+              return (
+                <div key={student.student_id} className="rounded-lg border border-slate-200 dark:border-white/6">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                    <div>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{student.full_name || student.email || 'Student'}</span>
+                      <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{student.class_name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedParentStudentId(isExpanded ? null : student.student_id)}
+                      className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Parent
+                    </button>
+                  </div>
+                  {isExpanded && (
+                    <div className="border-t border-slate-200 p-3 dark:border-white/6">
+                      <ParentLinksPanel studentId={student.student_id} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
