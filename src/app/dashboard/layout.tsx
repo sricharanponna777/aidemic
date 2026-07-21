@@ -10,6 +10,7 @@ import {
   BarChart3,
   BookOpen,
   Brain,
+  CalendarDays,
   ClipboardList,
   GraduationCap,
   Headphones,
@@ -27,6 +28,7 @@ import {
   Sparkles,
   Sun,
   Target,
+  TrendingUp,
   Users,
   X,
   Zap,
@@ -96,6 +98,10 @@ const TEACHER_NAV_ITEMS = [
 
 const PARENT_NAV_ITEMS = [
   { href: "/dashboard/parent", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/parent/progress", label: "Progress", icon: TrendingUp },
+  { href: "/dashboard/parent/subjects", label: "Subjects", icon: BookOpen },
+  { href: "/dashboard/parent/activity", label: "Activity", icon: CalendarDays },
+  { href: "/dashboard/parent/assignments", label: "Assignments", icon: ClipboardList },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
