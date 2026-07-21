@@ -2,9 +2,15 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseEnv } from '@/lib/supabase-env';
+import { checkIpRateLimit, getClientIp } from '@/lib/ipRateLimit';
 
 export async function POST(request: Request) {
   try {
+    // Coarse per-IP throttle so this session-setting endpoint can't be hammered.
+    if (!checkIpRateLimit(`auth:${getClientIp(request)}`, 20, 60_000)) {
+      return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 });
+    }
+
     const body = await request.json();
     const { access_token, refresh_token } = body || {};
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Brain, Layers, Loader2, MessageCircle, RotateCcw, Send, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Layers, Loader2, MessageCircle, RotateCcw, Send, Sparkles } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
@@ -37,6 +37,7 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string };
 const SS_TOPIC = 'notes-active-topic';
 const SS_SUBJECT = 'notes-active-subject';
 const SS_NOTES = 'notes-content';
+const SS_CHECKPOINTS = 'notes-checkpoints';
 const SS_CHAT = 'notes-chat-messages';
 
 function ssRead<T>(key: string, fallback: T): T {
@@ -214,6 +215,7 @@ export default function NotesPage() {
   const [activeTopic, setActiveTopic] = useState(() => ssRead(SS_TOPIC, ''));
   const [activeSubject, setActiveSubject] = useState<UserSubject | null>(() => ssRead<UserSubject | null>(SS_SUBJECT, null));
   const [notes, setNotes] = useState(() => ssRead(SS_NOTES, ''));
+  const [checkpoints, setCheckpoints] = useState<string[]>(() => ssRead<string[]>(SS_CHECKPOINTS, []));
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => ssRead<ChatMessage[]>(SS_CHAT, []));
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -221,6 +223,7 @@ export default function NotesPage() {
   useEffect(() => { ssWrite(SS_TOPIC, activeTopic); }, [activeTopic]);
   useEffect(() => { ssWrite(SS_SUBJECT, activeSubject); }, [activeSubject]);
   useEffect(() => { ssWrite(SS_NOTES, notes); }, [notes]);
+  useEffect(() => { ssWrite(SS_CHECKPOINTS, checkpoints); }, [checkpoints]);
   useEffect(() => { ssWrite(SS_CHAT, chatMessages); }, [chatMessages]);
 
   const effectiveSubjectId = selectedSubjectId || subjects[0]?.id || '';
@@ -280,7 +283,7 @@ export default function NotesPage() {
     setErrorMessage('');
 
     try {
-      const response = await fetch('/api/ai/generate-video', {
+      const response = await fetch('/api/ai/generate-notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -304,6 +307,7 @@ export default function NotesPage() {
       setActiveTopic(topic.trim() || 'General revision');
       setActiveSubject(selectedSubject);
       setNotes(body.script || '');
+      setCheckpoints(Array.isArray(body.slides) ? body.slides.filter((slide: unknown): slide is string => typeof slide === 'string' && slide.trim().length > 0) : []);
       setChatMessages([]);
     } catch {
       setErrorMessage('Network error while generating notes.');
@@ -316,6 +320,7 @@ export default function NotesPage() {
     setActiveTopic('');
     setActiveSubject(null);
     setNotes('');
+    setCheckpoints([]);
     setChatMessages([]);
     setErrorMessage('');
   };
@@ -518,13 +523,32 @@ export default function NotesPage() {
           </div>
 
           <div className="grid gap-5 xl:grid-cols-[1fr_0.72fr]">
-            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
-              {notes ? (
-                <MarkdownContent className="prose prose-slate max-w-none dark:prose-invert" content={notes} />
-              ) : (
-                <p className="text-sm text-slate-500 dark:text-slate-400">No notes were returned.</p>
-              )}
-            </article>
+            <div className="space-y-5">
+              <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
+                {notes ? (
+                  <MarkdownContent className="prose prose-slate max-w-none dark:prose-invert" content={notes} />
+                ) : (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">No notes were returned.</p>
+                )}
+              </article>
+              {checkpoints.length > 0 ? (
+                <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-6 dark:border-indigo-500/20 dark:bg-indigo-500/5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Recall checkpoints</h2>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Quick self-test prompts drawn from these notes.</p>
+                  <ol className="mt-4 space-y-2">
+                    {checkpoints.map((checkpoint, index) => (
+                      <li key={index} className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/6 dark:bg-[#131B2E]">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">{index + 1}</span>
+                        <MarkdownContent className="prose prose-sm prose-slate max-w-none dark:prose-invert" content={checkpoint} />
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ) : null}
+            </div>
             {activeSubject ? (
               <StudyChat
                 concept={activeTopic}

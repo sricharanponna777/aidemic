@@ -72,7 +72,7 @@ See `.env.local.example` for the full list including OpenRouter and local LLM op
 
 ## Database
 
-The core student schema lives in [queries.sql](queries.sql). **It contains destructive `DROP TABLE` statements** — always back up data before re-running it. It does not include the teacher/class/school/podcast tables — for those, the migrations in `supabase/migrations/` are the source of truth. Apply schema changes through the Supabase SQL editor or Supabase MCP tools.
+The migrations in `supabase/migrations/` are the **single source of truth** for the schema — apply changes through the Supabase SQL editor or Supabase MCP tools. [queries.sql](queries.sql) is a **legacy reference for the original student-learning tables only**; it predates the teacher/class/school, parent-link, podcast, and profile role/name columns and is **not runnable against a live database** (its destructive `DROP TABLE` block has been removed for that reason). To stand up a fresh database, apply the migrations in order.
 
 ### Weekly parent digest (Resend + Edge Function + pg_cron)
 

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Brain, Clock3, Layers, Play, Rocket, RotateCcw, ShieldPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, Clock3, Layers, Play, Rocket, RotateCcw } from 'lucide-react';
 import { StudySession, FlashcardDeck, Flashcard } from '@/types';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase-client';

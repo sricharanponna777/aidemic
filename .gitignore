@@ -13,6 +13,8 @@ package-lock.json
 yarn.*
 pnpm-lock.*
 bun.*
+# Keep the Bun lockfile tracked for reproducible installs
+!bun.lock
 
 # testing
 /coverage

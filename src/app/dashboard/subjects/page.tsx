@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, BookOpen, GraduationCap, Layers } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, GraduationCap } from 'lucide-react';
 import { SubjectManager } from '@/components/SubjectManager';
 import { buttonStyles } from '@/components/ui/button';
 

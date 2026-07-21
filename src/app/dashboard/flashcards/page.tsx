@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Plus, Sparkles, Trash2, Brain, ShieldPlus, Layers } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bot, Plus, Sparkles, Trash2, Brain, Layers } from 'lucide-react';
 import { Flashcard, FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 import { Button, buttonStyles } from '@/components/ui/button';

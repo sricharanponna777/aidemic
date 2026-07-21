@@ -1,44 +1,20 @@
--- Destructive schema recreation for AIDemic (DROP + CREATE)
--- BACKUP your data before running this script!
+-- ============================================================================
+-- LEGACY student-domain schema reference — DO NOT RUN against a live database.
+--
+-- The migrations in supabase/migrations/ are the single source of truth for the
+-- schema. This file predates the teacher/class/school, parent-link, podcast, and
+-- profile role/name columns, and is kept only as a readable reference for the
+-- original student-learning tables.
+--
+-- The destructive `DROP TABLE ... CASCADE` block that used to head this file has
+-- been removed: running it against a migrated database silently stripped the
+-- role/username/first_name/last_name columns and cascade-deleted data. If you
+-- need to stand up a fresh database, apply the migrations in order instead.
+-- ============================================================================
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "vector";
-
--- ============================================================================
--- DROP TABLES (destructive)
--- ============================================================================
-DROP TABLE IF EXISTS flashcard_tag_mapping CASCADE;
-DROP TABLE IF EXISTS flashcard_tags CASCADE;
-DROP TABLE IF EXISTS flashcards CASCADE;
-DROP TABLE IF EXISTS flashcard_decks CASCADE;
-DROP TABLE IF EXISTS study_session_results CASCADE;
-DROP TABLE IF EXISTS study_sessions CASCADE;
-DROP TABLE IF EXISTS study_goals CASCADE;
-DROP TABLE IF EXISTS user_statistics CASCADE;
-DROP TABLE IF EXISTS user_profiles CASCADE;
-DROP TABLE IF EXISTS generated_videos CASCADE;
-DROP TABLE IF EXISTS exam_practice_attempts CASCADE;
-DROP TABLE IF EXISTS user_subjects CASCADE;
-DROP TABLE IF EXISTS study_plan_progress CASCADE;
-DROP TABLE IF EXISTS study_plan_items CASCADE;
-DROP TABLE IF EXISTS academic_terms CASCADE;
-DROP TABLE IF EXISTS student_analytics CASCADE;
-DROP TABLE IF EXISTS topic_performance CASCADE;
-DROP TABLE IF EXISTS mock_test_answers CASCADE;
-DROP TABLE IF EXISTS mock_test_attempts CASCADE;
-DROP TABLE IF EXISTS mock_test_questions CASCADE;
-DROP TABLE IF EXISTS mock_tests CASCADE;
-DROP TABLE IF EXISTS questions CASCADE;
-DROP TABLE IF EXISTS student_subjects CASCADE;
-DROP TABLE IF EXISTS learning_objectives CASCADE;
-DROP TABLE IF EXISTS subtopics CASCADE;
-DROP TABLE IF EXISTS topics CASCADE;
-DROP TABLE IF EXISTS specifications CASCADE;
-DROP TABLE IF EXISTS subjects CASCADE;
-DROP TABLE IF EXISTS exam_boards CASCADE;
-DROP TABLE IF EXISTS qualifications CASCADE;
-DROP TABLE IF EXISTS curricula CASCADE;
 
 -- ============================================================================
 -- CREATE TABLES

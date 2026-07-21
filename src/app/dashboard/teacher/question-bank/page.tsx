@@ -68,7 +68,14 @@ export default function TeacherQuestionBankPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState('');
   const [preview, setPreview] = useState<ExamQuestion[]>([]);
+  const [sourceMaterial, setSourceMaterial] = useState('');
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
+
+  const [assignTitle, setAssignTitle] = useState('');
+  const [assignDueDate, setAssignDueDate] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [savedInfo, setSavedInfo] = useState<{ classId: string; title: string } | null>(null);
 
   useEffect(() => {
     if (isLoading || !session) return;
@@ -191,6 +198,8 @@ export default function TeacherQuestionBankPage() {
     setIsGenerating(true);
     setPreview([]);
     setRevealed(new Set());
+    setSavedInfo(null);
+    setSaveError('');
     try {
       const response = await fetch('/api/ai/generate-questions', {
         method: 'POST',
@@ -211,10 +220,65 @@ export default function TeacherQuestionBankPage() {
         return;
       }
       setPreview((body.questions as ExamQuestion[]) ?? []);
+      setSourceMaterial(typeof body.sourceMaterial === 'string' ? body.sourceMaterial : '');
     } catch (err) {
       setGenError(err instanceof Error ? err.message : 'Failed to generate questions.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Persist the questions the teacher just previewed as a practice assignment.
+  // Reuses the exact `assignments` insert shape from AssignmentForm, but saves
+  // the already-generated preview instead of making a second AI call.
+  const handleSaveAssignment = async () => {
+    if (!teacherId || !selectedClass) {
+      setSaveError('Choose a class first.');
+      return;
+    }
+    const topic = topics.find((t) => t.id === genTopicId);
+    if (!topic) {
+      setSaveError('Choose a topic before saving.');
+      return;
+    }
+    if (preview.length === 0) {
+      setSaveError('Generate a preview before saving.');
+      return;
+    }
+    const subtopic = subtopics.find((s) => s.id === genSubtopicId);
+    setIsSaving(true);
+    setSaveError('');
+    setSavedInfo(null);
+    try {
+      const { data, error } = await supabase
+        .from('assignments')
+        .insert({
+          class_id: selectedClass.id,
+          teacher_id: teacherId,
+          title: assignTitle.trim() || `${topic.name}${subtopic ? ` - ${subtopic.name}` : ''}`,
+          topic_id: topic.id,
+          subtopic_id: subtopic?.id ?? null,
+          assignment_type: 'practice',
+          due_date: assignDueDate ? new Date(assignDueDate).toISOString() : null,
+          questions_payload: preview,
+          source_material: sourceMaterial || null,
+          allow_reattempts: false,
+        })
+        .select('id, title, class_id, assignment_type, created_at, topics ( name )')
+        .single();
+      if (error) {
+        setSaveError(error.message);
+        return;
+      }
+      const saved = data as unknown as SavedAssignment;
+      setSavedAssignments((prev) => [saved, ...prev]);
+      setSavedInfo({ classId: saved.class_id, title: saved.title });
+      setAssignTitle('');
+      setAssignDueDate('');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save assignment.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -347,11 +411,8 @@ export default function TeacherQuestionBankPage() {
             <div className="space-y-4">
               <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Preview the questions AIDemic would produce for any topic. To set them as an assignment for students, use the{' '}
-                  <Link href="/dashboard/teacher/assignments" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                    Assignments
-                  </Link>{' '}
-                  page.
+                  Preview the questions AIDemic would produce for any topic, then save the set as an assignment for this class
+                  without regenerating.
                 </p>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
@@ -396,6 +457,43 @@ export default function TeacherQuestionBankPage() {
                   </button>
                 </div>
               </section>
+
+              {preview.length > 0 && (
+                <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-500/20 dark:bg-indigo-500/5">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Save these {preview.length} question{preview.length === 1 ? '' : 's'} as an assignment</h3>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Sets this exact preview for <span className="font-medium">{selectedClass?.name}</span> — no regeneration.
+                  </p>
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
+                    <input
+                      type="text"
+                      value={assignTitle}
+                      onChange={(e) => setAssignTitle(e.target.value)}
+                      placeholder="Title (optional — defaults to the topic name)"
+                      className={`${selectClass} w-full`}
+                    />
+                    <input
+                      type="date"
+                      value={assignDueDate}
+                      onChange={(e) => setAssignDueDate(e.target.value)}
+                      className={selectClass}
+                      aria-label="Due date (optional)"
+                    />
+                    <button type="button" onClick={handleSaveAssignment} disabled={isSaving} className={buttonStyles({ variant: 'primary' })}>
+                      {isSaving ? 'Saving...' : 'Save as assignment'}
+                    </button>
+                  </div>
+                  {saveError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{saveError}</p> : null}
+                  {savedInfo ? (
+                    <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
+                      Saved “{savedInfo.title}”.{' '}
+                      <Link href={`/dashboard/teacher/classes/${savedInfo.classId}`} className="font-medium underline">
+                        View in class
+                      </Link>
+                    </p>
+                  ) : null}
+                </section>
+              )}
 
               {preview.length > 0 && (
                 <section className="space-y-3">

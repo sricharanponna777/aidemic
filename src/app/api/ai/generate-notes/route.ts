@@ -1,3 +1,6 @@
+// Generates Markdown study notes (+ recall checkpoints). Persists to the
+// `generated_videos` table, whose name is legacy — this feature produces notes,
+// not video. The table/bucket names are kept to avoid a heavy schema migration.
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
@@ -219,7 +222,6 @@ Do NOT include any text outside the JSON.`;
 
   const data = await response.json() as { choices: { message: { content: string } }[] };
   const rawContent = data.choices[0].message.content;
-  console.info('[generate-notes] Raw AI output', rawContent);
   const parsed = parseGeneratedContent(rawContent) as {
     script: string;
     slides: string[];

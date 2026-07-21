@@ -1120,18 +1120,6 @@ export async function POST(request: Request) {
       12000
     );
 
-    console.info('[generate-questions] Produced question set', {
-      subject: payload.subject,
-      examBoard: payload.examBoard,
-      examType: payload.examType,
-      specification: payload.specification,
-      requestedQuestionCount: payload.questionCount,
-      producedQuestionCount: withFigures.length,
-      sourceMaterial,
-      questions: withFigures,
-      warnings,
-    });
-
     return NextResponse.json({
       success: true,
       questionCount: withFigures.length,
