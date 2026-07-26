@@ -112,6 +112,7 @@ export interface GeneratedPodcast {
   user_id: string;
   subject: string;
   topic: string;
+  subtopic?: string;
   length: 'short' | 'medium' | 'long';
   voice: string;
   script_content: string;

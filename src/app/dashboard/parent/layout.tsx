@@ -44,14 +44,14 @@ function ParentShell({ children }: { children: React.ReactNode }) {
   };
 
   if (isLoading || loading) {
-    return <PageLoader text="Loading your family dashboard..." />;
+    return <PageLoader text="Loading your Parent Dashboard..." />;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-content dark:text-white">Family Dashboard</h1>
+          <h1 className="text-2xl font-bold text-content dark:text-white">Parent Dashboard</h1>
           <p className="mt-1 text-sm text-content-muted">
             A read-only view of your child&apos;s progress on AIDemic.
           </p>

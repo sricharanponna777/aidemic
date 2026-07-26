@@ -4,32 +4,15 @@ import { buildAIHeaders, getAIConfig, getMissingHostedKeyError, getTTSConfig } f
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
+import { txt } from '@/lib/ai/text';
 
 type PodcastPayload = {
   subject: string;
   topic?: string;
+  subtopic?: string;
   examBoard?: string;
   examType?: string;
   specification?: string;
-  length?: 'short' | 'medium' | 'long';
-};
-
-const CHAR_TARGET: Record<'short' | 'medium' | 'long', number> = {
-  short: 700,
-  medium: 1800,
-  long: 3600,
-};
-
-const MINUTES_LABEL: Record<'short' | 'medium' | 'long', string> = {
-  short: '~1 minute',
-  medium: '~2-3 minutes',
-  long: '~5 minutes',
-};
-
-const TURN_COUNT: Record<'short' | 'medium' | 'long', number> = {
-  short: 4,
-  medium: 8,
-  long: 14,
 };
 
 type DialogueTurn = { speaker: 'HOST' | 'GUEST'; text: string };
@@ -85,13 +68,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body: PodcastPayload = await request.json();
-    const { subject, topic, examBoard, examType, specification, length = 'medium' } = body;
+    const { subject, topic, examBoard, examType, specification } = body;
+    const subtopic = txt(body.subtopic || '', 200);
 
     if (!subject) {
       return NextResponse.json({ error: 'Subject is required' }, { status: 400 });
-    }
-    if (!CHAR_TARGET[length]) {
-      return NextResponse.json({ error: 'Invalid length' }, { status: 400 });
     }
 
     if (topic) {
@@ -115,7 +96,7 @@ export async function POST(request: Request) {
     const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.generatePodcast);
     if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
 
-    const script = await generateScript(topic, subject, length, examBoard, examType, specification);
+    const script = await generateScript(topic, subtopic, subject, examBoard, examType, specification);
     const turns = parseDialogueTurns(script);
     if (turns.length === 0) {
       return NextResponse.json({ error: 'The AI provider returned an empty script.' }, { status: 500 });
@@ -128,13 +109,15 @@ export async function POST(request: Request) {
 
     const voiceFor = (speaker: DialogueTurn['speaker']) => (speaker === 'HOST' ? ttsConfig.voice : ttsConfig.secondaryVoice);
     const turnAudio = await Promise.all(turns.map((turn) => synthesizeSpeech(turn.text, ttsConfig, voiceFor(turn.speaker))));
-    const audioBuffer = Buffer.concat(turnAudio);
+    const pcmBuffer = Buffer.concat(turnAudio);
+    const audioBuffer = pcmToWav(pcmBuffer);
     const characterCount = turns.reduce((sum, turn) => sum + turn.text.length, 0);
+    const length = characterCount < 1200 ? 'short' : characterCount < 2800 ? 'medium' : 'long';
 
-    const filePath = `${user.id}/${crypto.randomUUID()}.mp3`;
+    const filePath = `${user.id}/${crypto.randomUUID()}.wav`;
     const { error: uploadError } = await supabase.storage
       .from('generated-podcasts')
-      .upload(filePath, audioBuffer, { contentType: 'audio/mpeg' });
+      .upload(filePath, audioBuffer, { contentType: 'audio/wav' });
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
@@ -149,6 +132,7 @@ export async function POST(request: Request) {
         user_id: user.id,
         subject,
         topic: topic || 'General revision',
+        subtopic: subtopic || null,
         length,
         voice: `${ttsConfig.voice} & ${ttsConfig.secondaryVoice}`,
         script_content: script,
@@ -175,8 +159,8 @@ export async function POST(request: Request) {
 
 async function generateScript(
   topic: string | undefined,
+  subtopic: string | undefined,
   subject: string,
-  length: 'short' | 'medium' | 'long',
   examBoard?: string,
   examType?: string,
   specification?: string,
@@ -190,15 +174,13 @@ async function generateScript(
   const examContext = [boardContext, levelContext].filter(Boolean).join(' ');
   const specContext = specification ? `Specification: ${specification}.` : '';
   const courseContext = [examContext, specContext].filter(Boolean).join(' ');
-  const charTarget = CHAR_TARGET[length];
-  const turnCount = TURN_COUNT[length];
 
   const instruction = `You are writing the script for a two-host educational audio podcast episode. HOST leads the episode; GUEST is a co-host who asks questions, reacts, and adds detail. They have a natural, friendly back-and-forth conversation, like two people who know the subject well talking to each other.
 
 ${topic
     ? `The episode is about "${topic}" in ${subject}.`
     : `No specific topic was given, so generalise across ${subject}, choosing a well-rounded, representative spread of topics from the specification.`}
-${courseContext ? `${courseContext}\n` : ''}Target length: ${MINUTES_LABEL[length]} of spoken audio, approximately ${charTarget} characters total across both speakers, in about ${turnCount} conversational turns.
+${topic && subtopic ? `Subtopic focus: ${subtopic}. Concentrate the episode on this subtopic rather than the whole topic.\n` : ''}${courseContext ? `${courseContext}\n` : ''}You decide the length. Cover the topic properly -- a narrow, simple topic might only need a tight ~1 minute (roughly 4-6 turns), while a broad or genuinely rich topic can run to ~5 minutes (roughly 12-16 turns). Do not pad with filler or repetition to hit a length, and do not rush past ideas that need room -- stop once the topic has been properly explained.
 
 HOST opens with a short hook, then the two of them explain the ideas together conversationally -- asking each other questions, building on what the other just said, reacting naturally ("oh that's a good point", "wait, so how does that work?") -- and GUEST or HOST closes with a brief recap.
 
@@ -207,8 +189,14 @@ Formatting requirements:
 - Each turn should be a short, natural chunk of speech (one to three sentences), not a long monologue.
 - Do not use markdown formatting (no #, *, -, bullet lists, or tables) anywhere in the spoken text.
 - Do not use LaTeX, mathematical symbols, or special notation. Spell everything out the way you would say it aloud (e.g. "x squared plus two" not "x^2 + 2", "the square root of nine" not "√9").
-- Do not include stage directions or sound effect cues -- only the speaker label and their spoken words.
 - Only include content that is assessable for the stated course/specification. Do not import topics from another exam board, qualification level, or option route.
+
+Voice delivery tags:
+This script will be read aloud by a Gemini text-to-speech voice that responds to inline delivery tags. Sprinkle these in where they'd occur naturally in real conversation, to make the read expressive rather than flat.
+- Place a tag in square brackets immediately before the word or phrase it colours, e.g. "GUEST: [laughs] okay yes, that one always gets me." or "HOST: [whispers] here's the bit examiners love to test."
+- Draw from this set (or a close variant of it) and use whichever fits the moment: [cheerful], [excited], [curious], [thoughtful], [amused], [laughs], [chuckles], [sighs], [surprised], [impressed], [reassuring], [serious], [emphatic], [encouraging], [explaining].
+- Use them sparingly and only where the emotion is genuine -- roughly one tag every one or two turns, never more than one per turn, and never on a turn that doesn't call for it. Do not tag every line or the effect becomes noise instead of expression.
+- Never invent stage directions or sound effects outside this bracket-tag format (no "(pause)", no narrated actions) -- only the speaker label, optional single leading tag, and their spoken words.
 
 Return ONLY the labelled dialogue lines. Do not include any preamble, title, or text outside the dialogue itself.`;
 
@@ -253,7 +241,7 @@ async function synthesizeSpeech(text: string, ttsConfig: ReturnType<typeof getTT
       model: ttsConfig.model,
       input: text,
       voice,
-      response_format: 'mp3',
+      response_format: 'pcm',
     }),
   });
 
@@ -264,4 +252,32 @@ async function synthesizeSpeech(text: string, ttsConfig: ReturnType<typeof getTT
 
   const arrayBuffer = await response.arrayBuffer();
   return Buffer.from(arrayBuffer);
+}
+
+// Gemini TTS returns raw headerless PCM (16-bit signed, mono, 24kHz), which
+// browsers can't play directly -- wrap it in a WAV header so <audio> can.
+const PCM_SAMPLE_RATE = 24000;
+const PCM_CHANNELS = 1;
+const PCM_BIT_DEPTH = 16;
+
+function pcmToWav(pcmData: Buffer): Buffer {
+  const blockAlign = PCM_CHANNELS * (PCM_BIT_DEPTH / 8);
+  const byteRate = PCM_SAMPLE_RATE * blockAlign;
+  const header = Buffer.alloc(44);
+
+  header.write('RIFF', 0, 'ascii');
+  header.writeUInt32LE(36 + pcmData.length, 4);
+  header.write('WAVE', 8, 'ascii');
+  header.write('fmt ', 12, 'ascii');
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(PCM_CHANNELS, 22);
+  header.writeUInt32LE(PCM_SAMPLE_RATE, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(PCM_BIT_DEPTH, 34);
+  header.write('data', 36, 'ascii');
+  header.writeUInt32LE(pcmData.length, 40);
+
+  return Buffer.concat([header, pcmData]);
 }

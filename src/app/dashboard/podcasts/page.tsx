@@ -7,6 +7,7 @@ import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useTopicOptions } from '@/hooks/useTopicOptions';
+import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
 import {
   getQualificationTopicError,
   isAllowedQualificationTopic,
@@ -15,14 +16,6 @@ import { getSubjectLabel, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
 import type { GeneratedPodcast } from '@/types';
-
-type PodcastLength = 'short' | 'medium' | 'long';
-
-const LENGTH_OPTIONS: { value: PodcastLength; label: string; hint: string }[] = [
-  { value: 'short', label: 'Short', hint: '~1 min' },
-  { value: 'medium', label: 'Medium', hint: '~2-3 min' },
-  { value: 'long', label: 'Long', hint: '~5 min' },
-];
 
 type DialogueTurn = { speaker: 'HOST' | 'GUEST'; text: string };
 
@@ -44,7 +37,7 @@ export default function PodcastsPage() {
   const { subjects, isLoading: subjectsLoading, error: subjectsError } = useUserSubjects();
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [topic, setTopic] = useState('');
-  const [length, setLength] = useState<PodcastLength>('medium');
+  const [subtopic, setSubtopic] = useState('');
   const [activePodcast, setActivePodcast] = useState<GeneratedPodcast | null>(null);
   const [history, setHistory] = useState<GeneratedPodcast[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -54,6 +47,8 @@ export default function PodcastsPage() {
   const selectedSubject = subjects.find((subject) => subject.id === effectiveSubjectId) ?? null;
   const { topics: topicOptions, isLoading: topicsLoading } = useTopicOptions(selectedSubject, '', '', '');
   const topicSuggestions = topicOptions.map((option) => option.name);
+  const selectedTopicOption = topicOptions.find((option) => option.name === topic.trim()) ?? null;
+  const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
   const topicIsAllowed = !topic.trim() || topicsLoading || isAllowedQualificationTopic(topic, topicSuggestions);
   const subjectSpecComplete = isSubjectSpecComplete(selectedSubject);
   const canGenerate = topicIsAllowed && !topicsLoading && !!selectedSubject && subjectSpecComplete && !isGenerating;
@@ -113,10 +108,10 @@ export default function PodcastsPage() {
         body: JSON.stringify({
           subject: selectedSubject.subject,
           topic: topic.trim() || undefined,
+          subtopic: subtopic.trim() || undefined,
           examBoard: selectedSubject.exam_board,
           examType: selectedSubject.exam_type,
           specification,
-          length,
         }),
       });
       const body = await response.json();
@@ -163,6 +158,7 @@ export default function PodcastsPage() {
               onSubjectChange={(id) => {
                 setSelectedSubjectId(id);
                 setTopic('');
+                setSubtopic('');
               }}
             />
 
@@ -171,6 +167,7 @@ export default function PodcastsPage() {
               value={topic}
               onChange={(value) => {
                 setTopic(value);
+                setSubtopic('');
                 setErrorMessage('');
               }}
               suggestions={topicSuggestions}
@@ -178,26 +175,15 @@ export default function PodcastsPage() {
               placeholder="Start typing a topic, or leave blank to generalise"
             />
 
-            <div>
-              <p className="block text-sm font-medium text-content-muted dark:text-slate-300">Length</p>
-              <div className="mt-1 grid grid-cols-3 gap-2">
-                {LENGTH_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setLength(option.value)}
-                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                      length === option.value
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/15 dark:text-indigo-300'
-                        : 'border-subtle text-content-muted hover:border-indigo-300'
-                    }`}
-                  >
-                    {option.label}
-                    <span className="block text-xs font-normal opacity-70">{option.hint}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
+              <TopicInput
+                label="Subtopic (optional)"
+                value={subtopic}
+                onChange={setSubtopic}
+                suggestions={subtopicSuggestions}
+                placeholder="Narrow the focus within this topic"
+              />
+            ) : null}
 
             {validationMessage ? (
               <p className={`text-xs ${errorMessage || subjectsError ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'}`}>
@@ -217,7 +203,10 @@ export default function PodcastsPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Podcast</p>
-                <p className="mt-0.5 text-lg font-semibold text-content">{activePodcast.topic}</p>
+                <p className="mt-0.5 text-lg font-semibold text-content">
+                  {activePodcast.topic}
+                  {activePodcast.subtopic ? <span className="font-normal text-content-subtle"> · {activePodcast.subtopic}</span> : null}
+                </p>
                 <p className="text-sm text-content-subtle">{getSubjectLabel(activePodcast.subject)}</p>
               </div>
               <button type="button" onClick={reset} className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'shrink-0' })}>
@@ -263,7 +252,10 @@ export default function PodcastsPage() {
                   className="flex w-full items-center justify-between gap-3 py-3 text-left text-sm hover:text-accent dark:hover:text-indigo-400"
                 >
                   <span>
-                    <span className="font-medium text-content">{podcast.topic}</span>
+                    <span className="font-medium text-content">
+                      {podcast.topic}
+                      {podcast.subtopic ? <span className="font-normal text-content-subtle"> · {podcast.subtopic}</span> : null}
+                    </span>
                     <span className="ml-2 text-content-subtle">{getSubjectLabel(podcast.subject)}</span>
                   </span>
                   <span className="shrink-0 text-xs text-content-subtle dark:text-content-subtle">
