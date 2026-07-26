@@ -129,14 +129,14 @@ function StudyChat({
   };
 
   return (
-    <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+    <aside className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="rounded-xl bg-indigo-100 p-2 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400">
+        <div className="rounded-xl bg-indigo-100 p-2 text-accent dark:bg-indigo-500/15">
           <MessageCircle className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="font-semibold text-slate-900 dark:text-slate-100">Study Chat</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+          <h2 className="font-semibold text-content">Study Chat</h2>
+          <p className="mt-1 text-sm text-content-muted">
             Ask for a simpler explanation, example, or quick check.
           </p>
         </div>
@@ -164,14 +164,14 @@ function StudyChat({
                 className={`rounded-xl px-3 py-2 text-sm ${
                   message.role === 'user'
                     ? 'ml-6 bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white'
-                    : 'mr-6 bg-slate-100 text-slate-800 dark:bg-white/8 dark:text-slate-100'
+                    : 'mr-6 bg-slate-100 text-content-muted dark:bg-surface/8 text-content'
                 }`}
               >
                 <MarkdownContent content={message.content} />
               </div>
             ))}
             {isSending ? (
-              <div className="mr-6 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-600 dark:bg-white/8 dark:text-slate-300">
+              <div className="mr-6 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-content-muted dark:bg-surface/8">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Thinking...
               </div>
@@ -187,7 +187,7 @@ function StudyChat({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Ask a follow-up..."
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+          className="min-w-0 flex-1 rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
         />
         <button
           type="submit"
@@ -329,15 +329,15 @@ export default function NotesPage() {
     <main className="space-y-7" aria-labelledby="notes-title">
       <RevisionCycleStepper current="learn" />
 
-      <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
+      <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 2 of 5</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 2 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <BookOpen className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="notes-title" className="text-3xl font-bold text-slate-900 dark:text-white">Learn</h1>
+              <BookOpen className="h-7 w-7 text-accent" />
+              <h1 id="notes-title" className="text-3xl font-bold text-content dark:text-white">Learn</h1>
             </div>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-2 text-sm text-content-muted">
               Generate focused study notes from one of your saved subjects.
             </p>
           </div>
@@ -356,8 +356,8 @@ export default function NotesPage() {
       </section>
 
       {!activeTopic ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create study notes</h2>
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+          <h2 className="text-lg font-semibold text-content">Create study notes</h2>
           <form onSubmit={generateNotes} className="mt-5 space-y-5">
             <SubjectSpecSelector
               subjects={subjects}
@@ -396,7 +396,7 @@ export default function NotesPage() {
 
             {isSelectedPoetryCluster ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
                   First poem
                   <select
                     value={poemOne}
@@ -406,7 +406,7 @@ export default function NotesPage() {
                       setSubtopic('');
                       if (event.target.value === poemTwo) setPoemTwo('');
                     }}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
                   >
                     <option value="">Select first poem</option>
                     {poetryPoems.map((poem) => (
@@ -414,8 +414,8 @@ export default function NotesPage() {
                     ))}
                   </select>
                 </label>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Second poem <span className="font-normal text-slate-400">(optional)</span>
+                <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
+                  Second poem <span className="font-normal text-content-subtle">(optional)</span>
                   <select
                     value={poemTwo}
                     onChange={(event) => {
@@ -424,7 +424,7 @@ export default function NotesPage() {
                       setSubtopic('');
                     }}
                     disabled={!poemOne}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100 dark:disabled:bg-white/5"
+                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent disabled:disabled:text-content-subtle text-content dark:disabled:bg-surface/5"
                   >
                     <option value="">No comparison poem</option>
                     {poetryPoems.filter((poem) => poem !== poemOne).map((poem) => (
@@ -459,12 +459,12 @@ export default function NotesPage() {
             ) : null}
 
             {learningObjectiveOptions.length > 0 ? (
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
                 Learning objective (optional)
                 <select
                   value={learningObjective}
                   onChange={(event) => setLearningObjective(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
                 >
                   <option value="">No specific focus</option>
                   {learningObjectiveOptions.map((objective) => (
@@ -475,12 +475,12 @@ export default function NotesPage() {
             ) : null}
 
             {paperOptions.length > 0 ? (
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
                 Paper (optional)
                 <select
                   value={paper}
                   onChange={(event) => setPaper(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
                 >
                   <option value="">General (any paper)</option>
                   {paperOptions.map((paperOption) => (
@@ -504,13 +504,13 @@ export default function NotesPage() {
         </section>
       ) : (
         <section className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
+          <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Study notes</p>
-                <p className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-slate-100">{activeTopic}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Study notes</p>
+                <p className="mt-0.5 text-lg font-semibold text-content">{activeTopic}</p>
                 {activeSubject ? (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="text-sm text-content-subtle">
                     {getSubjectLabel(activeSubject.subject)} - {getExamBoardLabel(activeSubject.exam_board)} {getExamTypeLabel(activeSubject.exam_type)}
                   </p>
                 ) : null}
@@ -524,23 +524,23 @@ export default function NotesPage() {
 
           <div className="grid gap-5 xl:grid-cols-[1fr_0.72fr]">
             <div className="space-y-5">
-              <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
+              <article className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
                 {notes ? (
                   <MarkdownContent className="prose prose-slate max-w-none dark:prose-invert" content={notes} />
                 ) : (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">No notes were returned.</p>
+                  <p className="text-sm text-content-subtle">No notes were returned.</p>
                 )}
               </article>
               {checkpoints.length > 0 ? (
                 <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-6 dark:border-indigo-500/20 dark:bg-indigo-500/5">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <Sparkles className="h-4 w-4 text-accent" />
                     <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Recall checkpoints</h2>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Quick self-test prompts drawn from these notes.</p>
+                  <p className="mt-1 text-xs text-content-subtle">Quick self-test prompts drawn from these notes.</p>
                   <ol className="mt-4 space-y-2">
                     {checkpoints.map((checkpoint, index) => (
-                      <li key={index} className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/6 dark:bg-[#131B2E]">
+                      <li key={index} className="flex gap-3 rounded-lg border border-subtle bg-surface p-3">
                         <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">{index + 1}</span>
                         <MarkdownContent className="prose prose-sm prose-slate max-w-none dark:prose-invert" content={checkpoint} />
                       </li>

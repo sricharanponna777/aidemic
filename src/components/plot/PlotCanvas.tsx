@@ -151,7 +151,7 @@ export function PlotCanvas({
   return (
     <svg
       viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-      className="w-full touch-none select-none rounded-lg border border-slate-300 bg-white text-slate-700 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-300"
+      className="w-full touch-none select-none rounded-lg border border-subtle bg-surface text-content-muted dark:text-slate-300"
     >
       {xMinorTicks.map((tick) => (
         <line key={`xmg-${tick}`} x1={xScale(tick)} x2={xScale(tick)} y1={plotTop} y2={plotBottom} stroke="currentColor" strokeOpacity={0.14} />

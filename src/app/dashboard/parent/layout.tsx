@@ -51,8 +51,8 @@ function ParentShell({ children }: { children: React.ReactNode }) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Family Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          <h1 className="text-2xl font-bold text-content dark:text-white">Family Dashboard</h1>
+          <p className="mt-1 text-sm text-content-muted">
             A read-only view of your child&apos;s progress on AIDemic.
           </p>
         </div>
@@ -67,15 +67,15 @@ function ParentShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {showLinkForm ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <label className="text-sm font-semibold text-slate-800 dark:text-slate-100">Link a child</label>
+        <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+          <label className="text-sm font-semibold text-content-muted text-content">Link a child</label>
           <div className="mt-2 flex gap-2">
             <input
               type="text"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
               placeholder="Enter invite code"
-              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono uppercase tracking-widest outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+              className="flex-1 rounded-lg border border-subtle px-3 py-2 text-sm font-mono uppercase tracking-widest outline-none focus:border-accent bg-surface text-content"
             />
             <button type="button" onClick={handleLink} disabled={isLinking} className={buttonStyles({ variant: 'primary' })}>
               <LogIn className="h-4 w-4" />
@@ -87,10 +87,10 @@ function ParentShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       {students.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center dark:border-white/6 dark:bg-white/3">
-          <Users className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
-          <p className="font-semibold text-slate-800 dark:text-slate-200">No linked children yet</p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-10 text-center dark:border-white/6 dark:bg-surface/3">
+          <Users className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-content-muted" />
+          <p className="font-semibold text-content-muted dark:text-slate-200">No linked children yet</p>
+          <p className="mt-1 text-sm text-content-subtle">
             Ask your child to open Family in their AIDemic dashboard and share their invite code, then add it above.
           </p>
         </div>
@@ -106,7 +106,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
                   className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
                     selectedStudentId === student.studentId
                       ? 'bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20'
-                      : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'
+                      : 'border border-subtle bg-surface text-content-muted hover:bg-surface-sunken dark:border-white/10 dark:bg-surface/5'
                   }`}
                 >
                   {student.name}
@@ -114,7 +114,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
               ))}
             </div>
           ) : (
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{students[0].name}</h2>
+            <h2 className="text-xl font-bold text-content dark:text-white">{students[0].name}</h2>
           )}
 
           {children}

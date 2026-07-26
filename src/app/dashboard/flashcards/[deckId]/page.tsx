@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Brain, Edit, Layers, Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Brain, Edit, Layers, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag, FlashcardTagMapping } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
+import { countLeeches, isLeech } from '@/lib/leeches';
 
 const TAG_COLORS = ['#2563eb', '#0f766e', '#7c3aed', '#be123c', '#b45309', '#0284c7'];
 
@@ -27,6 +28,7 @@ export default function DeckPage() {
   const [showAddCard, setShowAddCard] = useState(false);
   const [activeFilterTagId, setActiveFilterTagId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showLeechesOnly, setShowLeechesOnly] = useState(false);
   const [status, setStatus] = useState('');
   const [editingCard, setEditingCard] = useState<Flashcard | null>(null);
   const [editFront, setEditFront] = useState('');
@@ -84,11 +86,13 @@ export default function DeckPage() {
     return cards.filter((card) => {
       const inSearch = !lowered || card.front.toLowerCase().includes(lowered) || card.back.toLowerCase().includes(lowered);
       const inTag = !activeFilterTagId || (cardTags[card.id] || []).includes(activeFilterTagId);
-      return inSearch && inTag;
+      const inLeech = !showLeechesOnly || isLeech(card);
+      return inSearch && inTag && inLeech;
     });
-  }, [cards, searchQuery, activeFilterTagId, cardTags]);
+  }, [cards, searchQuery, activeFilterTagId, cardTags, showLeechesOnly]);
 
   const dueCards = useMemo(() => cards.filter((card) => new Date(card.next_review_date || 0) <= new Date()).length, [cards]);
+  const leechCount = useMemo(() => countLeeches(cards), [cards]);
 
   const handleAddCard = async () => {
     if (!newFront.trim() || !newBack.trim()) {
@@ -243,19 +247,19 @@ export default function DeckPage() {
     setEditSelectedTags([]);
   };
 
-  if (loading) return <p className="text-slate-600 dark:text-slate-300">Loading deck...</p>;
+  if (loading) return <p className="text-content-muted">Loading deck...</p>;
   if (!deck) return <p className="text-red-600">Deck not found.</p>;
 
   return (
     <main className="space-y-7" aria-labelledby="deck-page-title">
-      <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-white to-slate-100 p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-white/6 dark:from-slate-900 dark:to-slate-800 dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
+      <section className="rounded-card border border-subtle bg-linear-to-br from-surface to-surface-sunken p-6 shadow-raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className='flex flex-row items-center gap-3'>
-              <Layers className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="deck-page-title" className="text-3xl font-bold text-slate-900 dark:text-slate-100">{deck.name}</h1>
+              <Layers className="h-7 w-7 text-accent" />
+              <h1 id="deck-page-title" className="text-3xl font-bold text-content">{deck.name}</h1>
             </div>
-            {deck.description ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{deck.description}</p> : null}
+            {deck.description ? <p className="mt-2 text-sm text-content-muted">{deck.description}</p> : null}
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'secondary' })}>
@@ -269,15 +273,15 @@ export default function DeckPage() {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-[#131B2E] dark:text-slate-200">{deck.card_count || cards.length} cards</span>
-          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-[#131B2E] dark:text-slate-200">{dueCards} due now</span>
-          <span className="rounded-full bg-white px-3 py-1 text-slate-700 shadow-sm dark:bg-[#131B2E] dark:text-slate-200">{tags.length} tags</span>
+          <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{deck.card_count || cards.length} cards</span>
+          <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{dueCards} due now</span>
+          <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{tags.length} tags</span>
           {deck.ai_generated ? <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-900/45 dark:text-blue-200">AI deck</span> : null}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Tags</h2>
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-content">Tags</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             className={buttonStyles({
@@ -286,7 +290,7 @@ export default function DeckPage() {
               className: `${
                 !activeFilterTagId
                   ? 'bg-slate-900 text-white dark:bg-blue-600'
-                  : 'bg-slate-100 text-slate-700 dark:bg-white/8 dark:text-slate-200'
+                  : 'bg-slate-100 text-content-muted dark:bg-surface/8'
               }`,
             })}
             onClick={() => setActiveFilterTagId('')}
@@ -319,7 +323,7 @@ export default function DeckPage() {
             onChange={(event) => setNewTag(event.target.value)}
             placeholder="Create a new tag"
             aria-label="New tag name"
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+            className="flex-1 rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
           />
           <button onClick={handleAddTag} className={buttonStyles({ variant: 'primary' })}>
             <Tag className="h-4 w-4" />
@@ -328,9 +332,9 @@ export default function DeckPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Cards ({filteredCards.length})</h2>
+          <h2 className="text-xl font-semibold text-content">Cards ({filteredCards.length})</h2>
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <button
               type="button"
@@ -343,20 +347,35 @@ export default function DeckPage() {
               <Plus className="h-4 w-4" />
               Add card
             </button>
+            {leechCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowLeechesOnly((v) => !v)}
+                aria-pressed={showLeechesOnly}
+                className={buttonStyles({
+                  variant: showLeechesOnly ? 'danger' : 'secondary',
+                  size: 'sm',
+                })}
+                title="Cards you repeatedly get wrong — fix these first"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {showLeechesOnly ? 'Showing leeches' : `${leechCount} leech${leechCount === 1 ? '' : 'es'}`}
+              </button>
+            )}
             <div className="relative min-w-56 flex-1 sm:w-72 sm:flex-none">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-content-subtle" />
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search card text..."
                 aria-label="Search cards"
-                className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                className="w-full rounded-lg border border-subtle py-2 pl-9 pr-3 text-sm outline-none focus:border-accent bg-surface text-content"
               />
             </div>
           </div>
         </div>
         {status ? (
-          <p role="status" aria-live="polite" className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+          <p role="status" aria-live="polite" className="mt-3 text-sm text-content-muted">
             {status}
           </p>
         ) : null}
@@ -364,17 +383,24 @@ export default function DeckPage() {
         {filteredCards.length > 0 ? (
           <div className="mt-5 grid gap-3">
             {filteredCards.map((card) => (
-              <article key={card.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/6 dark:bg-[#0A0F1E]/70">
+              <article key={card.id} className="rounded-xl border border-subtle p-4 bg-surface/70">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Front</p>
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
+                      Front
+                      {isLeech(card) && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-danger-muted px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal text-danger">
+                          <AlertTriangle className="h-3 w-3" /> Leech
+                        </span>
+                      )}
+                    </p>
                     <MarkdownContent
-                      className="prose prose-sm mt-1 max-w-none text-slate-900 dark:text-slate-100"
+                      className="prose prose-sm mt-1 max-w-none text-content"
                       content={card.front}
                     />
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Back</p>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-content-subtle">Back</p>
                     <MarkdownContent
-                      className="prose prose-sm mt-1 max-w-none text-slate-800 dark:text-slate-200"
+                      className="prose prose-sm mt-1 max-w-none text-content-muted dark:text-slate-200"
                       content={card.back}
                     />
 
@@ -418,7 +444,7 @@ export default function DeckPage() {
             ))}
           </div>
         ) : (
-          <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">No cards match this filter.</p>
+          <p className="mt-4 text-sm text-content-muted">No cards match this filter.</p>
         )}
       </section>
 
@@ -443,13 +469,13 @@ export default function DeckPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-card-heading"
-            className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/6 dark:bg-[#131B2E]"
+            className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-subtle bg-surface p-6 shadow-2xl"
             style={{ animation: 'deck-modal-panel-in 190ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 id="add-card-heading" className="text-xl font-semibold text-slate-900 dark:text-slate-100">Add Card</h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Use formatting shortcuts, cloze syntax, and preview before saving.</p>
+                <h2 id="add-card-heading" className="text-xl font-semibold text-content">Add Card</h2>
+                <p className="mt-1 text-sm text-content-muted">Use formatting shortcuts, cloze syntax, and preview before saving.</p>
               </div>
               <button
                 type="button"
@@ -478,7 +504,7 @@ export default function DeckPage() {
               />
 
               <div>
-                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Attach tags</p>
+                <p className="mb-2 text-sm font-medium text-content-muted dark:text-slate-300">Attach tags</p>
                 <div className="flex flex-wrap gap-2">
                   {tags.length > 0 ? tags.map((tag) => {
                     const selected = selectedTags.includes(tag.id);
@@ -505,13 +531,13 @@ export default function DeckPage() {
                       </button>
                     );
                   }) : (
-                    <p className="text-sm text-slate-500 dark:text-slate-400">No tags yet.</p>
+                    <p className="text-sm text-content-subtle">No tags yet.</p>
                   )}
                 </div>
               </div>
 
               {status ? (
-                <p role="status" aria-live="polite" className="text-sm text-slate-600 dark:text-slate-300">
+                <p role="status" aria-live="polite" className="text-sm text-content-muted">
                   {status}
                 </p>
               ) : null}
@@ -541,10 +567,10 @@ export default function DeckPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-card-heading"
-            className="relative z-10 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/6 dark:bg-[#131B2E]"
+            className="relative z-10 w-full max-w-2xl rounded-2xl border border-subtle bg-surface p-6 shadow-2xl"
           >
-            <h2 id="edit-card-heading" className="text-xl font-semibold text-slate-900 dark:text-slate-100">Edit Card</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Update the card content and tags.</p>
+            <h2 id="edit-card-heading" className="text-xl font-semibold text-content">Edit Card</h2>
+            <p className="mt-1 text-sm text-content-muted">Update the card content and tags.</p>
 
             <div className="mt-4 space-y-4">
               <RichTextEditor
@@ -563,7 +589,7 @@ export default function DeckPage() {
               />
 
               <div>
-                <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Attach tags</p>
+                <p className="mb-2 text-sm font-medium text-content-muted dark:text-slate-300">Attach tags</p>
                 <div className="flex flex-wrap gap-2">
                   {tags.map((tag) => {
                     const selected = editSelectedTags.includes(tag.id);

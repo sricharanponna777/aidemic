@@ -107,7 +107,7 @@ export function HistogramInput({ spec, value, onChange, readOnly = false, correc
         )}
       </PlotCanvas>
       {correctValues ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -118,7 +118,7 @@ export function HistogramInput({ spec, value, onChange, readOnly = false, correc
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           Remember: unequal class widths mean bar height is frequency density, not frequency. Drag each bar to its correct height.
         </p>
       )}

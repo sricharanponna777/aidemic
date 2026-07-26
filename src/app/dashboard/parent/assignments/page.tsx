@@ -29,7 +29,7 @@ type Row = AssignmentRow & { attempt: AttemptRow | null };
 const STATUS_META: Record<string, { label: string; icon: typeof CheckCircle2; className: string }> = {
   completed: { label: 'Completed', icon: CheckCircle2, className: 'text-emerald-600 dark:text-emerald-400' },
   in_progress: { label: 'In progress', icon: Clock, className: 'text-amber-600 dark:text-amber-400' },
-  not_started: { label: 'Not started', icon: Circle, className: 'text-slate-400 dark:text-slate-500' },
+  not_started: { label: 'Not started', icon: Circle, className: 'text-content-subtle dark:text-content-subtle' },
 };
 
 const formatDate = (value?: string | null) =>
@@ -114,21 +114,21 @@ export default function ParentAssignmentsPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <ClipboardList className="h-5 w-5 text-indigo-500" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Assignments</h2>
+          <h2 className="text-lg font-bold text-content dark:text-white">Assignments</h2>
         </div>
         {rows.length > 0 ? (
-          <span className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="text-sm text-content-subtle">
             {summary.completed}/{summary.total} completed
           </span>
         ) : null}
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+        <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">
           No assignments yet. Teacher-set work will appear here once your child is added to a class.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+        <div className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm">
           <div className="divide-y divide-slate-100 dark:divide-white/6">
             {rows.map((row) => {
               const status = row.attempt?.status ?? 'not_started';
@@ -138,8 +138,8 @@ export default function ParentAssignmentsPage() {
               return (
                 <div key={row.id} className="flex items-center justify-between gap-4 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{row.title}</p>
-                    <p className="text-xs capitalize text-slate-500 dark:text-slate-400">
+                    <p className="truncate text-sm font-semibold text-content dark:text-white">{row.title}</p>
+                    <p className="text-xs capitalize text-content-subtle">
                       {row.assignment_type}
                       {due ? ` · Due ${due}` : ''}
                     </p>
@@ -155,7 +155,7 @@ export default function ParentAssignmentsPage() {
                       </span>
                     ) : null}
                     {status === 'completed' && typeof row.attempt?.percentage === 'number' ? (
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      <span className="text-sm font-semibold text-content-muted">
                         {Math.round(row.attempt.percentage)}%
                       </span>
                     ) : null}

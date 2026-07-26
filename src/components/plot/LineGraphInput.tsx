@@ -175,8 +175,8 @@ export function LineGraphInput({ spec, value, yAxisChoice, xAxisChoice, onChange
               onClick={() => emit({ ...local, fitShape: shape })}
               className={`rounded-full border px-3 py-1 ${
                 local.fitShape === shape
-                  ? 'border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300'
-                  : 'border-slate-300 text-slate-500 dark:border-white/10 dark:text-slate-400'
+                  ? 'border-indigo-500 bg-indigo-500/10 text-accent dark:text-indigo-300'
+                  : 'border-subtle text-content-subtle'
               }`}
             >
               {label}
@@ -185,7 +185,7 @@ export function LineGraphInput({ spec, value, yAxisChoice, xAxisChoice, onChange
         </div>
       ) : null}
       {correctValue ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -196,7 +196,7 @@ export function LineGraphInput({ spec, value, yAxisChoice, xAxisChoice, onChange
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {spec.requiresBestFit
             ? 'Drag each point into position, then choose whether a straight line or a curve of best fit should be drawn.'
             : 'Drag each point into position.'}

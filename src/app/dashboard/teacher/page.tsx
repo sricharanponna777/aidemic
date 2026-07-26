@@ -66,14 +66,14 @@ export default function TeacherDashboardPage() {
       <VerificationBanner verificationStatus={verificationStatus} schoolStatus={schoolStatus} />
 
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Your at-a-glance overview across every class.</p>
+        <h1 className="text-2xl font-bold text-content dark:text-white">Dashboard</h1>
+        <p className="mt-1 text-sm text-content-muted">Your at-a-glance overview across every class.</p>
       </div>
 
       {classes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">
           You haven&apos;t created a class yet.{' '}
-          <Link href="/dashboard/teacher/classes" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href="/dashboard/teacher/classes" className="font-medium text-accent hover:underline">
             Create your first class
           </Link>{' '}
           to get started.
@@ -82,13 +82,13 @@ export default function TeacherDashboardPage() {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => (
-              <div key={stat.label} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+              <div key={stat.label} className="flex items-center gap-3 rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${stat.from} ${stat.to} shadow-md`}>
                   <stat.icon className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
+                  <p className="text-2xl font-bold text-content dark:text-white">{stat.value}</p>
+                  <p className="text-xs text-content-subtle">{stat.label}</p>
                 </div>
               </div>
             ))}
@@ -96,29 +96,29 @@ export default function TeacherDashboardPage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Class summary */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] lg:col-span-2">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Class summary</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Completion and average score per active class.</p>
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm lg:col-span-2">
+              <h2 className="text-lg font-semibold text-content">Class summary</h2>
+              <p className="mt-1 text-sm text-content-subtle">Completion and average score per active class.</p>
               {activeClassStats.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No active classes.</p>
+                <p className="mt-4 text-sm text-content-subtle">No active classes.</p>
               ) : (
                 <div className="mt-4 space-y-3">
                   {activeClassStats.map((cls) => (
                     <Link
                       key={cls.class_id}
                       href={`/dashboard/teacher/classes/${cls.class_id}`}
-                      className="block rounded-xl border border-slate-200 px-4 py-3 transition hover:border-indigo-300 dark:border-white/6 dark:hover:border-indigo-500/40"
+                      className="block rounded-xl border border-subtle px-4 py-3 transition hover:border-indigo-300 dark:hover:border-indigo-500/40"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium text-slate-900 dark:text-slate-100">{cls.name}</span>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="font-medium text-content">{cls.name}</span>
+                        <div className="flex items-center gap-3 text-xs text-content-subtle">
                           <span>{cls.rosterSize} students</span>
                           <span>{cls.assignmentCount} assignments</span>
                           {cls.avgScore !== null && <span className={`font-semibold ${scoreTextTone(cls.avgScore)}`}>{cls.avgScore}% avg</span>}
                         </div>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-surface/10">
                           <div className={`h-full rounded-full ${scoreBarTone(cls.completionRate)}`} style={{ width: `${cls.completionRate ?? 0}%` }} />
                         </div>
                         <span className={`text-xs font-semibold ${scoreTextTone(cls.completionRate)}`}>
@@ -132,18 +132,18 @@ export default function TeacherDashboardPage() {
             </section>
 
             {/* Students needing help */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Students needing help</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Not started or averaging below 40%.</p>
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-content">Students needing help</h2>
+              <p className="mt-1 text-sm text-content-subtle">Not started or averaging below 40%.</p>
               {needingHelp.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">Everyone is keeping up. 🎉</p>
+                <p className="mt-4 text-sm text-content-subtle">Everyone is keeping up. 🎉</p>
               ) : (
                 <div className="mt-4 space-y-2">
                   {needingHelp.map((student) => (
-                    <div key={`${student.class_id}:${student.student_id}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/6">
+                    <div key={`${student.class_id}:${student.student_id}`} className="flex items-center justify-between gap-2 rounded-lg border border-subtle px-3 py-2 text-sm">
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800 dark:text-slate-200">{student.name}</p>
-                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">{student.className}</p>
+                        <p className="truncate font-medium text-content-muted dark:text-slate-200">{student.name}</p>
+                        <p className="truncate text-xs text-content-subtle">{student.className}</p>
                       </div>
                       <span className="flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
                         <AlertTriangle className="h-3 w-3" />
@@ -151,7 +151,7 @@ export default function TeacherDashboardPage() {
                       </span>
                     </div>
                   ))}
-                  <Link href="/dashboard/teacher/ai-insights" className="mt-1 inline-block text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                  <Link href="/dashboard/teacher/ai-insights" className="mt-1 inline-block text-xs font-medium text-accent hover:underline">
                     View all in AI Insights →
                   </Link>
                 </div>
@@ -160,23 +160,23 @@ export default function TeacherDashboardPage() {
           </div>
 
           {/* Today's activity */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+          <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Today&apos;s activity</h2>
-              <span className="text-sm text-slate-500 dark:text-slate-400">{completedToday.length} completed today</span>
+              <h2 className="text-lg font-semibold text-content">Today&apos;s activity</h2>
+              <span className="text-sm text-content-subtle">{completedToday.length} completed today</span>
             </div>
             {completedToday.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No assignments completed yet today.</p>
+              <p className="mt-4 text-sm text-content-subtle">No assignments completed yet today.</p>
             ) : (
               <div className="mt-4 space-y-2">
                 {completedToday.slice(0, 10).map((row) => (
-                  <div key={row.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm dark:border-white/6">
+                  <div key={row.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-subtle px-4 py-2.5 text-sm">
                     <div>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{row.name}</span>
-                      <span className="text-slate-500 dark:text-slate-400"> completed </span>
-                      <span className="text-slate-700 dark:text-slate-300">{row.assignmentTitle}</span>
+                      <span className="font-medium text-content">{row.name}</span>
+                      <span className="text-content-subtle"> completed </span>
+                      <span className="text-content-muted dark:text-slate-300">{row.assignmentTitle}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-3 text-xs text-content-subtle">
                       {typeof row.percentage === 'number' && <span className={`font-semibold ${scoreTextTone(row.percentage)}`}>{row.percentage}%</span>}
                       <span>{row.at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>

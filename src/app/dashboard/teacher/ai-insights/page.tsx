@@ -108,7 +108,7 @@ export default function TeacherAiInsightsPage() {
   }, [weakTopics, atRisk]);
 
   if (loading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Analysing your classes...</p>;
+    return <p className="text-sm text-content-subtle">Analysing your classes...</p>;
   }
 
   const hasData = data.assignments.length > 0;
@@ -116,25 +116,25 @@ export default function TeacherAiInsightsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">AI Insights</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Patterns surfaced across your classes to help you decide what to do next.</p>
+        <h1 className="text-2xl font-bold text-content dark:text-white">AI Insights</h1>
+        <p className="mt-1 text-sm text-content-muted">Patterns surfaced across your classes to help you decide what to do next.</p>
       </div>
 
       {classes.length === 0 || !hasData ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">
           Insights appear once your students start completing assignments.{' '}
-          <Link href="/dashboard/teacher/assignments" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href="/dashboard/teacher/assignments" className="font-medium text-accent hover:underline">
             Create an assignment
           </Link>
         </div>
       ) : (
         <>
           {/* AI-generated class summary */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+          <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">AI-generated summary</h2>
+                <h2 className="text-lg font-semibold text-content">AI-generated summary</h2>
                 <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
                   AI-generated
                 </span>
@@ -150,14 +150,14 @@ export default function TeacherAiInsightsPage() {
             </div>
             {summaryError ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{summaryError}</p> : null}
             {!summary && !summaryError ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-3 text-sm text-content-subtle">
                 Generate a &ldquo;what to reteach this week&rdquo; summary written by AI from your classes&apos; current performance data.
               </p>
             ) : null}
             {summary && (
               <div className="mt-4 space-y-3">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{summary.headline}</p>
-                <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
+                <p className="text-sm font-medium text-content-muted dark:text-slate-200">{summary.headline}</p>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-content-muted dark:text-slate-300">
                   {summary.priorities.map((priority, index) => (
                     <li key={index}>{priority}</li>
                   ))}
@@ -165,8 +165,8 @@ export default function TeacherAiInsightsPage() {
                 {summary.classNotes.length > 0 && (
                   <div className="space-y-1.5 border-t border-slate-100 pt-3 dark:border-white/6">
                     {summary.classNotes.map((note) => (
-                      <p key={note.className} className="text-xs text-slate-600 dark:text-slate-400">
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{note.className}:</span> {note.note}
+                      <p key={note.className} className="text-xs text-content-muted">
+                        <span className="font-semibold text-content-muted dark:text-slate-200">{note.className}:</span> {note.note}
                       </p>
                     ))}
                   </div>
@@ -178,18 +178,18 @@ export default function TeacherAiInsightsPage() {
           {/* Suggested interventions */}
           <section className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-6 shadow-sm dark:border-indigo-500/20 dark:bg-indigo-500/5">
             <div className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Suggested interventions</h2>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+              <Lightbulb className="h-5 w-5 text-accent" />
+              <h2 className="text-lg font-semibold text-content">Suggested interventions</h2>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-content-subtle dark:bg-surface/10">
                 Rules-based
               </span>
             </div>
             <div className="mt-4 space-y-2">
               {interventions.map((item) => (
-                <div key={item.key} className="flex items-start justify-between gap-3 rounded-xl border border-white/60 bg-white px-4 py-3 text-sm dark:border-white/6 dark:bg-[#131B2E]">
-                  <p className="text-slate-700 dark:text-slate-300">{item.text}</p>
+                <div key={item.key} className="flex items-start justify-between gap-3 rounded-xl border border-white/60 bg-surface px-4 py-3 text-sm dark:border-white/6">
+                  <p className="text-content-muted dark:text-slate-300">{item.text}</p>
                   {item.href && (
-                    <Link href={item.href} className="shrink-0 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                    <Link href={item.href} className="shrink-0 text-xs font-medium text-accent hover:underline">
                       Set practice →
                     </Link>
                   )}
@@ -200,28 +200,28 @@ export default function TeacherAiInsightsPage() {
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Weak topics */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-amber-500" />
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Weak topics</h2>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                <h2 className="text-lg font-semibold text-content">Weak topics</h2>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-content-subtle dark:bg-surface/10">
                   Rules-based
                 </span>
               </div>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Topics scoring below 60% across your classes.</p>
+              <p className="mt-1 text-sm text-content-subtle">Topics scoring below 60% across your classes.</p>
               {weakTopics.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No weak topics — your classes are scoring well.</p>
+                <p className="mt-4 text-sm text-content-subtle">No weak topics — your classes are scoring well.</p>
               ) : (
                 <div className="mt-4 space-y-3">
                   {weakTopics.map((topic) => (
                     <div key={topic.topic_id}>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-slate-800 dark:text-slate-200">
-                          {topic.name} <span className="text-xs font-normal text-slate-400">· {topic.className}</span>
+                        <span className="font-medium text-content-muted dark:text-slate-200">
+                          {topic.name} <span className="text-xs font-normal text-content-subtle">· {topic.className}</span>
                         </span>
                         <span className={`font-semibold ${scoreTextTone(topic.avgScore)}`}>{topic.avgScore}%</span>
                       </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-surface/10">
                         <div className={`h-full rounded-full ${scoreBarTone(topic.avgScore)}`} style={{ width: `${topic.avgScore ?? 0}%` }} />
                       </div>
                     </div>
@@ -231,24 +231,24 @@ export default function TeacherAiInsightsPage() {
             </section>
 
             {/* Students at risk */}
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-red-500" />
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Students at risk</h2>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                <h2 className="text-lg font-semibold text-content">Students at risk</h2>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-content-subtle dark:bg-surface/10">
                   Rules-based
                 </span>
               </div>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Not started, or averaging below 40%.</p>
+              <p className="mt-1 text-sm text-content-subtle">Not started, or averaging below 40%.</p>
               {atRisk.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No students currently at risk. 🎉</p>
+                <p className="mt-4 text-sm text-content-subtle">No students currently at risk. 🎉</p>
               ) : (
                 <div className="mt-4 space-y-2">
                   {atRisk.slice(0, 10).map((student) => (
-                    <div key={`${student.class_id}:${student.student_id}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-white/6">
+                    <div key={`${student.class_id}:${student.student_id}`} className="flex items-center justify-between gap-2 rounded-lg border border-subtle px-3 py-2 text-sm">
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800 dark:text-slate-200">{student.name}</p>
-                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        <p className="truncate font-medium text-content-muted dark:text-slate-200">{student.name}</p>
+                        <p className="truncate text-xs text-content-subtle">
                           {student.className} · {student.completedCount}/{student.assignedCount} done
                         </p>
                       </div>

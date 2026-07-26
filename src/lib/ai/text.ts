@@ -13,6 +13,23 @@ export const isChartPlottingTopic = (subject: string, topic: string, subtopic: s
   return CHART_PLOTTING_KEYWORDS.test(`${topic} ${subtopic} ${learningObjective}`);
 };
 
+// Interactive "complete the unfinished diagram" gating — Biology/Chemistry/Physics only,
+// unlocked by the seeded diagram_completion learning objective or by topic/subtopic wording
+// that clearly implies a labelled/structural diagram (a cell, apparatus, a circuit, a cycle,
+// a food web, an energy-transfer chain).
+const DIAGRAM_SUBJECTS = new Set(['biology', 'chemistry', 'physics']);
+
+const DIAGRAM_KEYWORDS =
+  /\b(diagram|label(?:led|ling)?|structure|apparatus|circuit|ray\b|food\s*(?:web|chain)|life\s*cycle|the\s+\w+\s+cycle|carbon\s+cycle|water\s+cycle|nitrogen\s+cycle|pathway|flow\s*chart|energy\s+transfer|classification|dot[\s-]and[\s-]cross|ionic\s+bond(?:ing)?|covalent\s+bond(?:ing)?|electron\s+shell|atomic\s+structure|ray\s+diagram|lens|mirror|refraction|reflection|distillation|titration|electrolysis|chromatography|filtration|nephron|palisade|epithelial|wave(?:length|s)?|transverse|longitudinal|amplitude|electromagnetic|spectrum|heart|circulatory|digestive|organ|series\s+circuit|parallel\s+circuit)\b/i;
+
+export const isDiagramCompletionObjective = (learningObjective: string) =>
+  /(complete|label)[\s\S]*diagram|unfinished\s+diagram/i.test(learningObjective);
+
+export const isDiagramCompletionTopic = (subject: string, topic: string, subtopic: string, learningObjective: string) => {
+  if (!DIAGRAM_SUBJECTS.has(subject.toLowerCase())) return false;
+  return isDiagramCompletionObjective(learningObjective) || DIAGRAM_KEYWORDS.test(`${topic} ${subtopic} ${learningObjective}`);
+};
+
 export const txt = (value: string, length: number) =>
   value
     .replace(/\r\n/g, '\n')

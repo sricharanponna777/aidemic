@@ -171,7 +171,7 @@ export function PlotAnswerInput({ plotSpec, value, onChange, mode, studentSubmis
   }
 
   return (
-    <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-white/10 dark:text-slate-400">
+    <p className="rounded-lg border border-dashed border-subtle p-4 text-sm text-content-subtle">
       This chart type isn&apos;t supported for interactive plotting yet.
     </p>
   );

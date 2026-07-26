@@ -7,7 +7,7 @@ import { buildSpecString } from '@/lib/ai/subjectConfig';
 import { normalizeBoard, normalizeExamType } from '@/lib/ai/validation';
 
 const selectClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
+  'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
 
 export type AssignmentFormClass = {
   id: string;
@@ -206,14 +206,14 @@ export function AssignmentForm({ teacherId, classes, fixedClassId, onCreated, on
 
   return (
     <>
-      <p className="text-sm text-slate-600 dark:text-slate-400">
+      <p className="text-sm text-content-muted">
         AIDemic will write a set of practice questions for your students based on what you pick below. Mock tests and flashcard
         assignments are coming in a future update.
       </p>
 
       {!fixedClassId && (
         <>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">1. Which class?</p>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-content-subtle">1. Which class?</p>
           <div className="mt-2">
             <select
               value={selectedClassId}
@@ -236,12 +236,12 @@ export function AssignmentForm({ teacherId, classes, fixedClassId, onCreated, on
         </>
       )}
 
-      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-content-subtle">
         {stepOffset + 1}. What should students practice?
       </p>
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Topic</label>
+          <label className="text-xs font-medium text-content-subtle">Topic</label>
           <select
             value={topicId}
             onChange={(e) => {
@@ -260,7 +260,7 @@ export function AssignmentForm({ teacherId, classes, fixedClassId, onCreated, on
           </select>
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Subtopic (optional)</label>
+          <label className="text-xs font-medium text-content-subtle">Subtopic (optional)</label>
           <select
             value={subtopicId}
             onChange={(e) => setSubtopicId(e.target.value)}
@@ -277,7 +277,7 @@ export function AssignmentForm({ teacherId, classes, fixedClassId, onCreated, on
         </div>
         <div className="space-y-1">
           <label
-            className="text-xs font-medium text-slate-500 dark:text-slate-400"
+            className="text-xs font-medium text-content-subtle"
             title="Narrows the questions to one specific exam skill within the topic."
           >
             Focus on a specific skill (optional)
@@ -298,29 +298,29 @@ export function AssignmentForm({ teacherId, classes, fixedClassId, onCreated, on
         </div>
       </div>
 
-      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-content-subtle">
         {stepOffset + 2}. Assignment details
       </p>
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1 sm:col-span-2">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+          <label className="text-xs font-medium text-content-subtle">
             Title (optional — we&apos;ll name it after the topic if left blank)
           </label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className={`${selectClass} w-full`} />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Due date (optional — schedules the assignment)</label>
+          <label className="text-xs font-medium text-content-subtle">Due date (optional — schedules the assignment)</label>
           <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={`${selectClass} w-full`} />
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1 sm:col-span-2">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Notes for students (optional)</label>
+          <label className="text-xs font-medium text-content-subtle">Notes for students (optional)</label>
           <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} className={`${selectClass} w-full`} />
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Number of questions</label>
+          <label className="text-xs font-medium text-content-subtle">Number of questions</label>
           <input
             type="number"
             min={1}
@@ -332,12 +332,12 @@ export function AssignmentForm({ teacherId, classes, fixedClassId, onCreated, on
         </div>
       </div>
 
-      <label className="mt-3 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+      <label className="mt-3 flex items-center gap-2 text-xs text-content-muted">
         <input
           type="checkbox"
           checked={allowReattempts}
           onChange={(e) => setAllowReattempts(e.target.checked)}
-          className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600"
+          className="h-3.5 w-3.5 rounded border-subtle"
         />
         Allow students to resubmit after marking
       </label>

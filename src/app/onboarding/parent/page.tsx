@@ -50,7 +50,7 @@ export default function ParentOnboardingPage() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#eef2fb] dark:bg-[#0A0F1E]">
+      <main className="flex min-h-screen items-center justify-center bg-canvas">
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 animate-bounce rounded-full bg-indigo-500" />
           <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:0.15s]" />
@@ -63,19 +63,19 @@ export default function ParentOnboardingPage() {
   if (!session) return null;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef2fb] px-4 py-8 dark:bg-[#0A0F1E] sm:px-6">
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-8 sm:px-6">
       <div className="w-full max-w-3xl">
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+        <section className="overflow-hidden rounded-2xl border border-subtle bg-surface p-8 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25 dark:animate-glow-pulse">
                 <Zap className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
                   Welcome to AIDemic
                 </p>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Link your child&apos;s account.</h1>
+                <h1 className="text-3xl font-bold text-content dark:text-white">Link your child&apos;s account.</h1>
               </div>
             </div>
             <button type="button" onClick={handleSignOut} className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
@@ -85,11 +85,11 @@ export default function ParentOnboardingPage() {
           </div>
 
           <div className="mt-8 space-y-2">
-            <label htmlFor="inviteCode" className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-              <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <label htmlFor="inviteCode" className="flex items-center gap-2 text-sm font-semibold text-content-muted text-content">
+              <Users className="h-4 w-4 text-accent" />
               Family invite code
             </label>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-content-muted">
               Ask your child to open Family in their AIDemic dashboard and share their invite code with you.
             </p>
             <input
@@ -98,7 +98,7 @@ export default function ParentOnboardingPage() {
               value={inviteCode}
               onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
               placeholder="Enter invite code"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono uppercase tracking-widest text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+              className="w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-mono uppercase tracking-widest text-content outline-none focus:border-accent"
             />
           </div>
 

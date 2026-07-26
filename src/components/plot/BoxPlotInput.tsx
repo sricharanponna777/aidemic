@@ -141,7 +141,7 @@ export function BoxPlotInput({ spec, value, onChange, readOnly = false, correctV
         )}
       </PlotCanvas>
       {correctValues ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -152,7 +152,7 @@ export function BoxPlotInput({ spec, value, onChange, readOnly = false, correctV
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">Drag each handle (Min, LQ, Median, UQ, Max) into position.</p>
+        <p className="text-xs text-content-subtle">Drag each handle (Min, LQ, Median, UQ, Max) into position.</p>
       )}
     </div>
   );

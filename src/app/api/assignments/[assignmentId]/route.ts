@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import type { PlotSpec } from '@/types';
+import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
 
 type StoredQuestion = {
-  questionType: 'open' | 'mcq' | 'plot';
+  questionType: 'open' | 'mcq' | 'plot' | 'diagram';
   question: string;
   marks: number;
   options: string[];
@@ -11,10 +11,14 @@ type StoredQuestion = {
   markScheme?: string[];
   modelAnswer?: string;
   plotSpec: PlotSpec | null;
+  diagramSpec: DiagramSpec | null;
+  diagramTemplate?: DiagramTemplateSelection | null;
 };
 
 // Strip answer-key fields (correctOption/markScheme/modelAnswer) so a student
-// can't read them from the network response before submitting.
+// can't read them from the network response before submitting. Note: plotSpec/diagramSpec
+// are passed through as-is (both carry their own correct-answer fields, e.g. correctLabel) --
+// an existing accepted tradeoff, same for both question types, not addressed here.
 function sanitizeQuestion(question: StoredQuestion) {
   return {
     questionType: question.questionType,
@@ -23,6 +27,8 @@ function sanitizeQuestion(question: StoredQuestion) {
     options: question.options,
     correctOption: '' as const,
     plotSpec: question.plotSpec,
+    diagramSpec: question.diagramSpec,
+    diagramTemplate: question.diagramTemplate ?? null,
   };
 }
 

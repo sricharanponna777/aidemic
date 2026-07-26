@@ -1,51 +1,213 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ---------------------------------------------------------------------------
+   Design tokens
+   ---------------------------------------------------------------------------
+   Every colour, radius, shadow and type step in the app resolves through this
+   block. Components must use the generated utilities (bg-surface, border-subtle,
+   text-content-muted, shadow-card, rounded-card, text-title) rather than raw
+   palette values, so the whole look can be retuned from one place and dark mode
+   needs no per-component `dark:` variant.
+
+   `--light-*` / `--dark-*` below are the two palettes; the `:root` blocks pick
+   one and expose it under the neutral `--t-*` names that @theme reads.
+--------------------------------------------------------------------------- */
+
+@layer theme {
+  :root,
+  :root.light,
+  :root:not(.dark) {
+    /* Backgrounds */
+    --t-canvas: #eef2fb;
+    --t-surface: #ffffff;
+    --t-surface-raised: #ffffff;
+    --t-surface-sunken: #f1f5f9;
+
+    /* Borders */
+    --t-subtle: #dde4f0;
+    --t-strong: #c3cee0;
+
+    /* Text */
+    --t-content: #0f172a;
+    --t-content-muted: #475569;
+    --t-content-subtle: #64748b;
+
+    /* Brand */
+    --t-accent: #4f46e5;
+    --t-accent-hover: #4338ca;
+    --t-accent-fg: #ffffff;
+    --t-accent-muted: #eef2ff;
+    --t-accent-ring: rgba(79, 70, 229, 0.45);
+    /* Gradient end-stop, reserved for brand moments (logo, active nav) */
+    --t-accent-2: #9333ea;
+
+    /* Semantic state */
+    --t-success: #059669;
+    --t-success-muted: #ecfdf5;
+    --t-warning: #d97706;
+    --t-warning-muted: #fffbeb;
+    --t-danger: #dc2626;
+    --t-danger-muted: #fef2f2;
+    --t-info: #0284c7;
+    --t-info-muted: #f0f9ff;
+
+    /* Elevation */
+    --t-shadow-card: 0 1px 3px 0 rgba(99, 102, 241, 0.06), 0 1px 2px -1px rgba(99, 102, 241, 0.04);
+    --t-shadow-raised: 0 8px 24px -8px rgba(79, 70, 229, 0.18), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
+    --t-shadow-overlay: 0 24px 48px -12px rgba(15, 23, 42, 0.24);
+  }
+
+  :root.dark {
+    --t-canvas: #0A0F1E;
+    --t-surface: #131B2E;
+    --t-surface-raised: #1a2338;
+    --t-surface-sunken: #0d1424;
+
+    --t-subtle: rgba(255, 255, 255, 0.06);
+    --t-strong: rgba(255, 255, 255, 0.14);
+
+    --t-content: #F8FAFC;
+    --t-content-muted: #cbd5e1;
+    --t-content-subtle: #94A3B8;
+
+    --t-accent: #6366f1;
+    --t-accent-hover: #818cf8;
+    --t-accent-fg: #ffffff;
+    --t-accent-muted: rgba(99, 102, 241, 0.16);
+    --t-accent-ring: rgba(129, 140, 248, 0.55);
+    --t-accent-2: #a855f7;
+
+    --t-success: #34d399;
+    --t-success-muted: rgba(16, 185, 129, 0.14);
+    --t-warning: #fbbf24;
+    --t-warning-muted: rgba(245, 158, 11, 0.14);
+    --t-danger: #f87171;
+    --t-danger-muted: rgba(239, 68, 68, 0.14);
+    --t-info: #38bdf8;
+    --t-info-muted: rgba(14, 165, 233, 0.14);
+
+    --t-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --t-shadow-raised: 0 8px 28px -8px rgba(99, 102, 241, 0.35), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+    --t-shadow-overlay: 0 24px 56px -12px rgba(0, 0, 0, 0.7);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark) {
+      --t-canvas: #0A0F1E;
+      --t-surface: #131B2E;
+      --t-surface-raised: #1a2338;
+      --t-surface-sunken: #0d1424;
+
+      --t-subtle: rgba(255, 255, 255, 0.06);
+      --t-strong: rgba(255, 255, 255, 0.14);
+
+      --t-content: #F8FAFC;
+      --t-content-muted: #cbd5e1;
+      --t-content-subtle: #94A3B8;
+
+      --t-accent: #6366f1;
+      --t-accent-hover: #818cf8;
+      --t-accent-fg: #ffffff;
+      --t-accent-muted: rgba(99, 102, 241, 0.16);
+      --t-accent-ring: rgba(129, 140, 248, 0.55);
+
+      --t-success: #34d399;
+      --t-success-muted: rgba(16, 185, 129, 0.14);
+      --t-warning: #fbbf24;
+      --t-warning-muted: rgba(245, 158, 11, 0.14);
+      --t-danger: #f87171;
+      --t-danger-muted: rgba(239, 68, 68, 0.14);
+      --t-info: #38bdf8;
+      --t-info-muted: rgba(14, 165, 233, 0.14);
+
+      --t-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+      --t-shadow-raised: 0 8px 28px -8px rgba(99, 102, 241, 0.35), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+      --t-shadow-overlay: 0 24px 56px -12px rgba(0, 0, 0, 0.7);
+    }
+  }
+}
+
+/* Legacy aliases — kept so the pre-token rules further down keep resolving
+   while components migrate onto the utilities above. */
 :root {
-  --background: #eef2fb;
-  --foreground: #0f172a;
-  --muted: #64748b;
-  --surface: #ffffff;
-  --border: #dde4f0;
-}
-
-:root.light {
-  --background: #eef2fb;
-  --foreground: #0f172a;
-  --muted: #64748b;
-  --surface: #ffffff;
-  --border: #dde4f0;
-}
-
-:root.dark {
-  --background: #0A0F1E;
-  --foreground: #F8FAFC;
-  --muted: #94A3B8;
-  --surface: #131B2E;
-  --border: #1e2a42;
+  --background: var(--t-canvas);
+  --foreground: var(--t-content);
+  --muted: var(--t-content-subtle);
+  --surface: var(--t-surface);
+  --border: var(--t-subtle);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Backgrounds */
+  --color-canvas: var(--t-canvas);
+  --color-surface: var(--t-surface);
+  --color-surface-raised: var(--t-surface-raised);
+  --color-surface-sunken: var(--t-surface-sunken);
+
+  /* Borders — `border-subtle` / `border-strong` */
+  --color-subtle: var(--t-subtle);
+  --color-strong: var(--t-strong);
+
+  /* Text — `text-content` / `text-content-muted` / `text-content-subtle` */
+  --color-content: var(--t-content);
+  --color-content-muted: var(--t-content-muted);
+  --color-content-subtle: var(--t-content-subtle);
+
+  /* Brand */
+  --color-accent: var(--t-accent);
+  --color-accent-hover: var(--t-accent-hover);
+  --color-accent-fg: var(--t-accent-fg);
+  --color-accent-muted: var(--t-accent-muted);
+  --color-accent-ring: var(--t-accent-ring);
+  --color-accent-2: var(--t-accent-2);
+
+  /* Semantic state */
+  --color-success: var(--t-success);
+  --color-success-muted: var(--t-success-muted);
+  --color-warning: var(--t-warning);
+  --color-warning-muted: var(--t-warning-muted);
+  --color-danger: var(--t-danger);
+  --color-danger-muted: var(--t-danger-muted);
+  --color-info: var(--t-info);
+  --color-info-muted: var(--t-info-muted);
+
+  /* Back-compat with the original two tokens */
+  --color-background: var(--t-canvas);
+  --color-foreground: var(--t-content);
+
+  /* Elevation — `shadow-card` / `shadow-raised` / `shadow-overlay` */
+  --shadow-card: var(--t-shadow-card);
+  --shadow-raised: var(--t-shadow-raised);
+  --shadow-overlay: var(--t-shadow-overlay);
+
+  /* Radius — `rounded-card` / `rounded-control` / `rounded-field` */
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+  --radius-field: 0.5rem;
+
+  /* Type scale — `text-display` / `text-title` / `text-body` / `text-caption` */
+  --text-display: 1.875rem;
+  --text-display--line-height: 2.25rem;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 700;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 700;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.375rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+
   --font-sans: var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light):not(.dark) {
-    --background: #0A0F1E;
-    --foreground: #F8FAFC;
-    --muted: #94A3B8;
-    --surface: #131B2E;
-    --border: #1e2a42;
-  }
 }
 
 /* Premium light-mode card shadow scale */
 :root.light .card-elevated,
 :root:not(.dark) .card-elevated {
-  box-shadow: 0 1px 3px 0 rgba(99, 102, 241, 0.06), 0 1px 2px -1px rgba(99, 102, 241, 0.04);
+  box-shadow: var(--t-shadow-card);
 }
 
 * {

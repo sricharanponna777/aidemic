@@ -333,7 +333,7 @@ export default function TeacherClassPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/teacher/classes" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100">
+      <Link href="/dashboard/teacher/classes" className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100">
         <ArrowLeft className="h-3.5 w-3.5" />
         My Classes
       </Link>
@@ -353,18 +353,18 @@ export default function TeacherClassPage() {
                   if (e.key === 'Enter') void handleRenameSave();
                   if (e.key === 'Escape') setIsEditingName(false);
                 }}
-                className="rounded-md border border-indigo-300 bg-white px-2 py-1 text-xl font-bold text-slate-900 outline-none dark:border-indigo-500/50 dark:bg-[#0A0F1E] dark:text-white"
+                className="rounded-md border border-indigo-300 bg-surface px-2 py-1 text-xl font-bold text-content outline-none dark:border-indigo-500/50 dark:text-white"
               />
               <button type="button" onClick={() => void handleRenameSave()} aria-label="Save name" className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
                 <Check className="h-5 w-5" />
               </button>
-              <button type="button" onClick={() => setIsEditingName(false)} aria-label="Cancel rename" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <button type="button" onClick={() => setIsEditingName(false)} aria-label="Cancel rename" className="text-content-subtle hover:text-content-muted dark:hover:text-slate-200">
                 <X className="h-5 w-5" />
               </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{classInfo.name}</h1>
+              <h1 className="text-2xl font-bold text-content dark:text-white">{classInfo.name}</h1>
               <button
                 type="button"
                 onClick={() => {
@@ -372,34 +372,34 @@ export default function TeacherClassPage() {
                   setEditingName(classInfo.name);
                 }}
                 aria-label="Rename class"
-                className="text-slate-400 hover:text-indigo-500"
+                className="text-content-subtle hover:text-indigo-500"
               >
                 <Pencil className="h-4 w-4" />
               </button>
               {classInfo.status === 'archived' && (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-content-subtle dark:bg-surface/10">
                   Archived
                 </span>
               )}
             </div>
           )}
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{roster.length} student{roster.length === 1 ? '' : 's'}</p>
+          <p className="mt-1 text-sm text-content-muted">{roster.length} student{roster.length === 1 ? '' : 's'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-white/6 dark:bg-[#131B2E]">
+          <div className="flex items-center gap-3 rounded-lg border border-subtle bg-surface px-3 py-2">
             <div>
-              <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="flex items-center gap-1 text-[11px] text-content-subtle">
                 <Share2 className="h-3 w-3" />
                 Invite code — share with students
               </p>
-              <span className="font-mono text-sm font-semibold tracking-widest text-slate-800 dark:text-slate-100">
+              <span className="font-mono text-sm font-semibold tracking-widest text-content-muted text-content">
                 {classInfo.invite_code}
               </span>
             </div>
             <button
               type="button"
               onClick={() => void handleCopyCode(classInfo.invite_code)}
-              className="text-slate-400 transition hover:text-indigo-500"
+              className="text-content-subtle transition hover:text-indigo-500"
               aria-label="Copy invite code"
             >
               <Copy className="h-4 w-4" />
@@ -439,33 +439,33 @@ export default function TeacherClassPage() {
         ].map((stat) => (
           <div
             key={stat.label}
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]"
+            className="flex items-center gap-3 rounded-2xl border border-subtle bg-surface p-5 shadow-sm"
           >
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${stat.from} ${stat.to} shadow-md`}>
               <stat.icon className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
+              <p className="text-2xl font-bold text-content dark:text-white">{stat.value}</p>
+              <p className="text-xs text-content-subtle">{stat.label}</p>
             </div>
           </div>
         ))}
       </div>
 
       {topicStats.length > 0 && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Topics needing attention</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Average score by topic across every assignment, weakest first.</p>
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-content">Topics needing attention</h2>
+          <p className="mt-1 text-sm text-content-subtle">Average score by topic across every assignment, weakest first.</p>
           <div className="mt-4 space-y-3">
             {topicStats.map((topic) => (
               <div key={topic.topic_id}>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-slate-800 dark:text-slate-200">{topic.name}</span>
+                  <span className="font-medium text-content-muted dark:text-slate-200">{topic.name}</span>
                   <span className={`font-semibold ${scoreTextTone(topic.avgScore)}`}>
                     {topic.avgScore === null ? 'No completed attempts yet' : `${topic.avgScore}% avg`}
                   </span>
                 </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-surface/10">
                   <div className={`h-full rounded-full ${scoreBarTone(topic.avgScore)}`} style={{ width: `${topic.avgScore ?? 0}%` }} />
                 </div>
               </div>
@@ -474,16 +474,16 @@ export default function TeacherClassPage() {
         </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Roster</h2>
+          <h2 className="text-lg font-semibold text-content">Roster</h2>
           {roster.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               {selectedRosterIds.size > 0 &&
                 (pendingRemoveSelected ? (
                   <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 dark:border-red-900/40 dark:bg-red-950/30">
                     <p className="text-xs text-red-700 dark:text-red-300">Remove {selectedRosterIds.size} student{selectedRosterIds.size === 1 ? '' : 's'}?</p>
-                    <button type="button" onClick={() => setPendingRemoveSelected(false)} className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                    <button type="button" onClick={() => setPendingRemoveSelected(false)} className="text-xs font-medium text-content-subtle hover:text-content-muted dark:hover:text-slate-200">
                       Cancel
                     </button>
                     <button type="button" onClick={() => void handleRemoveSelected()} className="text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-400">
@@ -504,17 +504,17 @@ export default function TeacherClassPage() {
           )}
         </div>
         {roster.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-3 text-sm text-content-subtle">
             No students have joined yet. Share the invite code above — students enter it when they set up their account.
           </p>
         ) : (
           <div className="mt-3 space-y-2">
-            <label className="flex items-center gap-2 px-4 text-xs text-slate-500 dark:text-slate-400">
+            <label className="flex items-center gap-2 px-4 text-xs text-content-subtle">
               <input
                 type="checkbox"
                 checked={selectedRosterIds.size === roster.length}
                 onChange={toggleSelectAllRoster}
-                className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600"
+                className="h-3.5 w-3.5 rounded border-subtle"
               />
               Select all
             </label>
@@ -524,16 +524,16 @@ export default function TeacherClassPage() {
               const flagged = assignments.length > 0 && completedCount === 0;
               const isExpanded = expandedParentStudentId === student.student_id;
               return (
-                <div key={student.student_id} className="rounded-lg border border-slate-200 dark:border-white/6">
+                <div key={student.student_id} className="rounded-lg border border-subtle">
                   <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={selectedRosterIds.has(student.id)}
                         onChange={() => toggleRosterSelection(student.id)}
-                        className="h-3.5 w-3.5 rounded border-slate-300 dark:border-slate-600"
+                        className="h-3.5 w-3.5 rounded border-subtle"
                       />
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{student.full_name || student.email || 'Student'}</span>
+                      <span className="font-medium text-content">{student.full_name || student.email || 'Student'}</span>
                       {flagged && (
                         <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
                           <AlertTriangle className="h-3 w-3" />
@@ -541,7 +541,7 @@ export default function TeacherClassPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-3 text-xs text-content-subtle">
                       {assignments.length > 0 && <span>{completedCount}/{assignments.length} completed</span>}
                       {stats?.avgScore != null && <span className={`font-semibold ${scoreTextTone(stats.avgScore)}`}>{stats.avgScore}% avg</span>}
                       <span>{student.email}</span>
@@ -556,7 +556,7 @@ export default function TeacherClassPage() {
                     </div>
                   </div>
                   {isExpanded && (
-                    <div className="border-t border-slate-200 p-3 dark:border-white/6">
+                    <div className="border-t border-subtle p-3">
                       <ParentLinksPanel studentId={student.student_id} />
                     </div>
                   )}
@@ -567,9 +567,9 @@ export default function TeacherClassPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Assignments</h2>
+          <h2 className="text-lg font-semibold text-content">Assignments</h2>
           <button type="button" onClick={() => setShowForm((v) => !v)} className={buttonStyles({ variant: 'primary', size: 'sm' })}>
             <Plus className="h-4 w-4" />
             Create assignment
@@ -577,7 +577,7 @@ export default function TeacherClassPage() {
         </div>
 
         {showForm && teacherId && (
-          <div className="mt-4 rounded-xl border border-slate-200 p-4 dark:border-white/6">
+          <div className="mt-4 rounded-xl border border-subtle p-4">
             <AssignmentForm
               teacherId={teacherId}
               classes={[classInfo]}
@@ -589,23 +589,23 @@ export default function TeacherClassPage() {
         )}
 
         {assignments.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No assignments yet.</p>
+          <p className="mt-4 text-sm text-content-subtle">No assignments yet.</p>
         ) : (
           <div className="mt-4 space-y-2">
             {assignments.map((assignment) => {
               const analytics = assignmentStats.get(assignment.id);
               return (
-                <div key={assignment.id} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm dark:border-white/6">
+                <div key={assignment.id} className="rounded-lg border border-subtle px-4 py-2.5 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="font-medium text-slate-900 dark:text-slate-100">{assignment.title}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                      <p className="font-medium text-content">{assignment.title}</p>
+                      <p className="text-xs text-content-subtle capitalize">
                         {assignment.assignment_type}
                         {assignment.topics?.name ? ` · ${assignment.topics.name}` : ''}
                         {assignment.due_date ? ` · due ${new Date(assignment.due_date).toLocaleDateString()}` : ''}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-3 text-xs text-content-subtle">
                       <span>{analytics?.completedCount ?? 0}/{roster.length} completed</span>
                       {analytics?.avgScore != null && (
                         <span className={`font-semibold ${scoreTextTone(analytics.avgScore)}`}>{analytics.avgScore}% avg</span>
@@ -613,7 +613,7 @@ export default function TeacherClassPage() {
                     </div>
                   </div>
                   {analytics && analytics.completionRate !== null && (
-                    <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                    <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-surface/10">
                       <div className={`h-full rounded-full ${scoreBarTone(analytics.completionRate)}`} style={{ width: `${analytics.completionRate}%` }} />
                     </div>
                   )}

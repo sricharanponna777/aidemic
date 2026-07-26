@@ -6,9 +6,40 @@ import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, useTheme } from "@/hooks/useTheme";
 import { useSfxMuted } from "@/hooks/useSfxMuted";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Moon, Sun, Volume2, VolumeX } from "lucide-react";
+import { BookOpen, LogOut, Moon, Sun, Target, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
+import { Alert, Label, fieldStyles } from "@/components/ui/field";
+import { PageHeader } from "@/components/ui/feedback";
+import {
+  DAILY_CARD_TARGET_RANGE,
+  DEFAULT_STUDY_GOALS,
+  WEEKLY_MINUTE_TARGET_RANGE,
+  fetchStudyGoals,
+  saveStudyGoals,
+} from "@/lib/studyGoals";
+
+function SettingsCard({
+  title,
+  description,
+  children,
+  className = "",
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`rounded-card border border-subtle bg-surface p-6 shadow-card sm:p-8 ${className}`.trim()}>
+      <div className="mb-6">
+        <h2 className="text-title text-content">{title}</h2>
+        {description && <p className="mt-1 text-body text-content-subtle">{description}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function Settings() {
   const { session, profile: loadedProfile } = useAuth();
@@ -27,11 +58,31 @@ export default function Settings() {
   const [profileSaved, setProfileSaved] = useState(false);
   const [loadedProfileId, setLoadedProfileId] = useState<string | null>(null);
 
+  const [dailyTarget, setDailyTarget] = useState(DEFAULT_STUDY_GOALS.daily_card_target);
+  const [weeklyTarget, setWeeklyTarget] = useState(DEFAULT_STUDY_GOALS.weekly_minute_target);
+  const [isGoalsSaving, setIsGoalsSaving] = useState(false);
+  const [goalsError, setGoalsError] = useState("");
+  const [goalsSaved, setGoalsSaved] = useState(false);
+
   useEffect(() => {
     if (loadedProfile?.theme === "light" || loadedProfile?.theme === "dark") {
       setTheme(loadedProfile.theme);
     }
   }, [loadedProfile?.theme, setTheme]);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) return;
+    let cancelled = false;
+    void fetchStudyGoals(supabase, userId).then((goals) => {
+      if (cancelled) return;
+      setDailyTarget(goals.daily_card_target);
+      setWeeklyTarget(goals.weekly_minute_target);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, supabase]);
 
   if (loadedProfile && loadedProfile.id !== loadedProfileId) {
     setLoadedProfileId(loadedProfile.id);
@@ -68,6 +119,21 @@ export default function Settings() {
     setIsProfileSaving(false);
   };
 
+  const handleGoalsSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!session?.user.id) return;
+    setIsGoalsSaving(true);
+    setGoalsError("");
+    setGoalsSaved(false);
+    const { error } = await saveStudyGoals(supabase, session.user.id, {
+      daily_card_target: dailyTarget,
+      weekly_minute_target: weeklyTarget,
+    });
+    if (error) setGoalsError(error);
+    else setGoalsSaved(true);
+    setIsGoalsSaving(false);
+  };
+
   const handleSignOut = async () => {
     setIsLoading(true);
     await supabase.auth.signOut();
@@ -87,74 +153,127 @@ export default function Settings() {
     setIsThemeSaving(false);
   };
 
+  const isStudent = loadedProfile?.role !== "teacher" && loadedProfile?.role !== "parent";
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">Manage your account and preferences</p>
-      </div>
+      <PageHeader title="Settings" description="Manage your account and preferences." />
 
-      <form
-        onSubmit={handleProfileSave}
-        className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none sm:p-8"
-      >
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Profile</h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Update your name and username.</p>
-        </div>
+      <SettingsCard title="Profile" description="Update your name and username.">
+        <form onSubmit={handleProfileSave}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">First name</label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Last name</label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
-            />
-          </div>
+            <div>
+              <Label htmlFor="settings-first-name">First name</Label>
+              <input
+                id="settings-first-name"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className={fieldStyles()}
+              />
+            </div>
+            <div>
+              <Label htmlFor="settings-last-name">Last name</Label>
+              <input
+                id="settings-last-name"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className={fieldStyles()}
+              />
+            </div>
           <div className="sm:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              pattern="[a-zA-Z0-9_]{3,20}"
-              title="3-20 characters: letters, numbers, and underscores only"
-              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
-            />
+              <Label htmlFor="settings-username">Username</Label>
+              <input
+                id="settings-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                pattern="[a-zA-Z0-9_]{3,20}"
+                title="3-20 characters: letters, numbers, and underscores only"
+                className={fieldStyles()}
+              />
+            </div>
           </div>
-        </div>
-        {profileError && (
-          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{profileError}</p>
-        )}
+          {profileError && <Alert className="mt-3">{profileError}</Alert>}
         <div className="mt-4 flex items-center gap-3">
           <button type="submit" disabled={isProfileSaving} className={buttonStyles({ variant: "primary" })}>
-            {isProfileSaving ? "Saving..." : "Save changes"}
-          </button>
-          {profileSaved && !isProfileSaving && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">Saved.</span>
-          )}
-        </div>
-      </form>
+              {isProfileSaving ? "Saving…" : "Save changes"}
+            </button>
+            {profileSaved && !isProfileSaving && (
+            <span className="text-body text-content-subtle">Saved.</span>
+            )}
+          </div>
+        </form>
+      </SettingsCard>
+
+      {isStudent && (
+        <SettingsCard
+          title="Study goals"
+          description="Your dashboard tracks progress against these targets."
+        >
+          <form onSubmit={handleGoalsSave}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="daily-card-target">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-accent" />
+                    Daily card target
+                  </span>
+                </Label>
+                <input
+                  id="daily-card-target"
+                  type="number"
+                  inputMode="numeric"
+                  min={DAILY_CARD_TARGET_RANGE.min}
+                  max={DAILY_CARD_TARGET_RANGE.max}
+                  value={dailyTarget}
+                  onChange={(e) => setDailyTarget(Number(e.target.value))}
+                  className={fieldStyles()}
+                />
+                <p className="mt-1 text-caption text-content-subtle">
+                  Cards to review each day ({DAILY_CARD_TARGET_RANGE.min}–{DAILY_CARD_TARGET_RANGE.max}).
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="weekly-minute-target">Weekly study minutes</Label>
+                <input
+                  id="weekly-minute-target"
+                  type="number"
+                  inputMode="numeric"
+                  min={WEEKLY_MINUTE_TARGET_RANGE.min}
+                  max={WEEKLY_MINUTE_TARGET_RANGE.max}
+                  value={weeklyTarget}
+                  onChange={(e) => setWeeklyTarget(Number(e.target.value))}
+                  className={fieldStyles()}
+                />
+                <p className="mt-1 text-caption text-content-subtle">
+                  Roughly {Math.round(weeklyTarget / 7)} minutes a day.
+                </p>
+              </div>
+            </div>
+            {goalsError && <Alert className="mt-3">{goalsError}</Alert>}
+            <div className="mt-4 flex items-center gap-3">
+              <button type="submit" disabled={isGoalsSaving} className={buttonStyles({ variant: "primary" })}>
+                {isGoalsSaving ? "Saving…" : "Save goals"}
+              </button>
+              {goalsSaved && !isGoalsSaving && (
+                <span className="text-body text-content-subtle">Saved.</span>
+              )}
+            </div>
+          </form>
+        </SettingsCard>
+      )}
 
       {loadedProfile?.role !== "teacher" && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
+        <section className="rounded-card border border-subtle bg-surface p-6 shadow-card">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Subjects</h2>
+                <BookOpen className="h-5 w-5 text-accent" />
+                <h2 className="text-title text-content">Subjects</h2>
               </div>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              <p className="mt-1 text-body text-content-subtle">
                 Manage saved qualifications from the main Subjects page.
               </p>
             </div>
@@ -162,64 +281,52 @@ export default function Settings() {
               Subjects
             </Link>
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none sm:p-8">
-        <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Appearance</h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Pick the mode that feels best for your Flashcard reviews.</p>
-        </div>
+      <SettingsCard title="Appearance" description="Pick the mode that feels best for your reviews.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => handleThemeChange("light")}
+          {(
+            [
+              { mode: "light" as const, icon: Sun, label: "Light mode", hint: "Higher brightness with crisp contrast." },
+              { mode: "dark" as const, icon: Moon, label: "Dark mode", hint: "Lower glare for long, late-night sessions." },
+            ]
+          ).map(({ mode, icon: Icon, label, hint }) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => handleThemeChange(mode)}
+              aria-pressed={theme === mode}
             className={buttonStyles({
-              variant: "plain",
-              size: "none",
-              className: `justify-start rounded-lg border p-4 text-left ${
-                theme === "light"
-                  ? "border-indigo-500 bg-indigo-50 shadow-sm dark:border-indigo-400 dark:bg-indigo-900/20"
-                  : "border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-white/6 dark:bg-white/8 dark:hover:bg-white/12"
-              }`,
-            })}
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              <Sun className="h-4 w-4 text-amber-500" />
-              Light mode
-            </span>
-            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Higher brightness with crisp contrast.</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleThemeChange("dark")}
-            className={buttonStyles({
-              variant: "plain",
-              size: "none",
-              className: `justify-start rounded-lg border p-4 text-left ${
-                theme === "dark"
-                  ? "border-indigo-500 bg-indigo-50 shadow-sm dark:border-indigo-400 dark:bg-indigo-900/20"
-                  : "border-slate-200 bg-slate-50 hover:bg-slate-100 dark:border-white/6 dark:bg-white/8 dark:hover:bg-white/12"
-              }`,
-            })}
-          >
-            <span className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              <Moon className="h-4 w-4 text-indigo-500" />
-              Dark mode
-            </span>
-            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Lower glare for long, late-night sessions.</p>
-          </button>
+                variant: "plain",
+                size: "none",
+                className: `flex-col items-start rounded-field border p-4 text-left transition-colors ${
+                  theme === mode
+                    ? "border-accent bg-accent-muted"
+                    : "border-subtle bg-surface-sunken hover:border-strong"
+                }`,
+              })}
+            >
+            <span className="flex items-center gap-2 font-semibold text-content">
+              <Icon className={`h-4 w-4 ${mode === "light" ? "text-warning" : "text-accent"}`} />
+                {label}
+              </span>
+              <p className="mt-1 text-caption text-content-subtle">{hint}</p>
+            </button>
+          ))}
         </div>
-        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          {isThemeSaving ? "Saving preference..." : "Preference is saved to your profile."}
+        <p className="mt-3 text-caption text-content-subtle">
+          {isThemeSaving ? "Saving preference…" : "Preference is saved to your profile."}
         </p>
-      </div>
+      </SettingsCard>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none sm:p-8">
+      <section className="rounded-card border border-subtle bg-surface p-6 shadow-card sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Sound effects</h2>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">Clicks and keystrokes make a subtle sound as you use AIDemic.</p>
+            <h2 className="text-title text-content">Sound effects</h2>
+            <p className="mt-1 text-body text-content-subtle">
+              Clicks and keystrokes make a subtle sound as you use AIDemic.
+            </p>
           </div>
           <button
             type="button"
@@ -231,18 +338,20 @@ export default function Settings() {
             {muted ? "Muted" : "On"}
           </button>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-2xl bg-red-50 p-6 dark:bg-red-950/60 dark:ring-1 dark:ring-red-800/70 sm:p-8">
-        <div className="mb-6 flex items-center gap-3">
-          <LogOut className="h-6 w-6 text-red-600 dark:text-red-400" />
-          <h2 className="text-xl font-bold text-red-900 dark:text-red-100">Sign Out</h2>
+      <section className="rounded-card border border-subtle bg-danger-muted p-6 sm:p-8">
+        <div className="mb-4 flex items-center gap-3">
+          <LogOut className="h-5 w-5 text-danger" />
+          <h2 className="text-title text-danger">Sign out</h2>
         </div>
-        <p className="mb-6 text-sm text-red-700 dark:text-red-300">Sign out of your account on this device. You&apos;ll need to sign in again to continue.</p>
+        <p className="mb-6 text-body text-content-muted">
+          Sign out of your account on this device. You&apos;ll need to sign in again to continue.
+        </p>
         <button onClick={handleSignOut} disabled={isLoading} className={buttonStyles({ variant: "danger" })}>
-          {isLoading ? "Signing out..." : "Sign Out"}
+          {isLoading ? "Signing out…" : "Sign out"}
         </button>
-      </div>
+      </section>
     </div>
   );
 }

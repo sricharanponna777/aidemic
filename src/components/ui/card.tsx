@@ -7,22 +7,22 @@ interface CardProps {
 
 export function Card({ children, className = '' }: CardProps) {
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 ${className}`.trim()}>
+    <section className={`rounded-card border border-subtle bg-surface shadow-card ${className}`.trim()}>
       {children}
     </section>
   );
 }
 
 export function CardHeader({ children, className = '' }: CardProps) {
-  return <div className={`border-b border-slate-200 p-4 dark:border-slate-700 ${className}`.trim()}>{children}</div>;
+  return <div className={`border-b border-subtle p-4 ${className}`.trim()}>{children}</div>;
 }
 
 export function CardTitle({ children, className = '' }: CardProps) {
-  return <h3 className={`text-lg font-semibold text-slate-900 dark:text-slate-100 ${className}`.trim()}>{children}</h3>;
+  return <h3 className={`text-title text-content ${className}`.trim()}>{children}</h3>;
 }
 
 export function CardDescription({ children, className = '' }: CardProps) {
-  return <p className={`mt-1 text-sm text-slate-600 dark:text-slate-300 ${className}`.trim()}>{children}</p>;
+  return <p className={`mt-1 text-body text-content-muted ${className}`.trim()}>{children}</p>;
 }
 
 export function CardContent({ children, className = '' }: CardProps) {

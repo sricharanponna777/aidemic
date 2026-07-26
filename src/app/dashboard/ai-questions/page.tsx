@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
+import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
 import { TopicInput } from '@/components/TopicInput';
@@ -41,7 +42,8 @@ import { createClient } from '@/lib/supabase-client';
 import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { gradeBadgeTone } from '@/lib/gradeTone';
-import type { PlotSpec } from '@/types';
+import { isDiagramCompletionTopic } from '@/lib/ai/text';
+import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
 
 
 type Subject =
@@ -63,7 +65,7 @@ type ExamBoard = 'aqa' | 'edexcel' | 'ocr';
 type ExamType = 'gcse' | 'a-level';
 
 type ExamQuestion = {
-  questionType: 'open' | 'mcq' | 'plot';
+  questionType: 'open' | 'mcq' | 'plot' | 'diagram';
   question: string;
   marks: number;
   commandWord: string;
@@ -77,6 +79,8 @@ type ExamQuestion = {
   sourceTitle: string;
   sourceUrl: string;
   plotSpec: PlotSpec | null;
+  diagramSpec: DiagramSpec | null;
+  diagramTemplate: DiagramTemplateSelection | null;
 };
 
 type MarkedAnswer = {
@@ -272,14 +276,14 @@ function CalculationAnswerEditor({
   return (
     <div className="mt-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Your answer</p>
+        <p className="text-sm font-semibold text-content-muted dark:text-slate-300">Your answer</p>
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             title="Inline math"
             aria-label="Insert inline math"
             onClick={() => insertSnippet('\\(x\\)', 3)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
           >
             <Sigma className="h-3.5 w-3.5" />
           </button>
@@ -288,7 +292,7 @@ function CalculationAnswerEditor({
             title="Power"
             aria-label="Insert power notation"
             onClick={() => insertSnippet('\\(x^{2}\\)', 3)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
           >
             x²
           </button>
@@ -297,7 +301,7 @@ function CalculationAnswerEditor({
             title="Fraction"
             aria-label="Insert fraction"
             onClick={() => insertSnippet('\\(\\frac{a}{b}\\)', 8)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
           >
             a/b
           </button>
@@ -306,7 +310,7 @@ function CalculationAnswerEditor({
             title="Square root"
             aria-label="Insert square root"
             onClick={() => insertSnippet('\\(\\sqrt{x}\\)', 8)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-slate-700 transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
           >
             √
           </button>
@@ -319,10 +323,10 @@ function CalculationAnswerEditor({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           rows={rows}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+          className="w-full rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
         />
-        <div className="min-h-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-100">
-          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="min-h-full rounded-lg border border-subtle px-3 py-2 text-sm text-content-muted bg-surface text-content">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <Eye className="h-3.5 w-3.5" />
             Rendered
           </div>
@@ -488,6 +492,10 @@ export default function AIQuestionsPage() {
       questionCount: fixedQuestionCount,
       allowMcq: isEnglishLanguagePractice ? true : form.allowMcq,
       allowCalculation: isEnglishLanguagePractice ? false : form.allowCalculation,
+      // Interactive diagram-completion is unlocked by the diagram-completion learning
+      // objective OR by topic/subtopic wording that implies a labelled/structural diagram
+      // (mirrors isDiagramCompletionTopic's own gating); the server re-validates the same way.
+      allowDiagram: !isEnglishLanguagePractice && isDiagramCompletionTopic(selectedSubject.subject, form.topic, form.subtopic, form.learningObjective || ''),
       useOnlineResources: true,
     };
 
@@ -719,15 +727,15 @@ export default function AIQuestionsPage() {
     <main className="space-y-7" aria-labelledby="ai-questions-title">
       <RevisionCycleStepper current="practice" />
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
+      <section className="overflow-hidden rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 5 of 5</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 5 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <Rocket className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="ai-questions-title" className="text-3xl font-bold text-slate-900 dark:text-white">Smart Practice</h1>
+              <Rocket className="h-7 w-7 text-accent" />
+              <h1 id="ai-questions-title" className="text-3xl font-bold text-content dark:text-white">Smart Practice</h1>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-2 max-w-2xl text-sm text-content-muted">
               Generate exam-board questions, answer them, then get marks, a predicted grade, and targeted upgrade advice.
             </p>
           </div>
@@ -752,14 +760,14 @@ export default function AIQuestionsPage() {
       {isGenerating ? (
         <>
           <style>{`@keyframes ai-loading{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
-          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-surface/10">
             <div className="h-full w-2/5 rounded-full bg-linear-to-r from-indigo-600 to-purple-500" style={{ animation: 'ai-loading 1.4s ease-in-out infinite' }} />
           </div>
         </>
       ) : null}
 
       {!inPractice ? (
-        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <SubjectSpecSelector
             subjects={userSubjects}
             isLoading={subjectsLoading}
@@ -773,7 +781,7 @@ export default function AIQuestionsPage() {
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
             {isEnglishLanguagePractice ? (
               <fieldset className="md:col-span-2">
-                <legend className="text-sm font-semibold text-slate-700 dark:text-slate-300">Paper</legend>
+                <legend className="text-sm font-semibold text-content-muted dark:text-slate-300">Paper</legend>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
                   {(['paper1', 'paper2'] as const).map((paper) => {
                     const selected = form.englishLanguagePaper === paper;
@@ -786,11 +794,11 @@ export default function AIQuestionsPage() {
                         className={`rounded-lg border px-4 py-3 text-left transition ${
                           selected
                             ? 'border-indigo-500 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-500/10 dark:text-indigo-100'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-indigo-500/10'
+                            : 'border-subtle bg-surface text-content-muted hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-white/10 dark:bg-surface/5 dark:hover:bg-indigo-500/10'
                         }`}
                       >
                         <span className="block text-sm font-semibold">{paper === 'paper1' ? 'Paper 1' : 'Paper 2'}</span>
-                        <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                        <span className="mt-1 block text-xs text-content-subtle">
                           {paper === 'paper1' ? '8 questions - fiction reading and creative writing' : '5 questions - viewpoints, comparison and writing'}
                         </span>
                       </button>
@@ -817,14 +825,14 @@ export default function AIQuestionsPage() {
                   ...creationOptions.map((option) => ({ value: option, label: option })),
                 ]}
                 placeholder={`Search ${creationOptionLabel.toLowerCase()}...`}
-                className="text-sm text-slate-700 dark:text-slate-300"
-                inputClassName="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                className="text-sm text-content-muted dark:text-slate-300"
+                inputClassName="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
               />
             ) : null}
 
             {isSelectedPoetryCluster ? (
               <>
-                <label className="text-sm text-slate-700 dark:text-slate-300">
+                <label className="text-sm text-content-muted dark:text-slate-300">
                   First poem
                   <select
                     value={form.poemOne}
@@ -835,7 +843,7 @@ export default function AIQuestionsPage() {
                       topic: '',
                       subtopic: '',
                     }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
                   >
                     <option value="">Select first poem</option>
                     {poetryPoems.map((poem) => (
@@ -843,13 +851,13 @@ export default function AIQuestionsPage() {
                     ))}
                   </select>
                 </label>
-                <label className="text-sm text-slate-700 dark:text-slate-300">
-                  Second poem <span className="text-slate-400">(optional)</span>
+                <label className="text-sm text-content-muted dark:text-slate-300">
+                  Second poem <span className="text-content-subtle">(optional)</span>
                   <select
                     value={form.poemTwo}
                     onChange={(event) => setForm((prev) => ({ ...prev, poemTwo: event.target.value, topic: '', subtopic: '' }))}
                     disabled={!form.poemOne}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 disabled:bg-slate-100 disabled:text-slate-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100 dark:disabled:bg-white/5"
+                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent disabled:disabled:text-content-subtle text-content dark:disabled:bg-surface/5"
                   >
                     <option value="">No comparison poem</option>
                     {poetryPoems.filter((poem) => poem !== form.poemOne).map((poem) => (
@@ -871,8 +879,8 @@ export default function AIQuestionsPage() {
                 suggestions={topicSuggestions}
                 isValidSelection={topicIsAllowed}
                 placeholder="Start typing a topic, or leave blank to generalise"
-                className="text-sm text-slate-700 dark:text-slate-300"
-                inputClassName="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                className="text-sm text-content-muted dark:text-slate-300"
+                inputClassName="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
               />
             ) : null}
 
@@ -883,18 +891,18 @@ export default function AIQuestionsPage() {
                 onChange={(value) => setForm((prev) => ({ ...prev, subtopic: value }))}
                 suggestions={subtopicSuggestions}
                 placeholder="Narrow the focus within this topic"
-                className="text-sm text-slate-700 dark:text-slate-300"
-                inputClassName="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                className="text-sm text-content-muted dark:text-slate-300"
+                inputClassName="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
               />
             ) : null}
 
             {!isEnglishLanguagePractice && learningObjectiveOptions.length > 0 ? (
-              <label className="text-sm text-slate-700 dark:text-slate-300">
+              <label className="text-sm text-content-muted dark:text-slate-300">
                 Learning objective (optional)
                 <select
                   value={form.learningObjective}
                   onChange={(event) => setForm((prev) => ({ ...prev, learningObjective: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
                 >
                   <option value="">No specific focus</option>
                   {learningObjectiveOptions.map((objective) => (
@@ -905,12 +913,12 @@ export default function AIQuestionsPage() {
             ) : null}
 
             {!isEnglishLanguagePractice && paperOptions.length > 0 ? (
-              <label className="text-sm text-slate-700 dark:text-slate-300">
+              <label className="text-sm text-content-muted dark:text-slate-300">
                 Paper (optional)
                 <select
                   value={form.paper}
                   onChange={(event) => setForm((prev) => ({ ...prev, paper: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
                 >
                   <option value="">General (any paper)</option>
                   {paperOptions.map((paper) => (
@@ -921,7 +929,7 @@ export default function AIQuestionsPage() {
             ) : null}
 
             {!isEnglishLanguagePractice ? (
-              <label className="text-sm text-slate-700 dark:text-slate-300">
+              <label className="text-sm text-content-muted dark:text-slate-300">
                 Question count
                 <input
                   type="number"
@@ -936,30 +944,30 @@ export default function AIQuestionsPage() {
                       questionCount: Math.min(Math.max(Math.floor(next), MIN_QUESTIONS), MAX_QUESTIONS),
                     }));
                   }}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
                 />
               </label>
             ) : null}
 
             {!isEnglishLanguagePractice ? (
-              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200">
+              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
                 <input
                   type="checkbox"
                   checked={isMockExam}
                   onChange={(event) => setIsMockExam(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                  className="h-4 w-4 rounded border-subtle text-accent"
                 />
                 Timed mock exam (countdown, no feedback until submitted)
               </label>
             ) : null}
 
             {!isEnglishLanguagePractice && isMockExam ? (
-              <label className="text-sm text-slate-700 dark:text-slate-300">
+              <label className="text-sm text-content-muted dark:text-slate-300">
                 Duration
                 <select
                   value={mockDurationMinutes}
                   onChange={(event) => setMockDurationMinutes(Number(event.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
                 >
                   {MOCK_DURATION_OPTIONS.map((mins) => (
                     <option key={mins} value={mins}>{mins} minutes</option>
@@ -972,24 +980,24 @@ export default function AIQuestionsPage() {
 
           {!isEnglishLanguagePractice ? (
           <div className="mt-5">
-            <fieldset className="rounded-lg border border-slate-200 p-4 dark:border-white/6">
-              <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Question mix</legend>
+            <fieldset className="rounded-lg border border-subtle p-4">
+              <legend className="px-1 text-sm font-semibold text-content-muted dark:text-slate-200">Question mix</legend>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200">
+                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
                   <input
                     type="checkbox"
                     checked={form.allowMcq}
                     onChange={(event) => setForm((prev) => ({ ...prev, allowMcq: event.target.checked }))}
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                    className="h-4 w-4 rounded border-subtle text-blue-600"
                   />
                   Allow MCQs
                 </label>
-                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200">
+                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
                   <input
                     type="checkbox"
                     checked={form.allowCalculation}
                     onChange={(event) => setForm((prev) => ({ ...prev, allowCalculation: event.target.checked }))}
-                    className="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                    className="h-4 w-4 rounded border-subtle text-emerald-600"
                   />
                   Allow calculations
                 </label>
@@ -1018,13 +1026,13 @@ export default function AIQuestionsPage() {
       ) : null}
 
       {inPractice && !report ? (
-        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-600 dark:text-indigo-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">
                 {questions.length} questions · {totalAvailableMarks} marks
               </p>
-              <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+              <h2 className="mt-1 text-2xl font-bold text-content">
                 {isMockExam ? 'Timed Mock Exam' : 'Answer Practice'}
               </h2>
             </div>
@@ -1059,19 +1067,19 @@ export default function AIQuestionsPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">
                 Source Extract
               </p>
-              <MarkdownContent className="mt-3 max-h-136 overflow-y-auto pr-2 text-sm leading-7 text-slate-900 dark:text-slate-100" content={sourceMaterial} />
+              <MarkdownContent className="mt-3 max-h-136 overflow-y-auto pr-2 text-sm leading-7 text-content" content={sourceMaterial} />
             </section>
           ) : null}
 
           <div className="mt-5 space-y-5">
             {questions.map((question, index) => (
-              <article key={`${question.marks}-${index}`} className="rounded-lg border border-slate-200 p-5 dark:border-white/6">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <article key={`${question.marks}-${index}`} className="rounded-lg border border-subtle p-5">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
                   <span>Question {index + 1}</span>
                   <span className="rounded-full bg-indigo-100 dark:bg-indigo-500/15 px-2.5 py-1 text-indigo-700 dark:text-indigo-300">
                     {question.marks} marks
                   </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-content-muted dark:bg-slate-800">
                     {question.commandWord}
                   </span>
                   {question.questionType === 'mcq' ? (
@@ -1087,20 +1095,20 @@ export default function AIQuestionsPage() {
                   ) : null}
                 </div>
 
-                <MarkdownContent className="mt-4 text-lg font-semibold text-slate-900 dark:text-slate-100" content={question.question} />
+                <MarkdownContent className="mt-4 text-lg font-semibold text-content" content={question.question} />
                 {question.figureUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL (AI/user supplied); host isn't known ahead of time for next/image's remotePatterns
                   <img
                     src={question.figureUrl}
                     alt="Question figure"
-                    className="mt-4 max-h-72 w-full rounded-lg border border-slate-300 object-contain dark:border-white/6"
+                    className="mt-4 max-h-72 w-full rounded-lg border border-subtle object-contain dark:border-white/6"
                   />
                 ) : null}
 
                 {question.skillsAssessed.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {question.skillsAssessed.map((skill) => (
-                      <span key={skill} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      <span key={skill} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-content-muted dark:bg-slate-800">
                         {skill}
                       </span>
                     ))}
@@ -1122,13 +1130,13 @@ export default function AIQuestionsPage() {
                           className={`flex w-full items-center justify-start gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
                             selected
                               ? 'border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 brightness-125'
-                              : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50 dark:border-white/6 dark:bg-[#0A0F1E] dark:text-slate-200 dark:hover:bg-white/5'
+                              : 'border-subtle bg-surface text-content-muted hover:border-slate-400 hover:dark:border-white/6 dark:text-slate-200 dark:hover:bg-surface/5'
                           }`}
                         >
                           <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
                             selected
                               ? 'border-white/50 text-white'
-                              : 'border-slate-300 text-slate-500 dark:border-white/20 dark:text-slate-400'
+                              : 'border-subtle text-content-subtle dark:border-white/20'
                           }`}>{letter}</span>
                           <MarkdownContent inline content={option} />
                         </button>
@@ -1144,6 +1152,16 @@ export default function AIQuestionsPage() {
                       mode="answer"
                     />
                   </div>
+                ) : question.questionType === 'diagram' && question.diagramSpec ? (
+                  <div className="mt-4">
+                    <DiagramAnswerInput
+                      diagramSpec={question.diagramSpec}
+                      diagramTemplate={question.diagramTemplate}
+                      value={answers[index] || ''}
+                      onChange={(value) => updateAnswer(index, value)}
+                      mode="answer"
+                    />
+                  </div>
                 ) : question.isCalculation ? (
                   <CalculationAnswerEditor
                     value={answers[index] || ''}
@@ -1151,13 +1169,13 @@ export default function AIQuestionsPage() {
                     rows={question.marks >= 9 ? 9 : question.marks >= 6 ? 7 : 5}
                   />
                 ) : (
-                  <label className="mt-4 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  <label className="mt-4 block text-sm font-semibold text-content-muted dark:text-slate-300">
                     Your answer
                     <textarea
                       value={answers[index] || ''}
                       onChange={(event) => updateAnswer(index, event.target.value)}
                       rows={question.marks >= 9 ? 9 : question.marks >= 6 ? 7 : 5}
-                      className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                      className="mt-2 w-full rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
                     />
                   </label>
                 )}
@@ -1165,8 +1183,8 @@ export default function AIQuestionsPage() {
             ))}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-5 dark:border-white/6">
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-subtle pt-5">
+            <p className="text-sm text-content-muted">
               {answeredCount} of {questions.length} answered
             </p>
             <button type="button" onClick={handleMarkAnswers} disabled={isMarking || answeredCount === 0} className={buttonStyles({ variant: 'primary', size: 'lg' })}>
@@ -1178,10 +1196,10 @@ export default function AIQuestionsPage() {
       ) : null}
 
       {report ? (
-        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/6 dark:bg-[#0A0F1E]">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Predicted Grade</p>
+            <div className="rounded-lg border border-subtle p-5 bg-surface">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Predicted Grade</p>
               <p className={`mt-3 inline-flex rounded-xl px-4 py-2 text-6xl font-black ${gradeBadgeTone({
                 grade: report.predictedGrade,
                 examType: selectedSubject?.exam_type,
@@ -1189,7 +1207,7 @@ export default function AIQuestionsPage() {
               })}`}>
                 {report.predictedGrade}
               </p>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-2 text-sm text-content-muted">
                 {report.totalMarksAwarded} / {report.totalAvailableMarks} marks - {report.percentage}%
               </p>
               {report.targetGrade ? (
@@ -1203,19 +1221,19 @@ export default function AIQuestionsPage() {
                   Top grade secured
                 </p>
               )}
-              <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">{report.gradeBoundaryNote}</p>
+              <p className="mt-4 text-xs text-content-subtle">{report.gradeBoundaryNote}</p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Marked Attempt</h2>
-                <MarkdownContent className="mt-2 text-sm text-slate-700 dark:text-slate-300" content={report.summary} />
+                <h2 className="text-2xl font-bold text-content">Marked Attempt</h2>
+                <MarkdownContent className="mt-2 text-sm text-content-muted dark:text-slate-300" content={report.summary} />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 p-4 dark:border-white/6">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">Weakness Analysis</h3>
-                  <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                <div className="rounded-lg border border-subtle p-4">
+                  <h3 className="font-semibold text-content">Weakness Analysis</h3>
+                  <ul className="mt-3 space-y-2 text-sm text-content-muted dark:text-slate-300">
                     {report.weaknessAnalysis.map((item) => (
                       <li key={item} className="flex gap-2">
                         <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
@@ -1229,9 +1247,9 @@ export default function AIQuestionsPage() {
                   </Link>
                 </div>
 
-                <div className="rounded-lg border border-slate-200 p-4 dark:border-white/6">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">Grade Upgrade Advice</h3>
-                  <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
+                <div className="rounded-lg border border-subtle p-4">
+                  <h3 className="font-semibold text-content">Grade Upgrade Advice</h3>
+                  <ul className="mt-3 space-y-2 text-sm text-content-muted dark:text-slate-300">
                     {report.gradeBoostAdvice.map((item) => (
                       <li key={item} className="flex gap-2">
                         <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
@@ -1249,11 +1267,11 @@ export default function AIQuestionsPage() {
               const question = questions[marked.questionIndex];
               if (!question) return null;
               return (
-                <article key={marked.questionIndex} className="rounded-lg border border-slate-200 p-5 dark:border-white/6">
+                <article key={marked.questionIndex} className="rounded-lg border border-subtle p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Question {marked.questionIndex + 1}</span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                      <span className="text-sm font-semibold text-content-muted dark:text-slate-300">Question {marked.questionIndex + 1}</span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-content-muted dark:bg-slate-800">
                         {question.commandWord}
                       </span>
                       {question.questionType === 'mcq' ? (
@@ -1267,12 +1285,29 @@ export default function AIQuestionsPage() {
                     </span>
                   </div>
 
-                  <MarkdownContent className="mt-3 text-slate-900 dark:text-slate-100" content={question.question} />
+                  <MarkdownContent className="mt-3 text-content" content={question.question} />
 
                   {question.questionType === 'plot' && question.plotSpec ? (
                     <div className="mt-3">
                       <PlotAnswerInput
                         plotSpec={question.plotSpec}
+                        value=""
+                        onChange={() => {}}
+                        mode="review"
+                        studentSubmission={(() => {
+                          try {
+                            return JSON.parse(answers[marked.questionIndex] || '');
+                          } catch {
+                            return null;
+                          }
+                        })()}
+                      />
+                    </div>
+                  ) : question.questionType === 'diagram' && question.diagramSpec ? (
+                    <div className="mt-3">
+                      <DiagramAnswerInput
+                        diagramSpec={question.diagramSpec}
+                        diagramTemplate={question.diagramTemplate}
                         value=""
                         onChange={() => {}}
                         mode="review"
@@ -1299,7 +1334,7 @@ export default function AIQuestionsPage() {
                                 ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-200'
                                 : isSelected
                                   ? 'border-red-500 bg-red-50 text-red-900 dark:bg-red-950/35 dark:text-red-200'
-                                  : 'border-slate-200 text-slate-700 dark:border-white/6 dark:text-slate-300'
+                                  : 'border-subtle text-content-muted dark:text-slate-300'
                             }`}
                           >
                             <span className="font-bold">{letter}.</span> <MarkdownContent inline content={option} />
@@ -1308,45 +1343,45 @@ export default function AIQuestionsPage() {
                       })}
                     </div>
                   ) : answers[marked.questionIndex]?.trim() ? (
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/6 dark:bg-[#0A0F1E]">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Your answer</p>
-                      <p className="mt-1.5 whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{answers[marked.questionIndex]}</p>
+                    <div className="mt-3 rounded-lg border border-subtle px-4 py-3 bg-surface">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Your answer</p>
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm text-content-muted dark:text-slate-200">{answers[marked.questionIndex]}</p>
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm italic text-slate-400 dark:text-slate-500">No answer entered.</p>
+                    <p className="mt-3 text-sm italic text-content-subtle dark:text-content-subtle">No answer entered.</p>
                   )}
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Feedback - {marked.band}</p>
-                      <MarkdownContent className="mt-2 text-sm text-slate-700 dark:text-slate-300" content={marked.feedback} />
+                      <p className="text-sm font-semibold text-content">Feedback - {marked.band}</p>
+                      <MarkdownContent className="mt-2 text-sm text-content-muted dark:text-slate-300" content={marked.feedback} />
                     </div>
 
                     <div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Exemplar Answer</p>
-                      <MarkdownContent className="mt-2 text-sm text-slate-700 dark:text-slate-300" content={marked.exemplarAnswer} />
+                      <p className="text-sm font-semibold text-content">Exemplar Answer</p>
+                      <MarkdownContent className="mt-2 text-sm text-content-muted dark:text-slate-300" content={marked.exemplarAnswer} />
                     </div>
                   </div>
 
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Strengths</p>
-                      <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300">
-                        {(marked.strengths.length > 0 ? marked.strengths : ['No clear credit points were identified.']).map((item) => (
-                          <li key={item}>{item}</li>
+                      <ul className="mt-2 space-y-1 text-sm text-content-muted dark:text-slate-300">
+                        {(marked.strengths.length > 0 ? marked.strengths : ['No clear credit points were identified.']).map((item, index) => (
+                          <li key={`${item}-${index}`}>{item}</li>
                         ))}
                       </ul>
                     </div>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Improvements</p>
-                      <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                      <ul className="mt-2 space-y-1 text-sm text-content-muted dark:text-slate-300">
                         {(marked.improvements.length > 0
                           ? marked.improvements
                           : marked.marksAwarded >= marked.maxMarks
                             ? ['Full marks secured.']
                             : ['Add more precise evidence from the question context.']
-                        ).map((item) => (
-                          <li key={item}>{item}</li>
+                        ).map((item, index) => (
+                          <li key={`${item}-${index}`}>{item}</li>
                         ))}
                       </ul>
                     </div>

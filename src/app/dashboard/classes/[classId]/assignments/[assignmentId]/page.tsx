@@ -7,17 +7,28 @@ import { ArrowLeft } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
+import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
 import { useAuth } from '@/hooks/useAuth';
 import { PageLoader } from '@/components/PageLoader';
-import type { PlotSpec } from '@/types';
+import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
 
 type AssignmentQuestion = {
-  questionType: 'open' | 'mcq' | 'plot';
+  questionType: 'open' | 'mcq' | 'plot' | 'diagram';
   question: string;
   marks: number;
   options: string[];
   correctOption: '' | 'A' | 'B' | 'C' | 'D';
   plotSpec: PlotSpec | null;
+  diagramSpec: DiagramSpec | null;
+  diagramTemplate?: DiagramTemplateSelection | null;
+};
+
+const parseSubmission = (value: string) => {
+  try {
+    return JSON.parse(value || '');
+  } catch {
+    return null;
+  }
 };
 
 type MarkedAnswer = {
@@ -150,19 +161,19 @@ export default function TakeAssignmentPage() {
     <div className="space-y-6">
       <Link
         href={`/dashboard/classes/${classId}`}
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+        className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
         Back to class
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{assignment.title}</h1>
-        {assignment.description ? <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{assignment.description}</p> : null}
+        <h1 className="text-2xl font-bold text-content dark:text-white">{assignment.title}</h1>
+        {assignment.description ? <p className="mt-1 text-sm text-content-muted">{assignment.description}</p> : null}
       </div>
 
       {assignment.source_material ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+        <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
           <MarkdownContent content={assignment.source_material} />
         </div>
       ) : null}
@@ -170,7 +181,7 @@ export default function TakeAssignmentPage() {
       {report ? (
         <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-500/30 dark:bg-indigo-500/10">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="text-lg font-semibold text-content">
               {Math.round(report.totalMarksAwarded)}/{Math.round(report.totalAvailableMarks)} marks · {Math.round(report.percentage)}% · Predicted grade {report.predictedGrade}
             </h2>
             {assignment.allow_reattempts && (
@@ -179,7 +190,7 @@ export default function TakeAssignmentPage() {
               </button>
             )}
           </div>
-          <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">{report.summary}</p>
+          <p className="mt-2 text-sm text-content-muted dark:text-slate-300">{report.summary}</p>
         </div>
       ) : null}
 
@@ -187,10 +198,10 @@ export default function TakeAssignmentPage() {
         {questions.map((question, index) => {
           const marked = report?.markedAnswers.find((m) => m.questionIndex === index);
           return (
-            <div key={index} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <div key={index} className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <MarkdownContent content={`**${index + 1}.** ${question.question}`} />
-                <span className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">{question.marks} marks</span>
+                <span className="shrink-0 text-xs font-medium text-content-subtle">{question.marks} marks</span>
               </div>
 
               <div className="mt-3">
@@ -199,7 +210,7 @@ export default function TakeAssignmentPage() {
                     {question.options.map((option, optionIndex) => {
                       const letter = ['A', 'B', 'C', 'D'][optionIndex] as 'A' | 'B' | 'C' | 'D';
                       return (
-                        <label key={letter} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                        <label key={letter} className="flex items-center gap-2 text-sm text-content-muted dark:text-slate-300">
                           <input
                             type="radio"
                             name={`question-${index}`}
@@ -220,6 +231,16 @@ export default function TakeAssignmentPage() {
                     value={answers[index] ?? ''}
                     onChange={(value) => updateAnswer(index, value)}
                     mode={isReview ? 'review' : 'answer'}
+                    studentSubmission={isReview ? parseSubmission(answers[index] ?? '') : undefined}
+                  />
+                ) : question.questionType === 'diagram' && question.diagramSpec ? (
+                  <DiagramAnswerInput
+                    diagramSpec={question.diagramSpec}
+                    diagramTemplate={question.diagramTemplate}
+                    value={answers[index] ?? ''}
+                    onChange={(value) => updateAnswer(index, value)}
+                    mode={isReview ? 'review' : 'answer'}
+                    studentSubmission={isReview ? parseSubmission(answers[index] ?? '') : undefined}
                   />
                 ) : (
                   <textarea
@@ -228,17 +249,17 @@ export default function TakeAssignmentPage() {
                     disabled={isReview}
                     rows={4}
                     placeholder="Write your answer..."
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 disabled:bg-slate-50 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100 dark:disabled:bg-white/3"
+                    className="w-full rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent disabled:text-content dark:disabled:bg-surface/3"
                   />
                 )}
               </div>
 
               {marked ? (
-                <div className="mt-3 rounded-lg bg-slate-50 p-3 text-sm dark:bg-white/3">
-                  <p className="font-semibold text-slate-800 dark:text-slate-100">
+                <div className="mt-3 rounded-lg bg-surface-sunken p-3 text-sm dark:bg-surface/3">
+                  <p className="font-semibold text-content-muted text-content">
                     {marked.marksAwarded}/{marked.maxMarks} · {marked.band}
                   </p>
-                  <p className="mt-1 text-slate-600 dark:text-slate-300">{marked.feedback}</p>
+                  <p className="mt-1 text-content-muted">{marked.feedback}</p>
                 </div>
               ) : null}
             </div>

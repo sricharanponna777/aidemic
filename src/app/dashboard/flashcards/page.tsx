@@ -169,15 +169,15 @@ export default function Flashcards() {
     <main className="space-y-8" aria-labelledby="flashcards-title">
       <RevisionCycleStepper current="learn" />
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-28px_rgba(2,6,23,0.95)]">
+      <section className="overflow-hidden rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 3 of 5</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 3 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <Layers className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="flashcards-title" className="text-3xl font-bold text-slate-900 dark:text-white">Flashcards</h1>
+              <Layers className="h-7 w-7 text-accent" />
+              <h1 id="flashcards-title" className="text-3xl font-bold text-content dark:text-white">Flashcards</h1>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-2 max-w-2xl text-sm text-content-muted">
               Build flashcards from what you learned.
             </p>
           </div>
@@ -213,39 +213,39 @@ export default function Flashcards() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/6 dark:bg-[#131B2E]">
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Decks</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalDecks}</p>
+          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-content-subtle">Decks</p>
+            <p className="mt-1 text-2xl font-bold text-content">{stats.totalDecks}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/6 dark:bg-[#131B2E]">
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Cards</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalCards}</p>
+          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-content-subtle">Cards</p>
+            <p className="mt-1 text-2xl font-bold text-content">{stats.totalCards}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/6 dark:bg-[#131B2E]">
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Due now</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.dueNow}</p>
+          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-content-subtle">Due now</p>
+            <p className="mt-1 text-2xl font-bold text-content">{stats.dueNow}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-white/6 dark:bg-[#131B2E]">
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">AI decks</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.aiDecks}</p>
+          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
+            <p className="text-xs uppercase tracking-wide text-content-subtle">AI decks</p>
+            <p className="mt-1 text-2xl font-bold text-content">{stats.aiDecks}</p>
           </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+      <section className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search deck names or descriptions..."
             aria-label="Search deck names or descriptions"
-            className="min-w-55 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+            className="min-w-55 flex-1 rounded-lg border border-subtle px-3 py-2 text-sm text-content outline-none focus:border-accent bg-surface"
           />
           <select
             value={sortBy}
             onChange={(event) => setSortBy(event.target.value as 'recent' | 'name' | 'cards')}
             aria-label="Sort decks"
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-200"
+            className="rounded-lg border border-subtle px-3 py-2 text-sm text-content-muted outline-none focus:border-accent bg-surface"
           >
             <option value="recent">Sort: Recently updated</option>
             <option value="name">Sort: Name</option>
@@ -257,18 +257,18 @@ export default function Flashcards() {
       {status ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassName}`}>{status.text}</div> : null}
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {isLoading ? <p className="text-sm text-slate-600 dark:text-slate-300">Loading decks...</p> : null}
+        {isLoading ? <p className="text-sm text-content-muted">Loading decks...</p> : null}
         {!isLoading && filteredDecks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-slate-600 dark:border-white/6 dark:bg-[#131B2E] dark:text-slate-300">
+          <div className="rounded-2xl border border-dashed border-subtle p-8 text-center text-content-muted dark:border-white/6 bg-surface">
             No decks match your filters.
           </div>
         ) : null}
         {filteredDecks.map((deck) => (
-          <article key={deck.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-36px_rgba(15,23,42,0.9)] dark:border-white/6 dark:bg-[#131B2E] dark:shadow-[0_20px_50px_-30px_rgba(2,6,23,0.95)]">
+          <article key={deck.id} className="rounded-2xl border border-subtle bg-surface p-5 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-36px_rgba(15,23,42,0.9)] dark:shadow-[0_20px_50px_-30px_rgba(2,6,23,0.95)]">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{deck.name}</h3>
-                {deck.description ? <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{deck.description}</p> : null}
+                <h3 className="text-lg font-semibold text-content">{deck.name}</h3>
+                {deck.description ? <p className="mt-1 text-sm text-content-muted">{deck.description}</p> : null}
               </div>
               <button
                 onClick={() => handleDeleteDeck(deck.id)}
@@ -281,7 +281,7 @@ export default function Flashcards() {
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 dark:bg-white/10 dark:text-slate-200">{deck.card_count || 0} cards</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-content-muted dark:bg-surface/10">{deck.card_count || 0} cards</span>
               {deck.due_count ? (
                 <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{deck.due_count} due now</span>
               ) : null}
@@ -294,7 +294,7 @@ export default function Flashcards() {
             </div>
 
             <div className="mt-5 flex items-center justify-between">
-              <p className="text-xs text-slate-500 dark:text-slate-400">Updated {new Date(deck.updated_at || deck.created_at || '').toLocaleDateString()}</p>
+              <p className="text-xs text-content-subtle">Updated {new Date(deck.updated_at || deck.created_at || '').toLocaleDateString()}</p>
               <Link
                 href={`/dashboard/flashcards/${deck.id}`}
                 className={buttonStyles({ variant: 'primary', size: 'sm' })}
@@ -313,16 +313,16 @@ export default function Flashcards() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-deck-title"
-            className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-2xl"
+            className="relative z-10 w-full max-w-md rounded-2xl border border-subtle bg-surface p-6 shadow-2xl"
           >
-            <h2 id="create-deck-title" className="text-xl font-semibold text-slate-900 dark:text-slate-100">Create deck</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Name your deck and start adding cards.</p>
+            <h2 id="create-deck-title" className="text-xl font-semibold text-content">Create deck</h2>
+            <p className="mt-1 text-sm text-content-muted">Name your deck and start adding cards.</p>
             <input
               value={newDeckName}
               onChange={(event) => setNewDeckName(event.target.value)}
               placeholder="Example: Renal Physiology Midterm"
               aria-label="Deck name"
-              className="mt-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+              className="mt-4 w-full rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
             />
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setShowCreate(false)}>

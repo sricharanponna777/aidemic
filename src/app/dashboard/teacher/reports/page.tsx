@@ -84,25 +84,25 @@ export default function TeacherReportsPage() {
   }
 
   const selectClass =
-    'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
+    'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Reports</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Deep-dive performance reports for students and classes.</p>
+        <h1 className="text-2xl font-bold text-content dark:text-white">Reports</h1>
+        <p className="mt-1 text-sm text-content-muted">Deep-dive performance reports for students and classes.</p>
       </div>
 
       {classes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">
           You need a class with assignments before reports appear.{' '}
-          <Link href="/dashboard/teacher/classes" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href="/dashboard/teacher/classes" className="font-medium text-accent hover:underline">
             Create a class
           </Link>
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+          <div className="flex flex-wrap gap-1 rounded-xl border border-subtle bg-surface p-1 shadow-sm">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -111,7 +111,7 @@ export default function TeacherReportsPage() {
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                   tab === t.id
                     ? 'bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/6'
+                    : 'text-content-muted hover:bg-slate-100 dark:text-content-subtle dark:hover:bg-surface/6'
                 }`}
               >
                 {t.label}
@@ -122,12 +122,12 @@ export default function TeacherReportsPage() {
           {/* Class reports */}
           {tab === 'class' && (
             <div className="space-y-4">
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">All classes</h2>
+              <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-content">All classes</h2>
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-130 text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/6 dark:text-slate-400">
+                      <tr className="border-b border-subtle text-left text-xs uppercase tracking-wide text-content-subtle">
                         <th className="pb-2 pr-4 font-medium">Class</th>
                         <th className="pb-2 pr-4 font-medium">Students</th>
                         <th className="pb-2 pr-4 font-medium">Assignments</th>
@@ -139,13 +139,13 @@ export default function TeacherReportsPage() {
                       {classStats.map((cls) => (
                         <tr key={cls.class_id} className="border-b border-slate-100 last:border-0 dark:border-white/4">
                           <td className="py-2.5 pr-4">
-                            <Link href={`/dashboard/teacher/classes/${cls.class_id}`} className="font-medium text-slate-900 hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400">
+                            <Link href={`/dashboard/teacher/classes/${cls.class_id}`} className="font-medium text-content hover:text-accent dark:hover:text-indigo-400">
                               {cls.name}
                             </Link>
-                            {cls.status === 'archived' && <span className="ml-2 text-[10px] uppercase text-slate-400">archived</span>}
+                            {cls.status === 'archived' && <span className="ml-2 text-[10px] uppercase text-content-subtle">archived</span>}
                           </td>
-                          <td className="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{cls.rosterSize}</td>
-                          <td className="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{cls.assignmentCount}</td>
+                          <td className="py-2.5 pr-4 text-content-muted">{cls.rosterSize}</td>
+                          <td className="py-2.5 pr-4 text-content-muted">{cls.assignmentCount}</td>
                           <td className="py-2.5 pr-4">
                             <span className={`font-semibold ${scoreTextTone(cls.completionRate)}`}>{cls.completionRate === null ? '—' : `${cls.completionRate}%`}</span>
                           </td>
@@ -159,9 +159,9 @@ export default function TeacherReportsPage() {
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+              <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Topic breakdown</h2>
+                  <h2 className="text-lg font-semibold text-content">Topic breakdown</h2>
                   <select value={effectiveClassId} onChange={(e) => setClassId(e.target.value)} className={selectClass}>
                     {classes.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -171,18 +171,18 @@ export default function TeacherReportsPage() {
                   </select>
                 </div>
                 {topicStats.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No assignments in this class yet.</p>
+                  <p className="mt-4 text-sm text-content-subtle">No assignments in this class yet.</p>
                 ) : (
                   <div className="mt-4 space-y-3">
                     {topicStats.map((topic) => (
                       <div key={topic.topic_id}>
                         <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-slate-800 dark:text-slate-200">{topic.name}</span>
+                          <span className="font-medium text-content-muted dark:text-slate-200">{topic.name}</span>
                           <span className={`font-semibold ${scoreTextTone(topic.avgScore)}`}>
                             {topic.avgScore === null ? 'No completed attempts' : `${topic.avgScore}% avg`}
                           </span>
                         </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-surface/10">
                           <div className={`h-full rounded-full ${scoreBarTone(topic.avgScore)}`} style={{ width: `${topic.avgScore ?? 0}%` }} />
                         </div>
                       </div>
@@ -191,16 +191,16 @@ export default function TeacherReportsPage() {
                 )}
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Weakness heatmap</h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Average score by topic across all your classes.</p>
+              <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-content">Weakness heatmap</h2>
+                <p className="mt-1 text-sm text-content-subtle">Average score by topic across all your classes.</p>
                 {weaknessHeatmap.topics.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No assignments yet.</p>
+                  <p className="mt-4 text-sm text-content-subtle">No assignments yet.</p>
                 ) : (
                   <div className="mt-4 overflow-x-auto">
                     <table className="w-full min-w-130 text-sm">
                       <thead>
-                        <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/6 dark:text-slate-400">
+                        <tr className="border-b border-subtle text-left text-xs uppercase tracking-wide text-content-subtle">
                           <th className="pb-2 pr-4 font-medium">Topic</th>
                           {weaknessHeatmap.classNames.map((className) => (
                             <th key={className} className="pb-2 pr-4 text-center font-medium">
@@ -212,7 +212,7 @@ export default function TeacherReportsPage() {
                       <tbody>
                         {weaknessHeatmap.topics.map((topicName) => (
                           <tr key={topicName} className="border-b border-slate-100 last:border-0 dark:border-white/4">
-                            <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">{topicName}</td>
+                            <td className="py-2.5 pr-4 font-medium text-content-muted dark:text-slate-200">{topicName}</td>
                             {weaknessHeatmap.classNames.map((className) => {
                               const avgScore = weaknessHeatmap.cellByKey.get(`${topicName}::${className}`) ?? null;
                               return (
@@ -235,7 +235,7 @@ export default function TeacherReportsPage() {
 
           {/* Individual reports */}
           {tab === 'individual' && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <select value={effectiveClassId} onChange={(e) => { setClassId(e.target.value); setStudentId(''); }} className={selectClass}>
                   {classes.map((c) => (
@@ -258,50 +258,50 @@ export default function TeacherReportsPage() {
               </div>
 
               {!selectedStudent ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No students have joined this class yet.</p>
+                <p className="mt-4 text-sm text-content-subtle">No students have joined this class yet.</p>
               ) : (
                 <>
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/6">
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                    <div className="rounded-xl border border-subtle px-4 py-3">
+                      <p className="text-2xl font-bold text-content dark:text-white">
                         {selectedStudent.completedCount}/{selectedStudent.assignedCount}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Completed</p>
+                      <p className="text-xs text-content-subtle">Completed</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/6">
+                    <div className="rounded-xl border border-subtle px-4 py-3">
                       <p className={`text-2xl font-bold ${scoreTextTone(selectedStudent.avgScore)}`}>{selectedStudent.avgScore === null ? '—' : `${selectedStudent.avgScore}%`}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Avg. score</p>
+                      <p className="text-xs text-content-subtle">Avg. score</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/6">
-                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedStudent.predictedGrade ?? '—'}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Predicted grade</p>
+                    <div className="rounded-xl border border-subtle px-4 py-3">
+                      <p className="text-2xl font-bold text-content dark:text-white">{selectedStudent.predictedGrade ?? '—'}</p>
+                      <p className="text-xs text-content-subtle">Predicted grade</p>
                     </div>
-                    <div className="rounded-xl border border-slate-200 px-4 py-3 dark:border-white/6">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    <div className="rounded-xl border border-subtle px-4 py-3">
+                      <p className="text-sm font-semibold text-content dark:text-white">
                         {selectedStudent.lastActivity ? selectedStudent.lastActivity.toLocaleDateString() : '—'}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Last active</p>
+                      <p className="text-xs text-content-subtle">Last active</p>
                     </div>
                   </div>
 
                   <div className="mt-4 space-y-2">
                     {studentAssignments.map((a) => (
-                      <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm dark:border-white/6">
+                      <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-subtle px-4 py-2.5 text-sm">
                         <div>
-                          <p className="font-medium text-slate-900 dark:text-slate-100">{a.title}</p>
-                          {a.topic && <p className="text-xs text-slate-500 dark:text-slate-400">{a.topic}</p>}
+                          <p className="font-medium text-content">{a.title}</p>
+                          {a.topic && <p className="text-xs text-content-subtle">{a.topic}</p>}
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                          {a.predictedGrade && <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">Grade {a.predictedGrade}</span>}
+                          {a.predictedGrade && <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-content-muted dark:bg-surface/10">Grade {a.predictedGrade}</span>}
                           {a.status === 'completed' ? (
                             <span className={`rounded-full px-2 py-0.5 font-semibold ${scoreBadgeTone(a.percentage)}`}>{a.percentage === null ? 'Done' : `${a.percentage}%`}</span>
                           ) : (
-                            <span className="capitalize text-slate-400 dark:text-slate-500">{a.status.replace('_', ' ')}</span>
+                            <span className="capitalize text-content-subtle dark:text-content-subtle">{a.status.replace('_', ' ')}</span>
                           )}
                           {a.status === 'completed' && (
                             <Link
                               href={`/dashboard/teacher/classes/${effectiveClassId}/assignments/${a.id}/students/${effectiveStudentId}`}
-                              className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                              className="font-medium text-accent hover:underline"
                             >
                               View answers
                             </Link>
@@ -309,21 +309,21 @@ export default function TeacherReportsPage() {
                         </div>
                       </div>
                     ))}
-                    {studentAssignments.length === 0 && <p className="text-sm text-slate-500 dark:text-slate-400">No assignments in this class yet.</p>}
+                    {studentAssignments.length === 0 && <p className="text-sm text-content-subtle">No assignments in this class yet.</p>}
                   </div>
 
                   {topicMasteryTrend.length > 0 && (
                     <div className="mt-6">
-                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Topic mastery over time</h3>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Score progression across completed attempts on the same topic, oldest first.</p>
+                      <h3 className="text-sm font-semibold text-content">Topic mastery over time</h3>
+                      <p className="mt-1 text-xs text-content-subtle">Score progression across completed attempts on the same topic, oldest first.</p>
                       <div className="mt-3 space-y-2">
                         {topicMasteryTrend.map((topic) => (
                           <div key={topic.name} className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="w-32 shrink-0 font-medium text-slate-700 dark:text-slate-300">{topic.name}</span>
+                            <span className="w-32 shrink-0 font-medium text-content-muted dark:text-slate-300">{topic.name}</span>
                             <div className="flex flex-wrap items-center gap-1">
                               {topic.points.map((point, index) => (
                                 <span key={`${topic.name}-${index}`} className="flex items-center gap-1">
-                                  {index > 0 && <span className="text-slate-300 dark:text-slate-600">→</span>}
+                                  {index > 0 && <span className="text-slate-300 dark:text-content-muted">→</span>}
                                   <span className={`rounded-full px-2 py-0.5 font-semibold ${scoreBadgeTone(point.percentage)}`}>{point.percentage}%</span>
                                 </span>
                               ))}
@@ -340,18 +340,18 @@ export default function TeacherReportsPage() {
 
           {/* Grade predictions */}
           {tab === 'predictions' && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Grade predictions</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-content">Grade predictions</h2>
+              <p className="mt-1 text-sm text-content-subtle">
                 Most recent predicted grade per student, from their completed assignments.
               </p>
               {studentStats.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No students have joined your classes yet.</p>
+                <p className="mt-4 text-sm text-content-subtle">No students have joined your classes yet.</p>
               ) : (
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-130 text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-white/6 dark:text-slate-400">
+                      <tr className="border-b border-subtle text-left text-xs uppercase tracking-wide text-content-subtle">
                         <th className="pb-2 pr-4 font-medium">Student</th>
                         <th className="pb-2 pr-4 font-medium">Class</th>
                         <th className="pb-2 pr-4 font-medium">Completed</th>
@@ -362,9 +362,9 @@ export default function TeacherReportsPage() {
                     <tbody>
                       {studentStats.map((s) => (
                         <tr key={`${s.class_id}:${s.student_id}`} className="border-b border-slate-100 last:border-0 dark:border-white/4">
-                          <td className="py-2.5 pr-4 font-medium text-slate-900 dark:text-slate-100">{s.name}</td>
-                          <td className="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{s.className}</td>
-                          <td className="py-2.5 pr-4 text-slate-600 dark:text-slate-300">{s.completedCount}/{s.assignedCount}</td>
+                          <td className="py-2.5 pr-4 font-medium text-content">{s.name}</td>
+                          <td className="py-2.5 pr-4 text-content-muted">{s.className}</td>
+                          <td className="py-2.5 pr-4 text-content-muted">{s.completedCount}/{s.assignedCount}</td>
                           <td className="py-2.5 pr-4">
                             <span className={`font-semibold ${scoreTextTone(s.avgScore)}`}>{s.avgScore === null ? '—' : `${s.avgScore}%`}</span>
                           </td>
@@ -372,7 +372,7 @@ export default function TeacherReportsPage() {
                             {s.predictedGrade ? (
                               <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">{s.predictedGrade}</span>
                             ) : (
-                              <span className="text-slate-400 dark:text-slate-500">—</span>
+                              <span className="text-content-subtle dark:text-content-subtle">—</span>
                             )}
                           </td>
                         </tr>

@@ -142,7 +142,7 @@ export function PieChartInput({ spec, value, onChange, readOnly = false, correct
     <div className="space-y-2">
       <svg
         viewBox="0 0 300 240"
-        className="w-full touch-none select-none rounded-lg border border-slate-300 bg-white text-slate-700 dark:border-white/10 dark:bg-[#0A0F1E] dark:text-slate-300"
+        className="w-full touch-none select-none rounded-lg border border-subtle bg-surface text-content-muted dark:text-slate-300"
       >
         {correctValues ? <PieSectors spec={spec} angles={correctValues} color="#16a34a" draggable={false} /> : null}
         {readOnly && !value ? null : (
@@ -155,7 +155,7 @@ export function PieChartInput({ spec, value, onChange, readOnly = false, correct
           />
         )}
       </svg>
-      <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-content-subtle">
         {spec.categories.map((category) => (
           <li key={category.label}>
             {category.label}: {category.value}
@@ -163,7 +163,7 @@ export function PieChartInput({ spec, value, onChange, readOnly = false, correct
         ))}
       </ul>
       {correctValues ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -174,7 +174,7 @@ export function PieChartInput({ spec, value, onChange, readOnly = false, correct
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">Drag each divider around the circle so every sector&apos;s angle matches its share of the data.</p>
+        <p className="text-xs text-content-subtle">Drag each divider around the circle so every sector&apos;s angle matches its share of the data.</p>
       )}
     </div>
   );

@@ -142,19 +142,19 @@ export default function PodcastsPage() {
     <main className="space-y-7" aria-labelledby="podcasts-title">
       <RevisionCycleStepper current="learn" />
 
-      <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
+      <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
         <div className="flex items-center gap-3">
-          <Headphones className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-          <h1 id="podcasts-title" className="text-3xl font-bold text-slate-900 dark:text-white">Podcasts</h1>
+          <Headphones className="h-7 w-7 text-accent" />
+          <h1 id="podcasts-title" className="text-3xl font-bold text-content dark:text-white">Podcasts</h1>
         </div>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        <p className="mt-2 text-sm text-content-muted">
           Generate a short AI-narrated audio episode for any of your saved subjects.
         </p>
       </section>
 
       {!activePodcast ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Create a podcast</h2>
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+          <h2 className="text-lg font-semibold text-content">Create a podcast</h2>
           <form onSubmit={generatePodcast} className="mt-5 space-y-5">
             <SubjectSpecSelector
               subjects={subjects}
@@ -179,7 +179,7 @@ export default function PodcastsPage() {
             />
 
             <div>
-              <p className="block text-sm font-medium text-slate-700 dark:text-slate-300">Length</p>
+              <p className="block text-sm font-medium text-content-muted dark:text-slate-300">Length</p>
               <div className="mt-1 grid grid-cols-3 gap-2">
                 {LENGTH_OPTIONS.map((option) => (
                   <button
@@ -189,7 +189,7 @@ export default function PodcastsPage() {
                     className={`rounded-lg border px-3 py-2 text-sm font-medium transition ${
                       length === option.value
                         ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-500/15 dark:text-indigo-300'
-                        : 'border-slate-300 text-slate-600 hover:border-indigo-300 dark:border-slate-600 dark:text-slate-300'
+                        : 'border-subtle text-content-muted hover:border-indigo-300'
                     }`}
                   >
                     {option.label}
@@ -213,12 +213,12 @@ export default function PodcastsPage() {
         </section>
       ) : (
         <section className="space-y-5">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
+          <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Podcast</p>
-                <p className="mt-0.5 text-lg font-semibold text-slate-900 dark:text-slate-100">{activePodcast.topic}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{getSubjectLabel(activePodcast.subject)}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Podcast</p>
+                <p className="mt-0.5 text-lg font-semibold text-content">{activePodcast.topic}</p>
+                <p className="text-sm text-content-subtle">{getSubjectLabel(activePodcast.subject)}</p>
               </div>
               <button type="button" onClick={reset} className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'shrink-0' })}>
                 <RotateCcw className="h-3.5 w-3.5" />
@@ -228,8 +228,8 @@ export default function PodcastsPage() {
             <audio controls src={activePodcast.audio_url} className="mt-4 w-full" />
           </div>
 
-          <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Transcript</h2>
+          <article className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+            <h2 className="text-sm font-semibold text-content">Transcript</h2>
             <div className="mt-4 space-y-3">
               {parseDialogueTurns(activePodcast.script_content).map((turn, index) => (
                 <div
@@ -237,7 +237,7 @@ export default function PodcastsPage() {
                   className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
                     turn.speaker === 'HOST'
                       ? 'bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white'
-                      : 'ml-auto bg-slate-100 text-slate-800 dark:bg-white/8 dark:text-slate-100'
+                      : 'ml-auto bg-slate-100 text-content-muted dark:bg-surface/8 text-content'
                   }`}
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
@@ -252,21 +252,21 @@ export default function PodcastsPage() {
       )}
 
       {history.length > 0 ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">History</h2>
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+          <h2 className="text-lg font-semibold text-content">History</h2>
           <ul className="mt-4 divide-y divide-slate-100 dark:divide-white/6">
             {history.map((podcast) => (
               <li key={podcast.id}>
                 <button
                   type="button"
                   onClick={() => setActivePodcast(podcast)}
-                  className="flex w-full items-center justify-between gap-3 py-3 text-left text-sm hover:text-indigo-600 dark:hover:text-indigo-400"
+                  className="flex w-full items-center justify-between gap-3 py-3 text-left text-sm hover:text-accent dark:hover:text-indigo-400"
                 >
                   <span>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">{podcast.topic}</span>
-                    <span className="ml-2 text-slate-500 dark:text-slate-400">{getSubjectLabel(podcast.subject)}</span>
+                    <span className="font-medium text-content">{podcast.topic}</span>
+                    <span className="ml-2 text-content-subtle">{getSubjectLabel(podcast.subject)}</span>
                   </span>
-                  <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
+                  <span className="shrink-0 text-xs text-content-subtle dark:text-content-subtle">
                     {new Date(podcast.created_at).toLocaleDateString()}
                   </span>
                 </button>

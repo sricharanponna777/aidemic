@@ -372,3 +372,128 @@ export interface PlotSubmission {
     max: number;
   };
 }
+
+// Interactive "complete the unfinished diagram" question types (shared between
+// generate-questions, mark-answers, and the ai-questions client page). Structural
+// diagrams are node+arrow graphs (cycles, food webs, energy chains); pictorial
+// diagrams add an AI-drawn base image built from a whitelist of safe SVG primitives.
+// All coordinates live in a normalized 0..100 space (both x and y).
+
+export type DiagramKind = 'structural' | 'pictorial' | 'template';
+
+export type DiagramPrimitiveKind =
+  | 'path'
+  | 'line'
+  | 'circle'
+  | 'ellipse'
+  | 'rect'
+  | 'polygon'
+  | 'polyline'
+  | 'text';
+
+// A single validated drawing element. Only the fields relevant to `kind` are used;
+// the rest carry safe defaults. No raw SVG markup is ever accepted — we render our
+// own React elements from these validated numeric/string props.
+export interface DiagramPrimitive {
+  kind: DiagramPrimitiveKind;
+  d: string; // path only: validated against a path-grammar whitelist
+  points: number[]; // polygon/polyline only: [x1, y1, x2, y2, ...]
+  cx: number;
+  cy: number;
+  r: number;
+  rx: number;
+  ry: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  text: string; // text only
+  fontSize: number;
+  stroke: string; // validated: #hex or named-palette
+  fill: string; // validated: #hex, named-palette, or 'none'
+  strokeWidth: number;
+}
+
+export type DiagramNodeRole = 'label' | 'anchor';
+
+export interface DiagramNode {
+  id: string;
+  x: number; // box centre / callout anchor, 0..100
+  y: number;
+  correctLabel: string;
+  acceptableLabels: string[]; // additional answers marked correct (synonyms / alternative spellings,
+                              // e.g. "plasma membrane" for "Cell membrane"); [] when none. Matching is
+                              // case/punctuation-insensitive, so only genuine alternatives belong here.
+  given: boolean; // given=false → blank the student must fill
+  role: DiagramNodeRole; // 'anchor' = unlabelled connection endpoint (e.g. a ray-diagram kink
+                         // point); never label-editable and never a blank-label gradeable feature.
+}
+
+export interface DiagramConnection {
+  from: string; // node id
+  to: string; // node id
+  directed: boolean;
+  label: string; // optional edge label ('' when none)
+  given: boolean; // given=false → student must draw this connection
+  style: 'solid' | 'dashed'; // 'dashed' for e.g. virtual-image ray construction lines
+}
+
+// A single symbol-placement slot: the student picks one option from a small fixed palette
+// (see DIAGRAM_SYMBOL_PALETTES) instead of typing a free-text label. Used for dot-and-cross
+// electron placement, image-property choices (real/virtual etc.), and similar discrete-choice
+// diagram completions that a label/word-bank box can't express.
+export interface DiagramSlot {
+  id: string;
+  x: number;
+  y: number;
+  paletteId: string; // key into DIAGRAM_SYMBOL_PALETTES
+  correctOption: string; // must be one of that palette's option ids
+  given: boolean; // given=false → blank the student must fill
+  description: string; // '' when unused; human text for marking feedback only, not grading
+  group: string; // '' = graded on its own; slots sharing a non-empty group are graded as an
+                 // order-independent SET (only the multiset of symbols matters, not which slot got
+                 // which) — e.g. the dot and cross of a bonding pair are interchangeable.
+}
+
+export interface DiagramSpec {
+  kind: DiagramKind;
+  title: string;
+  primitives: DiagramPrimitive[]; // [] for structural diagrams
+  nodes: DiagramNode[];
+  connections: DiagramConnection[];
+  slots: DiagramSlot[]; // [] when unused
+  labelBank: string[]; // labels for blank nodes (correct labels + optional distractors)
+}
+
+export interface DiagramSubmission {
+  labels: { nodeId: string; label: string }[]; // student's placed labels for blank nodes
+  connections: { from: string; to: string }[]; // student-drawn connections
+  slots: { slotId: string; optionId: string }[]; // student's placed symbols for blank slots
+}
+
+// A generic key/value parameter bag the AI uses to select and configure a hand-authored
+// diagram template (see src/lib/diagrams/) instead of freehand-emitting DiagramSpec geometry.
+// Deliberately NOT a per-template named-field shape: OpenAI structured-output strict mode
+// forbids oneOf/conditional schemas, so one flat KV-bag is shared by every template and each
+// template's own parseParams() interprets it — adding a new template never touches this shared
+// schema or type.
+export interface DiagramTemplateParamKV<T> {
+  key: string;
+  value: T;
+}
+
+export interface DiagramTemplateListParam {
+  key: string;
+  values: string[];
+}
+
+export interface DiagramTemplateSelection {
+  templateId: string; // '' when not using a template (freehand diagramSpec is used instead)
+  stringParams: DiagramTemplateParamKV<string>[];
+  numberParams: DiagramTemplateParamKV<number>[];
+  listParams: DiagramTemplateListParam[]; // e.g. blankPartIds, blankSlotIds
+}

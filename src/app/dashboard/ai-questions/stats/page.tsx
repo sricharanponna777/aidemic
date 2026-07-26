@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase-client';
 import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
 import { gcseTierLabelForGrade, gradeBadgeTone } from '@/lib/gradeTone';
+import { LineChart } from '@/components/ui/charts';
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 
 type AttemptRow = {
@@ -105,6 +106,20 @@ export default function SmartPracticeStatsPage() {
     void loadAttempts();
   }, [session?.user?.id]);
 
+  // Score trend, oldest → newest, for the line chart. Excludes blurt attempts
+  // (free recall has no comparable percentage) and any attempt without a score.
+  const scoreTrend = useMemo(
+    () =>
+      [...attempts]
+        .filter((a) => a.attempt_mode !== 'blurt' && typeof a.percentage === 'number')
+        .reverse()
+        .map((a) => ({
+          label: formatDate(a.created_at),
+          value: Math.round(a.percentage as number),
+        })),
+    [attempts]
+  );
+
   const stats = useMemo(() => {
     const weaknessMap = new Map<string, number>();
     const subjectMap = new Map<string, AttemptRow[]>();
@@ -167,15 +182,15 @@ export default function SmartPracticeStatsPage() {
 
   return (
     <main className="space-y-7" aria-labelledby="practice-stats-title">
-      <section className="rounded-2xl border border-slate-200 bg-linear-to-br from-indigo-50 to-white p-6 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.7)] dark:border-white/6 dark:from-[#131B2E] dark:to-[#0d1424]">
+      <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Smart Practice</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Smart Practice</p>
             <div className="mt-2 flex items-center gap-3">
-              <BarChart3 className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="practice-stats-title" className="text-3xl font-bold text-slate-900 dark:text-white">Statistics</h1>
+              <BarChart3 className="h-7 w-7 text-accent" />
+              <h1 id="practice-stats-title" className="text-3xl font-bold text-content dark:text-white">Statistics</h1>
             </div>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            <p className="mt-2 text-sm text-content-muted">
               Review all marked practice attempts, grades, scores, and recurring weak areas.
             </p>
           </div>
@@ -193,25 +208,25 @@ export default function SmartPracticeStatsPage() {
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-[0.55fr_1fr]">
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <Target className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-          <p className="mt-3 text-2xl font-bold text-slate-900 dark:text-white">{isLoading ? '...' : attempts.length}</p>
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Exam Practice Attempts</p>
+        <article className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <Target className="h-5 w-5 text-accent" />
+          <p className="mt-3 text-2xl font-bold text-content dark:text-white">{isLoading ? '...' : attempts.length}</p>
+          <p className="text-xs font-semibold text-content-subtle">Exam Practice Attempts</p>
         </article>
 
-        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <Trophy className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-          <h2 className="mt-3 font-semibold text-slate-900 dark:text-white">Predicted Grades</h2>
+        <article className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <Trophy className="h-5 w-5 text-accent" />
+          <h2 className="mt-3 font-semibold text-content dark:text-white">Predicted Grades</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {isLoading ? (
-              [1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-white/5" />)
+              [1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-surface/5" />)
             ) : stats.subjectPredictions.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">Complete exam practice to build your report card.</p>
+              <p className="text-sm text-content-subtle">Complete exam practice to build your report card.</p>
             ) : (
               stats.subjectPredictions.map((item) => (
                 <div key={`${item.subject}-${item.examType}`} className="rounded-lg border border-slate-100 px-3 py-2 dark:border-white/6">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                    <p className="min-w-0 truncate text-sm font-semibold text-content dark:text-white">
                       {getSubjectLabel(item.subject)}
                     </p>
                     <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
@@ -222,10 +237,10 @@ export default function SmartPracticeStatsPage() {
                       {item.grade}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-content-subtle">
                     {formatTieredExamLabel(item.examType, item.specTier, item.grade)} - {item.analysableAttempts === 0 ? 'no analysable grades' : `${item.analysableAttempts}/${item.attempts} attempts`}
                   </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <p className="mt-1 text-xs font-semibold text-content-muted">
                     Total score: {item.totalMarksAwarded === null || item.totalAvailableMarks === null
                       ? '--'
                       : `${item.totalMarksAwarded}/${item.totalAvailableMarks}${item.totalPercentage === null ? '' : ` (${item.totalPercentage}%)`}`}
@@ -238,18 +253,26 @@ export default function SmartPracticeStatsPage() {
       </section>
 
       <section className="grid gap-5 lg:grid-cols-[1fr_0.55fr]">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="border-b border-slate-100 px-5 py-4 dark:border-white/6">
-            <h2 className="font-semibold text-slate-900 dark:text-white">All Attempts</h2>
+        <div className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm">
+          <div className="border-b border-subtle px-5 py-4">
+            <h2 className="font-semibold text-content dark:text-white">All Attempts</h2>
           </div>
+          {scoreTrend.length >= 2 && (
+            <div className="border-b border-subtle px-5 py-4">
+              <p className="mb-2 text-caption font-semibold uppercase tracking-[0.12em] text-content-subtle">
+                Score trend
+              </p>
+              <LineChart data={scoreTrend} suffix="%" ariaLabel="Practice score percentage over time" />
+            </div>
+          )}
           {isLoading ? (
             <div className="space-y-px p-4">
               {[1, 2, 3, 4, 5].map((item) => (
-                <div key={item} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+                <div key={item} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-surface/5" />
               ))}
             </div>
           ) : attempts.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            <div className="p-8 text-center text-sm text-content-subtle">
               No marked attempts yet.
             </div>
           ) : (
@@ -261,7 +284,7 @@ export default function SmartPracticeStatsPage() {
                   className="grid gap-3 px-5 py-4 transition hover:bg-indigo-50/50 dark:hover:bg-indigo-500/8 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-content dark:text-white">
                       {attempt.topic}
                       {attempt.attempt_mode === 'mock' ? (
                         <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
@@ -269,7 +292,7 @@ export default function SmartPracticeStatsPage() {
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-0.5 text-xs text-content-subtle">
                       {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {formatTieredExamLabel(
                         attempt.exam_type,
                         subjects.find((subject) =>
@@ -283,7 +306,7 @@ export default function SmartPracticeStatsPage() {
                       )} - {formatDate(attempt.created_at)}
                     </p>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">{attempt.percentage ?? '--'}%</span>
+                  <span className="text-sm font-bold text-content dark:text-white">{attempt.percentage ?? '--'}%</span>
                   <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
                     grade: attempt.predicted_grade,
                     examType: attempt.exam_type,
@@ -291,7 +314,7 @@ export default function SmartPracticeStatsPage() {
                   })}`}>
                     {attempt.predicted_grade || 'N/A'}
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="text-xs text-content-subtle">
                     {attempt.total_marks_awarded ?? '--'} / {attempt.total_available_marks ?? '--'} marks
                   </span>
                 </Link>
@@ -300,17 +323,17 @@ export default function SmartPracticeStatsPage() {
           )}
         </div>
 
-        <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Recurring Weak Areas</h2>
+        <aside className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <h2 className="font-semibold text-content dark:text-white">Recurring Weak Areas</h2>
           <div className="mt-4 space-y-2">
             {isLoading ? (
-              [1, 2, 3].map((item) => <div key={item} className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-white/5" />)
+              [1, 2, 3].map((item) => <div key={item} className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-surface/5" />)
             ) : stats.weaknesses.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">No weak areas recorded yet.</p>
+              <p className="text-sm text-content-subtle">No weak areas recorded yet.</p>
             ) : (
               stats.weaknesses.map(([label, count]) => (
                 <div key={label} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 dark:border-white/6">
-                  <span className="min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{label}</span>
+                  <span className="min-w-0 truncate text-sm font-medium text-content-muted text-content">{label}</span>
                   <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-500/20 dark:text-red-300">
                     {count}
                   </span>

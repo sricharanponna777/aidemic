@@ -21,6 +21,9 @@ import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/s
 import { gcseTierLabelForGrade, gradeBadgeTone } from "@/lib/gradeTone";
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from "@/lib/ai/studentSubjects";
 import { RevisionCycleStepper } from "@/components/RevisionCycleStepper";
+import { DEFAULT_STUDY_GOALS, fetchStudyGoals } from "@/lib/studyGoals";
+import { BarChart } from "@/components/ui/charts";
+import { countLeeches } from "@/lib/leeches";
 
 type RecentSession = {
   id: string;
@@ -82,6 +85,9 @@ type DashboardMetrics = {
   subjectPredictedGrades: SubjectPredictedGrade[];
   retentionRate: number;
   cardsStudiedToday: number;
+  leechCount: number;
+  activitySeries: { label: string; value: number }[];
+  dailyGoal: number;
   goalProgress: { percentage: number; message: string; achieved: boolean };
   motivationMessage: string;
 };
@@ -116,7 +122,8 @@ type DashboardSessionRow = Pick<StudySession, "id" | "started_at" | "duration_mi
   flashcard_decks?: { name?: string } | Array<{ name?: string }> | null;
 };
 
-const DEFAULT_DAILY_GOAL = 20;
+// Daily target now comes from the user's study_goals row; DEFAULT_STUDY_GOALS
+// supplies the fallback when they have never saved one.
 
 const emptyMetrics: DashboardMetrics = {
   deckCount: 0, totalCards: 0, dueCards: 0, reviewedCards: 0,
@@ -126,6 +133,9 @@ const emptyMetrics: DashboardMetrics = {
   primaryExamType: null, latestPracticePercentage: null, latestPracticeGrade: null,
   subjectPredictedGrades: [],
   retentionRate: 0, cardsStudiedToday: 0,
+  leechCount: 0,
+  activitySeries: [],
+  dailyGoal: DEFAULT_STUDY_GOALS.daily_card_target,
   goalProgress: { percentage: 0, message: "", achieved: false },
   motivationMessage: "",
 };
@@ -188,6 +198,34 @@ const formatTotalScoreLabel = (item: {
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+// Cards reviewed per day over the last `days` days, oldest first. Used by the
+// dashboard activity bar chart.
+const buildActivitySeries = (
+  sessions: { startedAt: string; cardsStudied: number }[],
+  days = 14
+): { label: string; value: number }[] => {
+  const buckets = new Map<string, number>();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const series: { label: string; value: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 86400000);
+    buckets.set(d.toDateString(), 0);
+  }
+  for (const s of sessions) {
+    if (!s.startedAt) continue;
+    const d = new Date(s.startedAt);
+    if (Number.isNaN(d.getTime())) continue;
+    d.setHours(0, 0, 0, 0);
+    const key = d.toDateString();
+    if (buckets.has(key)) buckets.set(key, (buckets.get(key) || 0) + s.cardsStudied);
+  }
+  for (const [key, value] of buckets) {
+    series.push({ label: new Intl.DateTimeFormat("en", { weekday: "short", day: "numeric" }).format(new Date(key)), value });
+  }
+  return series;
+};
+
 const normalizeInsightLabel = (value: string) =>
   value
     .replace(/^Main pattern to fix:\s*/i, "")
@@ -232,7 +270,7 @@ export default function Dashboard() {
         const deckRows = (decks || []) as DashboardDeckRow[];
         const deckIds = deckRows.map((deck) => deck.id);
 
-        const [cardsResponse, sessionsResponse, attemptsResponse, subjectsResponse] = await Promise.all([
+        const [cardsResponse, sessionsResponse, attemptsResponse, subjectsResponse, studyGoals] = await Promise.all([
           deckIds.length > 0
             ? supabase
                 .from("flashcards")
@@ -255,6 +293,7 @@ export default function Dashboard() {
             .select(STUDENT_SUBJECT_SELECT)
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: true }),
+          fetchStudyGoals(supabase, session.user.id),
         ]);
 
         if (cardsResponse.error) throw cardsResponse.error;
@@ -386,7 +425,10 @@ export default function Dashboard() {
         const cardsStudiedToday = sessions
           .filter((s) => s.startedAt && new Date(s.startedAt).toDateString() === todayKey)
           .reduce((sum, s) => sum + s.cardsStudied, 0);
-        const goalProgress = calculateGoalProgress(cardsStudiedToday, DEFAULT_DAILY_GOAL, studyStreak);
+        const dailyGoal = studyGoals.daily_card_target;
+        const leechCount = countLeeches(cards);
+        const activitySeries = buildActivitySeries(sessions, 14);
+        const goalProgress = calculateGoalProgress(cardsStudiedToday, dailyGoal, studyStreak);
         const motivationMessage = getMotivationMessage(studyStreak, retentionRate);
 
         setSubjectLookup(savedSubjects);
@@ -410,6 +452,9 @@ export default function Dashboard() {
           primaryExamType,
           retentionRate,
           cardsStudiedToday,
+          dailyGoal,
+          leechCount,
+          activitySeries,
           goalProgress,
           motivationMessage,
           latestPracticePercentage:
@@ -483,7 +528,7 @@ export default function Dashboard() {
       <RevisionCycleStepper />
 
       {/* ── Hero ───────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-2xl border border-indigo-100 dark:border-indigo-500/20 bg-linear-to-br from-indigo-50 via-white to-purple-50 dark:from-[#131B2E] dark:via-[#111829] dark:to-[#0e1525] p-6 sm:p-8">
+      <section className="relative overflow-hidden rounded-card border border-subtle bg-linear-to-br from-accent-muted via-surface to-accent-muted p-6 shadow-card sm:p-8">
         {/* Ambient blobs */}
         <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-8 right-24 h-48 w-48 rounded-full bg-purple-500/10 blur-2xl" />
@@ -495,13 +540,13 @@ export default function Dashboard() {
               <Sparkles className="h-3 w-3" />
               Your Personal AI Revision Coach
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight text-content dark:text-white sm:text-4xl">
               Welcome back,{" "}
               <span className="bg-linear-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
                 {displayName}
               </span>
             </h1>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 sm:text-base">
+            <p className="mt-2 text-sm text-content-muted sm:text-base">
               Your AI tutor has analysed your progress. Here&apos;s what to focus on today.
             </p>
           </div>
@@ -531,15 +576,15 @@ export default function Dashboard() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-emerald-500 to-teal-500">
               <Trophy className="h-4 w-4 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Predicted Grades</h2>
+            <h2 className="text-xl font-bold text-content dark:text-white">Predicted Grades</h2>
           </div>
           <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
             Exam practice only
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-white/6 dark:bg-white/5 dark:text-slate-400 sm:grid-cols-[1.15fr_0.75fr_0.5fr_auto]">
+        <div className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm">
+          <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-100 bg-surface-sunken px-5 py-3 text-xs font-bold uppercase tracking-wide text-content-subtle dark:border-white/6 dark:bg-surface/5 sm:grid-cols-[1.15fr_0.75fr_0.5fr_auto]">
             <span>Subject</span>
             <span className="hidden sm:block">Qualification</span>
             <span className="hidden sm:block">Total Score</span>
@@ -549,11 +594,11 @@ export default function Dashboard() {
           {isLoading ? (
             <div className="space-y-px p-4">
               {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+                <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-100 dark:bg-surface/5" />
               ))}
             </div>
           ) : metrics.subjectPredictedGrades.length === 0 ? (
-            <div className="p-6 text-sm text-slate-500 dark:text-slate-400">
+            <div className="p-6 text-sm text-content-subtle">
               Complete exam practice to build your report card.
             </div>
           ) : (
@@ -564,8 +609,8 @@ export default function Dashboard() {
                   className="grid grid-cols-[1fr_auto] gap-3 px-5 py-4 sm:grid-cols-[1.15fr_0.75fr_0.5fr_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{getSubjectLabel(item.subject)}</p>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 sm:hidden">
+                    <p className="truncate text-sm font-semibold text-content dark:text-white">{getSubjectLabel(item.subject)}</p>
+                    <p className="mt-0.5 text-xs text-content-subtle sm:hidden">
                       {formatQualificationLabel({
                         examBoard: item.examBoard,
                         examType: item.examType,
@@ -573,11 +618,11 @@ export default function Dashboard() {
                         grade: item.predictedGrade,
                       })}
                     </p>
-                    <p className="mt-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300 sm:hidden">
+                    <p className="mt-0.5 text-xs font-semibold text-content-muted sm:hidden">
                       Total score: {formatTotalScoreLabel(item)}
                     </p>
                   </div>
-                  <p className="hidden text-sm text-slate-600 dark:text-slate-300 sm:block">
+                  <p className="hidden text-sm text-content-muted sm:block">
                     {formatQualificationLabel({
                       examBoard: item.examBoard,
                       examType: item.examType,
@@ -586,7 +631,7 @@ export default function Dashboard() {
                       fallback: "Pending",
                     })}
                   </p>
-                  <p className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
+                  <p className="hidden text-sm text-content-subtle sm:block">
                     {formatTotalScoreLabel(item)}
                   </p>
                   <span className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({
@@ -610,7 +655,7 @@ export default function Dashboard() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-indigo-500 to-purple-600">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent Smart Practice</h2>
+            <h2 className="text-xl font-bold text-content dark:text-white">Recent Smart Practice</h2>
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
               Latest 5
             </span>
@@ -623,11 +668,11 @@ export default function Dashboard() {
           ) : null}
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-indigo-200 bg-white dark:border-indigo-500/25 dark:bg-[#131B2E]">
+        <div className="overflow-hidden rounded-2xl border border-indigo-200 bg-surface dark:border-indigo-500/25">
           {isLoading ? (
             <div className="space-y-px p-4">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+                <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-surface/5" />
               ))}
             </div>
           ) : metrics.recentPracticeAttempts.length === 0 ? (
@@ -635,8 +680,8 @@ export default function Dashboard() {
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-100 dark:bg-indigo-500/10">
                 <Sparkles className="h-6 w-6 text-indigo-500" />
               </div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">No practice attempts yet</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="font-semibold text-content-muted dark:text-slate-200">No practice attempts yet</p>
+              <p className="mt-1 text-sm text-content-subtle">
                 Complete a marked practice attempt to see your recent scores here.
               </p>
               <Link href="/dashboard/ai-questions" className={buttonStyles({ variant: 'primary', className: 'mt-4' })}>
@@ -653,7 +698,7 @@ export default function Dashboard() {
                   className="grid gap-3 px-5 py-4 transition hover:bg-indigo-50/50 dark:hover:bg-indigo-500/8 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-slate-900 dark:text-white">
+                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-content dark:text-white">
                       {attempt.topic}
                       {attempt.attemptMode === "mock" ? (
                         <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
@@ -661,11 +706,11 @@ export default function Dashboard() {
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-0.5 text-xs text-content-subtle">
                       {capitalize(attempt.subject)} - {attempt.examType === "a-level" ? "A-Level" : "GCSE"} - {formatDate(attempt.createdAt)}
                     </p>
                   </div>
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">
+                  <span className="text-sm font-bold text-content dark:text-white">
                     {attempt.percentage === null ? "--" : `${attempt.percentage}%`}
                   </span>
                   <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
@@ -675,7 +720,7 @@ export default function Dashboard() {
                   })}`}>
                     {attempt.predictedGrade || "N/A"}
                   </span>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="text-xs text-content-subtle">
                     {attempt.totalMarksAwarded ?? "--"} / {attempt.totalAvailableMarks ?? "--"} marks
                   </span>
                 </Link>
@@ -684,6 +729,25 @@ export default function Dashboard() {
           )}
         </div>
       </section>
+
+      {/* ── Leeches: cards you keep getting wrong ──────────────────── */}
+      {metrics.leechCount > 0 && (
+        <Link
+          href="/dashboard/flashcards"
+          className="flex items-center gap-3 rounded-card border border-subtle bg-danger-muted px-5 py-4 shadow-card transition hover:brightness-[0.98]"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-danger/15 text-danger">
+            <Trophy className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-content">Fix these first</p>
+            <p className="text-caption text-content-muted">
+              {metrics.leechCount} leech {metrics.leechCount === 1 ? "card keeps" : "cards keep"} tripping you up — open a deck and filter to leeches.
+            </p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-content-subtle" />
+        </Link>
+      )}
 
       {/* ── Learning Journey + Recent Sessions ─────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
@@ -694,33 +758,33 @@ export default function Dashboard() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-blue-500 to-cyan-500">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recommended Next Step</h2>
+            <h2 className="text-xl font-bold text-content dark:text-white">Recommended Next Step</h2>
           </div>
 
-          <div className="flex flex-1 flex-col rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+          <div className="flex flex-1 flex-col rounded-2xl border border-subtle bg-surface p-6 shadow-card">
             {isLoading ? (
               <div className="space-y-3">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100 dark:bg-white/5" />
-                <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+                <div className="h-4 w-3/4 animate-pulse rounded bg-slate-100 dark:bg-surface/5" />
+                <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-surface/5" />
               </div>
             ) : (
               <>
                 {metrics.motivationMessage ? (
-                  <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">{metrics.motivationMessage}</p>
+                  <p className="mb-5 text-sm text-content-muted">{metrics.motivationMessage}</p>
                 ) : null}
 
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center dark:border-white/6 dark:bg-white/3">
-                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Retention</p>
-                    <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{Math.round(metrics.retentionRate)}%</p>
+                  <div className="rounded-xl border border-subtle bg-surface-sunken px-3 py-3 text-center dark:bg-surface/3">
+                    <p className="text-xs uppercase tracking-wide text-content-subtle">Retention</p>
+                    <p className="mt-1 text-xl font-bold text-content">{Math.round(metrics.retentionRate)}%</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center dark:border-white/6 dark:bg-white/3">
-                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Today&apos;s goal</p>
-                    <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{metrics.cardsStudiedToday}/{DEFAULT_DAILY_GOAL}</p>
+                  <div className="rounded-xl border border-subtle bg-surface-sunken px-3 py-3 text-center dark:bg-surface/3">
+                    <p className="text-xs uppercase tracking-wide text-content-subtle">Today&apos;s goal</p>
+                    <p className="mt-1 text-xl font-bold text-content">{metrics.cardsStudiedToday}/{metrics.dailyGoal}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center dark:border-white/6 dark:bg-white/3">
-                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Streak</p>
-                    <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{metrics.studyStreak}d</p>
+                  <div className="rounded-xl border border-subtle bg-surface-sunken px-3 py-3 text-center dark:bg-surface/3">
+                    <p className="text-xs uppercase tracking-wide text-content-subtle">Streak</p>
+                    <p className="mt-1 text-xl font-bold text-content">{metrics.studyStreak}d</p>
                   </div>
                 </div>
 
@@ -770,7 +834,7 @@ export default function Dashboard() {
                   ) : (
                     <Link
                       href="/dashboard/ai-questions"
-                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-white/6 dark:bg-white/3 dark:text-slate-200"
+                      className="flex items-center justify-between rounded-xl border border-subtle bg-surface-sunken p-4 text-sm font-semibold text-content-muted transition hover:bg-slate-100 dark:bg-surface/3"
                     >
                       Keep practising to sharpen your predicted grades
                       <ArrowRight className="h-4 w-4" />
@@ -785,27 +849,35 @@ export default function Dashboard() {
         {/* Recent Sessions */}
         <section className="flex flex-col">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent Sessions</h2>
+            <h2 className="text-xl font-bold text-content dark:text-white">Recent Sessions</h2>
             <Link
               href="/dashboard/study-sessions"
-              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+              className="text-xs font-semibold text-accent hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
             >
               View all →
             </Link>
           </div>
 
-          <div className="flex-1 rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] overflow-hidden shadow-sm dark:shadow-none">
+          <div className="flex-1 rounded-2xl border border-subtle bg-surface overflow-hidden shadow-card">
+            {!isLoading && metrics.activitySeries.some((d) => d.value > 0) && (
+              <div className="border-b border-subtle p-4">
+                <p className="mb-2 text-caption font-semibold uppercase tracking-[0.12em] text-content-subtle">
+                  Cards reviewed · last 14 days
+                </p>
+                <BarChart data={metrics.activitySeries} suffix=" cards" ariaLabel="Cards reviewed per day over the last 14 days" />
+              </div>
+            )}
             {isLoading ? (
               <div className="space-y-px p-4">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-16 animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" />
+                  <div key={i} className="h-16 animate-pulse rounded-xl bg-surface-sunken" />
                 ))}
               </div>
             ) : metrics.recentSessions.length === 0 ? (
               <div className="px-6 py-10 text-center">
-                <Brain className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-slate-600" />
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No sessions yet</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                <Brain className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-content-muted" />
+                <p className="text-sm font-semibold text-content-muted dark:text-slate-300">No sessions yet</p>
+                <p className="mt-1 text-xs text-content-subtle">
                   Flashcard Revision
                 </p>
                 <Link
@@ -823,10 +895,10 @@ export default function Dashboard() {
                       <Brain className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                      <p className="truncate text-sm font-semibold text-content dark:text-white">
                         {item.deckName}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-content-subtle">
                         {formatDate(item.startedAt)} · {formatMinutes(item.durationMinutes)} · {item.cardsStudied} cards
                       </p>
                     </div>

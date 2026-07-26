@@ -6,6 +6,8 @@ import { ArrowRight, ListChecks, RotateCcw, Sparkles, Target } from 'lucide-reac
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
 import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
+import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useToast } from '@/components/ToastProvider';
@@ -288,25 +290,23 @@ export default function DailyReviewPage() {
       times_studied: card.times_studied || 0,
       times_correct: card.times_correct || 0,
     };
-    return [
-      { label: 'Again', quality: 0, color: 'bg-red-600 hover:bg-red-700' },
-      { label: 'Hard', quality: 1, color: 'bg-orange-600 hover:bg-orange-700' },
-      { label: 'Good', quality: 2, color: 'bg-blue-600 hover:bg-blue-700' },
-      { label: 'Easy', quality: 3, color: 'bg-green-600 hover:bg-green-700' },
-    ].map(({ label, quality, color }) => ({
+    return REVIEW_GRADES.map(({ label, quality, tone, key }) => ({
       label,
       quality,
-      color,
+      color: tone,
+      shortcut: key,
       subtext: formatInterval(previewNextReview(prev, quality).interval_days),
     }));
   }, [currentItem, showBack]);
 
-  const gradeButtons = flashcardPreviews ?? [
-    { label: 'Again', quality: 0, color: 'bg-red-600 hover:bg-red-700', subtext: 'Got it wrong' },
-    { label: 'Hard', quality: 1, color: 'bg-orange-600 hover:bg-orange-700', subtext: 'Struggled' },
-    { label: 'Good', quality: 2, color: 'bg-blue-600 hover:bg-blue-700', subtext: 'Got it right' },
-    { label: 'Easy', quality: 3, color: 'bg-green-600 hover:bg-green-700', subtext: 'Knew it cold' },
-  ];
+  const microSubtext = ['Got it wrong', 'Struggled', 'Got it right', 'Knew it cold'];
+  const gradeButtons = flashcardPreviews ?? REVIEW_GRADES.map(({ label, quality, tone, key }) => ({
+    label,
+    quality,
+    color: tone,
+    shortcut: key,
+    subtext: microSubtext[quality],
+  }));
 
   const finishReview = async () => {
     if (userId) {
@@ -373,6 +373,13 @@ export default function DailyReviewPage() {
     }
   };
 
+  useReviewShortcuts({
+    enabled: phase === 'reviewing' && !!currentItem,
+    isAnswerShown: showBack,
+    onReveal: () => setShowBack(true),
+    onGrade: handleGrade,
+  });
+
   const resetToIdle = () => {
     setPhase('idle');
     setQueue([]);
@@ -384,15 +391,15 @@ export default function DailyReviewPage() {
     <main className="space-y-6" aria-labelledby="daily-review-title">
       <RevisionCycleStepper current="review" />
 
-      <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Daily practice</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Daily practice</p>
             <div className="mt-2 flex items-center gap-3">
-              <ListChecks className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="daily-review-title" className="text-3xl font-bold text-slate-900 dark:text-white">Daily Review</h1>
+              <ListChecks className="h-7 w-7 text-accent" />
+              <h1 id="daily-review-title" className="text-3xl font-bold text-content dark:text-white">Daily Review</h1>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-2 max-w-2xl text-sm text-content-muted">
               One mixed queue: your due flashcards interleaved with quick questions targeting your recurring weak spots.
             </p>
           </div>
@@ -404,15 +411,15 @@ export default function DailyReviewPage() {
       </section>
 
       {phase === 'idle' && (
-        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 dark:border-white/6 p-4">
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Flashcards due</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{isLoadingSummary ? '…' : dueFlashcardCount}</p>
+            <div className="rounded-xl border border-subtle p-4">
+              <p className="text-sm font-medium text-content-muted">Flashcards due</p>
+              <p className="mt-2 text-3xl font-bold text-content">{isLoadingSummary ? '…' : dueFlashcardCount}</p>
             </div>
-            <div className="rounded-xl border border-slate-200 dark:border-white/6 p-4">
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Weak spots targeted</p>
-              <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-slate-100">{isLoadingSummary ? '…' : weakTopics.length}</p>
+            <div className="rounded-xl border border-subtle p-4">
+              <p className="text-sm font-medium text-content-muted">Weak spots targeted</p>
+              <p className="mt-2 text-3xl font-bold text-content">{isLoadingSummary ? '…' : weakTopics.length}</p>
             </div>
           </div>
 
@@ -441,7 +448,7 @@ export default function DailyReviewPage() {
               <ArrowRight className="h-4 w-4" />
             </button>
             {!isLoadingSummary && dueFlashcardCount === 0 && weakTopics.length === 0 ? (
-              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-3 text-sm text-content-subtle">
                 Nothing due right now. Come back once flashcards are due or after your next Smart Practice attempt.
               </p>
             ) : null}
@@ -450,23 +457,23 @@ export default function DailyReviewPage() {
       )}
 
       {phase === 'loading' && (
-        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <style>{`@keyframes daily-review-loading{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
-          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-surface/10">
             <div className="h-full w-2/5 rounded-full bg-linear-to-r from-indigo-600 to-purple-500" style={{ animation: 'daily-review-loading 1.4s ease-in-out infinite' }} />
           </div>
-          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Building your review queue…</p>
+          <p className="mt-3 text-sm text-content-muted">Building your review queue…</p>
         </section>
       )}
 
       {phase === 'reviewing' && currentItem && (
-        <section className="space-y-5 rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="space-y-5 rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-600 dark:text-indigo-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">
                 Item {currentIndex + 1} of {queue.length}
               </p>
-              <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+              <h2 className="mt-1 text-2xl font-bold text-content">
                 {currentItem.kind === 'flashcard' ? 'Flashcard' : `Weak spot: ${currentItem.weaknessTag}`}
               </h2>
             </div>
@@ -477,69 +484,86 @@ export default function DailyReviewPage() {
             ) : null}
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/6 dark:bg-white/3" aria-labelledby="current-item-heading">
-            <p id="current-item-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {currentItem.kind === 'flashcard' ? 'Front' : 'Question'}
+          <div className="rounded-lg border border-subtle bg-surface-sunken p-5 dark:bg-surface/3" aria-labelledby="current-item-heading">
+            <p id="current-item-heading" className="text-xs font-semibold uppercase tracking-wide text-content-subtle">
+              {currentItem.kind === 'flashcard' && hasCloze(currentItem.front)
+                ? 'Fill the gap'
+                : currentItem.kind === 'flashcard'
+                ? 'Front'
+                : 'Question'}
             </p>
-            <MarkdownContent className="prose prose-sm mt-2 max-w-none text-slate-900 dark:text-slate-100" content={currentItem.front} />
+            <MarkdownContent
+              className="prose prose-sm mt-2 max-w-none text-content"
+              content={hasCloze(currentItem.front) ? maskAllCloze(currentItem.front) : currentItem.front}
+            />
 
             {showBack ? (
               <>
-                <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-content-subtle">
                   {currentItem.kind === 'flashcard' ? 'Back' : 'Answer'}
                 </p>
-                <MarkdownContent className="prose prose-sm mt-2 max-w-none text-slate-800 dark:text-slate-200" content={currentItem.back} />
+                <MarkdownContent
+                  className="prose prose-sm mt-2 max-w-none text-content-muted dark:text-slate-200"
+                  content={hasCloze(currentItem.front) ? revealAllCloze(currentItem.front) : currentItem.back}
+                />
               </>
             ) : (
               <button
-                className={buttonStyles({
-                  variant: 'plain',
-                  className: 'mt-5 border border-amber-300 bg-amber-300 text-slate-950 hover:border-amber-400 hover:bg-amber-400',
-                })}
+                className={buttonStyles({ variant: 'primary', className: 'mt-5' })}
                 onClick={() => setShowBack(true)}
                 aria-label="Reveal answer"
+                aria-keyshortcuts="Space Enter"
               >
                 Show answer
+                <kbd className="rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-semibold">Space</kbd>
               </button>
             )}
           </div>
 
           {showBack && (
             <div className="space-y-3" role="group" aria-labelledby="recall-rating-label">
-              <p id="recall-rating-label" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <p id="recall-rating-label" className="text-body font-medium text-content-muted">
                 Rate your recall
               </p>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {gradeButtons.map(({ label, quality, color, subtext }) => (
+                {gradeButtons.map(({ label, quality, color, shortcut, subtext }) => (
                   <button
                     key={quality}
                     className={buttonStyles({
                       variant: 'plain',
                       size: 'none',
-                      className: `rounded-lg border border-transparent px-4 py-3 text-white ${color}`,
+                      className: `flex-col rounded-field border border-transparent px-4 py-3 shadow-card transition-all hover:brightness-110 hover:shadow-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${color}`,
                     })}
                     onClick={() => handleGrade(quality)}
                     aria-label={`${label}: ${subtext}`}
+                    aria-keyshortcuts={shortcut}
                   >
-                    <span className="block text-sm font-semibold">{label}</span>
-                    <span className="block text-xs opacity-90">{subtext}</span>
+                    <span className="flex items-center gap-1.5 text-body font-semibold">
+                      {label}
+                      <kbd className="rounded border border-white/35 px-1 text-[10px] font-semibold opacity-90">{shortcut}</kbd>
+                    </span>
+                    <span className="block text-caption opacity-90">{subtext}</span>
                   </button>
                 ))}
               </div>
+              <p className="text-caption text-content-subtle">
+                Keyboard: <kbd className="rounded bg-surface-sunken px-1">Space</kbd> reveal or Good ·{' '}
+                <kbd className="rounded bg-surface-sunken px-1">1</kbd>–<kbd className="rounded bg-surface-sunken px-1">4</kbd> to grade
+              </p>
             </div>
           )}
         </section>
       )}
 
       {phase === 'summary' && summary && (
-        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="flex items-start gap-4">
             <div className="rounded-xl bg-emerald-100 dark:bg-emerald-500/15 p-3 text-emerald-600 dark:text-emerald-400">
               <RotateCcw className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Review complete</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              <h2 className="text-xl font-bold text-content">Review complete</h2>
+              <p className="mt-1 text-sm text-content-muted">
                 {summary.flashcardsStudied} flashcard{summary.flashcardsStudied === 1 ? '' : 's'} reviewed
                 {summary.microAttempted > 0
                   ? ` · ${summary.microCorrect}/${summary.microAttempted} weak-spot questions right`

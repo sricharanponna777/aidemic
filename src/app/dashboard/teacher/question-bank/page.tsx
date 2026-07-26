@@ -14,7 +14,7 @@ import { normalizeBoard, normalizeExamType } from '@/lib/ai/validation';
 import type { ExamQuestion } from '@/app/api/ai/generate-questions/route';
 
 const selectClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
+  'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
 
 type Tab = 'browse' | 'generate' | 'saved';
 
@@ -297,21 +297,21 @@ export default function TeacherQuestionBankPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Question Bank</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Browse the curriculum, generate practice questions, and reuse saved assignments.</p>
+        <h1 className="text-2xl font-bold text-content dark:text-white">Question Bank</h1>
+        <p className="mt-1 text-sm text-content-muted">Browse the curriculum, generate practice questions, and reuse saved assignments.</p>
       </div>
 
       {classes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">
           Create a class first — the question bank follows its subject and exam board.{' '}
-          <Link href="/dashboard/teacher/classes" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href="/dashboard/teacher/classes" className="font-medium text-accent hover:underline">
             Create a class
           </Link>
         </div>
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <div className="flex flex-wrap gap-1 rounded-xl border border-subtle bg-surface p-1 shadow-sm">
               {TABS.map((t) => (
                 <button
                   key={t.id}
@@ -320,7 +320,7 @@ export default function TeacherQuestionBankPage() {
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                     tab === t.id
                       ? 'bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/6'
+                      : 'text-content-muted hover:bg-slate-100 dark:text-content-subtle dark:hover:bg-surface/6'
                   }`}
                 >
                   {t.label}
@@ -341,38 +341,38 @@ export default function TeacherQuestionBankPage() {
           {/* Browse curriculum */}
           {tab === 'browse' && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] lg:col-span-2">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Topics</h2>
+              <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm lg:col-span-2">
+                <h2 className="text-lg font-semibold text-content">Topics</h2>
                 {selectedClass && (
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-sm text-content-subtle">
                     {selectedClass.specifications?.subjects?.exam_boards?.qualifications?.name} · {selectedClass.specifications?.subjects?.exam_boards?.name} · {selectedClass.specifications?.subjects?.name}
                   </p>
                 )}
                 {topics.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No topics found for this specification.</p>
+                  <p className="mt-4 text-sm text-content-subtle">No topics found for this specification.</p>
                 ) : (
                   <div className="mt-4 space-y-1.5">
                     {topics.map((topic) => {
                       const isExpanded = expandedTopicId === topic.id;
                       const topicSubtopics = subtopics.filter((s) => s.topic_id === topic.id);
                       return (
-                        <div key={topic.id} className="rounded-lg border border-slate-200 dark:border-white/6">
+                        <div key={topic.id} className="rounded-lg border border-subtle">
                           <button
                             type="button"
                             onClick={() => setExpandedTopicId(isExpanded ? null : topic.id)}
-                            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium text-slate-800 dark:text-slate-200"
+                            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-medium text-content-muted dark:text-slate-200"
                           >
                             {topic.name}
-                            {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                            {isExpanded ? <ChevronDown className="h-4 w-4 text-content-subtle" /> : <ChevronRight className="h-4 w-4 text-content-subtle" />}
                           </button>
                           {isExpanded && (
-                            <div className="border-t border-slate-200 px-4 py-2 dark:border-white/6">
+                            <div className="border-t border-subtle px-4 py-2">
                               {topicSubtopics.length === 0 ? (
-                                <p className="py-1 text-xs text-slate-400 dark:text-slate-500">No subtopics listed.</p>
+                                <p className="py-1 text-xs text-content-subtle dark:text-content-subtle">No subtopics listed.</p>
                               ) : (
                                 <ul className="space-y-1">
                                   {topicSubtopics.map((s) => (
-                                    <li key={s.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                    <li key={s.id} className="flex items-center gap-2 text-sm text-content-muted">
                                       <span className="h-1 w-1 rounded-full bg-slate-300 dark:bg-slate-600" />
                                       {s.name}
                                     </li>
@@ -388,15 +388,15 @@ export default function TeacherQuestionBankPage() {
                 )}
               </section>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Learning objectives</h2>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Exam skills AIDemic can target for this subject.</p>
+              <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-content">Learning objectives</h2>
+                <p className="mt-1 text-sm text-content-subtle">Exam skills AIDemic can target for this subject.</p>
                 {objectives.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No learning objectives listed for this subject yet.</p>
+                  <p className="mt-4 text-sm text-content-subtle">No learning objectives listed for this subject yet.</p>
                 ) : (
                   <ul className="mt-4 space-y-2">
                     {objectives.map((o) => (
-                      <li key={o.id} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-600 dark:border-white/6 dark:text-slate-300">
+                      <li key={o.id} className="rounded-lg border border-subtle px-3 py-2 text-sm text-content-muted">
                         {o.objective}
                       </li>
                     ))}
@@ -409,14 +409,14 @@ export default function TeacherQuestionBankPage() {
           {/* Generate questions */}
           {tab === 'generate' && (
             <div className="space-y-4">
-              <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+              <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+                <p className="text-sm text-content-muted">
                   Preview the questions AIDemic would produce for any topic, then save the set as an assignment for this class
                   without regenerating.
                 </p>
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Topic</label>
+                    <label className="text-xs font-medium text-content-subtle">Topic</label>
                     <select value={genTopicId} onChange={(e) => { setGenTopicId(e.target.value); setGenSubtopicId(''); }} className={`${selectClass} w-full`}>
                       <option value="">Select topic</option>
                       {topics.map((t) => (
@@ -427,7 +427,7 @@ export default function TeacherQuestionBankPage() {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Subtopic (optional)</label>
+                    <label className="text-xs font-medium text-content-subtle">Subtopic (optional)</label>
                     <select value={genSubtopicId} onChange={(e) => setGenSubtopicId(e.target.value)} disabled={!genTopicId || genSubtopics.length === 0} className={`${selectClass} w-full`}>
                       <option value="">Whole topic</option>
                       {genSubtopics.map((s) => (
@@ -438,7 +438,7 @@ export default function TeacherQuestionBankPage() {
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Number of questions</label>
+                    <label className="text-xs font-medium text-content-subtle">Number of questions</label>
                     <input
                       type="number"
                       min={1}
@@ -460,8 +460,8 @@ export default function TeacherQuestionBankPage() {
 
               {preview.length > 0 && (
                 <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-500/20 dark:bg-indigo-500/5">
-                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Save these {preview.length} question{preview.length === 1 ? '' : 's'} as an assignment</h3>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <h3 className="text-sm font-semibold text-content">Save these {preview.length} question{preview.length === 1 ? '' : 's'} as an assignment</h3>
+                  <p className="mt-1 text-xs text-content-subtle">
                     Sets this exact preview for <span className="font-medium">{selectedClass?.name}</span> — no regeneration.
                   </p>
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
@@ -498,19 +498,19 @@ export default function TeacherQuestionBankPage() {
               {preview.length > 0 && (
                 <section className="space-y-3">
                   {preview.map((q, i) => (
-                    <div key={i} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+                    <div key={i} className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
                           <span>Q{i + 1}</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500 dark:bg-white/10 dark:text-slate-400">{q.marks} mark{q.marks === 1 ? '' : 's'}</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500 dark:bg-white/10 dark:text-slate-400">{q.commandWord}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-content-subtle dark:bg-surface/10">{q.marks} mark{q.marks === 1 ? '' : 's'}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-content-subtle dark:bg-surface/10">{q.commandWord}</span>
                         </div>
                       </div>
-                      <div className="mt-2 text-sm text-slate-800 dark:text-slate-200">
+                      <div className="mt-2 text-sm text-content-muted dark:text-slate-200">
                         <MathContent content={q.question} />
                       </div>
                       {q.questionType === 'mcq' && q.options.length > 0 && (
-                        <ul className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                        <ul className="mt-3 space-y-1 text-sm text-content-muted">
                           {q.options.map((opt, oi) => (
                             <li key={oi} className={revealed.has(i) && ['A', 'B', 'C', 'D'][oi] === q.correctOption ? 'font-semibold text-emerald-600 dark:text-emerald-400' : ''}>
                               {['A', 'B', 'C', 'D'][oi]}. <MathContent content={opt} inline />
@@ -518,13 +518,13 @@ export default function TeacherQuestionBankPage() {
                           ))}
                         </ul>
                       )}
-                      <button type="button" onClick={() => toggleRevealed(i)} className="mt-3 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                      <button type="button" onClick={() => toggleRevealed(i)} className="mt-3 text-xs font-medium text-accent hover:underline">
                         {revealed.has(i) ? 'Hide' : 'Show'} mark scheme
                       </button>
                       {revealed.has(i) && (
-                        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-white/6 dark:bg-white/3">
+                        <div className="mt-2 rounded-lg border border-subtle bg-surface-sunken p-3 text-sm dark:bg-surface/3">
                           {q.markScheme.length > 0 && (
-                            <ul className="list-disc space-y-1 pl-5 text-slate-600 dark:text-slate-300">
+                            <ul className="list-disc space-y-1 pl-5 text-content-muted">
                               {q.markScheme.map((point, pi) => (
                                 <li key={pi}>
                                   <MathContent content={point} inline />
@@ -533,7 +533,7 @@ export default function TeacherQuestionBankPage() {
                             </ul>
                           )}
                           {q.modelAnswer && (
-                            <div className="mt-2 text-slate-700 dark:text-slate-300">
+                            <div className="mt-2 text-content-muted dark:text-slate-300">
                               <span className="font-semibold">Model answer: </span>
                               <MathContent content={q.modelAnswer} inline />
                             </div>
@@ -549,28 +549,28 @@ export default function TeacherQuestionBankPage() {
 
           {/* Saved assignments */}
           {tab === 'saved' && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Saved assignments</h2>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Every question set you&apos;ve created, newest first.</p>
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-content">Saved assignments</h2>
+              <p className="mt-1 text-sm text-content-subtle">Every question set you&apos;ve created, newest first.</p>
               {savedAssignments.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">You haven&apos;t created any assignments yet.</p>
+                <p className="mt-4 text-sm text-content-subtle">You haven&apos;t created any assignments yet.</p>
               ) : (
                 <div className="mt-4 space-y-2">
                   {savedAssignments.map((a) => (
                     <Link
                       key={a.id}
                       href={`/dashboard/teacher/classes/${a.class_id}`}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm transition hover:border-indigo-300 dark:border-white/6 dark:hover:border-indigo-500/40"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-subtle px-4 py-2.5 text-sm transition hover:border-indigo-300 dark:hover:border-indigo-500/40"
                     >
                       <div>
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{a.title}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                        <p className="font-medium text-content">{a.title}</p>
+                        <p className="text-xs text-content-subtle capitalize">
                           {classNameById.get(a.class_id) ?? 'Class'}
                           {a.topics?.name ? ` · ${a.topics.name}` : ''}
                           {` · ${a.assignment_type}`}
                         </p>
                       </div>
-                      {a.created_at && <span className="text-xs text-slate-400 dark:text-slate-500">{new Date(a.created_at).toLocaleDateString()}</span>}
+                      {a.created_at && <span className="text-xs text-content-subtle dark:text-content-subtle">{new Date(a.created_at).toLocaleDateString()}</span>}
                     </Link>
                   ))}
                 </div>

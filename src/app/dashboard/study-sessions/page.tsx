@@ -10,6 +10,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
 import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
+import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
 
 type Session = Pick<
   StudySession,
@@ -215,8 +217,22 @@ export default function StudySessions() {
 
   const currentCard = cardsToReview[currentCardIndex];
 
+  // Cloze cards hide their {{c1::…}} deletions on the front and reveal them on
+  // the back. Non-cloze cards render their front/back unchanged.
+  const cardFace = useMemo(() => {
+    if (!currentCard) return { isCloze: false, front: '', back: '' };
+    if (hasCloze(currentCard.front)) {
+      return {
+        isCloze: true,
+        front: maskAllCloze(currentCard.front),
+        back: revealAllCloze(currentCard.front),
+      };
+    }
+    return { isCloze: false, front: currentCard.front, back: currentCard.back };
+  }, [currentCard]);
+
   const reviewPreviews = useMemo<
-    { label: string; quality: number; color: string; interval_days: number; next_review_date: string }[]
+    { label: string; quality: number; color: string; shortcut: string; interval_days: number; next_review_date: string }[]
   >(() => {
     if (!currentCard || !showBack) return [];
 
@@ -231,17 +247,13 @@ export default function StudySessions() {
       times_correct: currentCard.times_correct || 0,
     };
 
-    return [
-      { label: 'Again', quality: 0, color: 'bg-red-600 hover:bg-red-700' },
-      { label: 'Hard', quality: 1, color: 'bg-orange-600 hover:bg-orange-700' },
-      { label: 'Good', quality: 2, color: 'bg-blue-600 hover:bg-blue-700' },
-      { label: 'Easy', quality: 3, color: 'bg-green-600 hover:bg-green-700' },
-    ].map(({ label, quality, color }) => {
+    return REVIEW_GRADES.map(({ label, quality, tone, key }) => {
       const preview = previewNextReview(prev, quality);
       return {
         label,
         quality,
-        color,
+        color: tone,
+        shortcut: key,
         interval_days: preview.interval_days,
         next_review_date: preview.next_review_date,
       };
@@ -376,6 +388,13 @@ export default function StudySessions() {
     }
   };
 
+  useReviewShortcuts({
+    enabled: phase === 'reviewing' && !!currentCard,
+    isAnswerShown: showBack,
+    onReveal: () => setShowBack(true),
+    onGrade: handleGrade,
+  });
+
   const noticeClassName = notice
     ? {
         success: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/70 dark:bg-emerald-950/35 dark:text-emerald-200',
@@ -388,15 +407,15 @@ export default function StudySessions() {
     <main className="space-y-6" aria-labelledby="study-sessions-title">
       <RevisionCycleStepper current="recall" />
 
-      <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Step 4 of 5</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 4 of 5</p>
             <div className="mt-2 flex items-center gap-3">
-              <Brain className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="study-sessions-title" className="text-3xl font-bold text-slate-900 dark:text-white">Flashcard Revision</h1>
+              <Brain className="h-7 w-7 text-accent" />
+              <h1 id="study-sessions-title" className="text-3xl font-bold text-content dark:text-white">Flashcard Revision</h1>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-2 max-w-2xl text-sm text-content-muted">
               Review your flashcards with spaced repetition.
             </p>
           </div>
@@ -425,21 +444,21 @@ export default function StudySessions() {
       </section>
 
       <section aria-label="Study overview" className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-5 shadow-sm dark:shadow-none">
+        <article className="rounded-2xl border border-subtle bg-surface p-5 shadow-card">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Sessions completed</p>
+            <p className="text-sm font-medium text-content-muted">Sessions completed</p>
             <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
-          <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{sessionSummary.completed}</p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{formatMinutes(sessionSummary.totalMinutes)} total study time</p>
+          <p className="mt-3 text-3xl font-bold text-content">{sessionSummary.completed}</p>
+          <p className="mt-1 text-sm text-content-subtle">{formatMinutes(sessionSummary.totalMinutes)} total study time</p>
         </article>
-        <article className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-5 shadow-sm dark:shadow-none">
+        <article className="rounded-2xl border border-subtle bg-surface p-5 shadow-card">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Cards studied</p>
+            <p className="text-sm font-medium text-content-muted">Cards studied</p>
             <Layers className="h-5 w-5 text-teal-600 dark:text-teal-400" />
           </div>
-          <p className="mt-3 text-3xl font-bold text-slate-900 dark:text-slate-100">{sessionSummary.totalCards}</p>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">from saved sessions</p>
+          <p className="mt-3 text-3xl font-bold text-content">{sessionSummary.totalCards}</p>
+          <p className="mt-1 text-sm text-content-subtle">from saved sessions</p>
         </article>
       </section>
 
@@ -447,14 +466,14 @@ export default function StudySessions() {
 
       {phase === 'idle' && (
         <section className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">
-          <div className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+          <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
             <div className="flex items-start gap-4">
-              <div className="rounded-xl bg-indigo-100 dark:bg-indigo-500/15 p-3 text-indigo-600 dark:text-indigo-400">
+              <div className="rounded-xl bg-indigo-100 dark:bg-indigo-500/15 p-3 text-accent">
                 <RotateCcw className="h-6 w-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Ready cards first</h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                <h2 className="text-xl font-bold text-content">Ready cards first</h2>
+                <p className="mt-1 text-sm text-content-muted">
                   Decks with due cards appear first, so the next session starts in the right place.
                 </p>
               </div>
@@ -475,19 +494,19 @@ export default function StudySessions() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Deck order</h2>
+          <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+            <h2 className="text-lg font-bold text-content">Deck order</h2>
             <div className="mt-4 space-y-2">
               {orderedDeckList.slice(0, 4).map((deck) => (
-                <div key={deck.id} className="flex items-center justify-between rounded-xl border border-slate-200 dark:border-white/6 px-3 py-2">
-                  <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{deck.name}</span>
-                  <span className="ml-3 shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                <div key={deck.id} className="flex items-center justify-between rounded-xl border border-subtle px-3 py-2">
+                  <span className="truncate text-sm font-medium text-content-muted dark:text-slate-200">{deck.name}</span>
+                  <span className="ml-3 shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-content-muted dark:bg-surface/10">
                     {deck.due_count || 0} due
                   </span>
                 </div>
               ))}
               {orderedDeckList.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
+                <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-4 text-sm text-content-muted dark:border-white/6 dark:bg-surface/3">
                   No decks yet.
                 </p>
               ) : null}
@@ -497,16 +516,16 @@ export default function StudySessions() {
       )}
 
       {phase === 'choosing' && (
-        <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Select a deck</h2>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Decks with due cards are listed first.</p>
-          <label htmlFor="deck-select" className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+          <h2 className="text-xl font-bold text-content">Select a deck</h2>
+          <p className="mt-1 text-sm text-content-muted">Decks with due cards are listed first.</p>
+          <label htmlFor="deck-select" className="mt-4 block text-sm font-medium text-content-muted dark:text-slate-300">
             Deck
           </label>
           <select
             id="deck-select"
             aria-label="Choose the deck to review"
-            className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+            className="mt-1 w-full rounded-lg border border-subtle p-2 text-content outline-none focus:border-accent bg-surface"
             value={selectedDeckId}
             onChange={(event) => setSelectedDeckId(event.target.value)}
           >
@@ -519,9 +538,9 @@ export default function StudySessions() {
           </select>
 
           {selectedDeck ? (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/6 dark:bg-white/3">
-              <p className="font-semibold text-slate-900 dark:text-slate-100">{selectedDeck.name}</p>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            <div className="mt-4 rounded-lg border border-subtle bg-surface-sunken p-4 dark:bg-surface/3">
+              <p className="font-semibold text-content">{selectedDeck.name}</p>
+              <p className="mt-1 text-sm text-content-muted">
                 {selectedDeck.due_count || 0} cards due from {selectedDeck.card_count || 0} total cards.
               </p>
             </div>
@@ -547,110 +566,119 @@ export default function StudySessions() {
       )}
 
       {phase === 'reviewing' && currentCard && (
-        <section className="space-y-5 rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+        <section className="space-y-5 rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-indigo-600 dark:text-indigo-400">Now reviewing</p>
-              <h2 className="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">Now reviewing</p>
+              <h2 className="mt-1 text-2xl font-bold text-content">
                 {selectedDeck?.name || 'Selected deck'}
               </h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-1 text-sm text-content-muted">
                 Card {currentCardIndex + 1} of {cardsToReview.length}
               </p>
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-white/6 dark:bg-white/3" aria-labelledby="current-card-heading">
-            <p id="current-card-heading" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Front
+          <div className="rounded-field border border-subtle bg-surface-sunken p-5" aria-labelledby="current-card-heading">
+            <p id="current-card-heading" className="text-caption font-semibold uppercase tracking-wide text-content-subtle">
+              {cardFace.isCloze ? 'Fill the gap' : 'Front'}
             </p>
             <MarkdownContent
-              className="prose prose-sm mt-2 max-w-none text-slate-900 dark:text-slate-100"
-              content={currentCard.front}
+              className="prose prose-sm mt-2 max-w-none text-content"
+              content={cardFace.front}
             />
 
             {showBack ? (
               <>
-                <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Back</p>
+                <p className="mt-5 text-caption font-semibold uppercase tracking-wide text-content-subtle">
+                  {cardFace.isCloze ? 'Answer' : 'Back'}
+                </p>
                 <MarkdownContent
-                  className="prose prose-sm mt-2 max-w-none text-slate-800 dark:text-slate-200"
-                  content={currentCard.back}
+                  className="prose prose-sm mt-2 max-w-none text-content-muted"
+                  content={cardFace.back}
                 />
               </>
             ) : (
               <button
-                className={buttonStyles({
-                  variant: 'plain',
-                  className: 'mt-5 border border-amber-300 bg-amber-300 text-slate-950 hover:border-amber-400 hover:bg-amber-400',
-                })}
+              className={buttonStyles({ variant: 'primary', className: 'mt-5' })}
                 onClick={() => setShowBack(true)}
                 aria-label="Reveal answer"
+                aria-keyshortcuts="Space Enter"
               >
                 Show answer
+                <kbd className="rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-semibold">Space</kbd>
               </button>
             )}
           </div>
 
           {showBack && (
             <div className="space-y-3" role="group" aria-labelledby="recall-rating-label">
-              <p id="recall-rating-label" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              <p id="recall-rating-label" className="text-body font-medium text-content-muted">
                 Rate your recall
               </p>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {reviewPreviews.map(({ label, quality, color, interval_days }) => (
+                {reviewPreviews.map(({ label, quality, color, shortcut, interval_days }) => (
                   <button
                     key={quality}
                     className={buttonStyles({
                       variant: 'plain',
                       size: 'none',
-                      className: `rounded-lg border border-transparent px-4 py-3 text-white ${color}`,
+                      className: `flex-col rounded-field border border-transparent px-4 py-3 shadow-card transition-all hover:brightness-110 hover:shadow-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${color}`,
                     })}
                     onClick={() => handleGrade(quality)}
                     aria-label={`${label}: review in ${formatInterval(interval_days)}`}
+                    aria-keyshortcuts={shortcut}
                   >
-                    <span className="block text-sm font-semibold">{label}</span>
-                    <span className="block text-xs opacity-90">{formatInterval(interval_days)}</span>
+                  <span className="flex items-center gap-1.5 text-body font-semibold">
+                      {label}
+                      <kbd className="rounded border border-white/35 px-1 text-[10px] font-semibold opacity-90">{shortcut}</kbd>
+                    </span>
+                    <span className="block text-caption opacity-90">{formatInterval(interval_days)}</span>
                   </button>
                 ))}
               </div>
+              <p className="text-caption text-content-subtle">
+                Keyboard: <kbd className="rounded bg-surface-sunken px-1">Space</kbd> reveal or Good ·{' '}
+                <kbd className="rounded bg-surface-sunken px-1">1</kbd>–<kbd className="rounded bg-surface-sunken px-1">4</kbd> to grade
+              </p>
             </div>
           )}
         </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Session history</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Newest sessions are shown first.</p>
+            <h2 className="text-xl font-bold text-content">Session history</h2>
+            <p className="mt-1 text-sm text-content-muted">Newest sessions are shown first.</p>
           </div>
-          <Clock3 className="h-5 w-5 text-slate-400" />
+          <Clock3 className="h-5 w-5 text-content-subtle" />
         </div>
 
         <div className="mt-5 space-y-3">
           {sessions.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
+            <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-4 text-sm text-content-muted dark:border-white/6 dark:bg-surface/3">
               No saved Flashcard reviews yet.
             </p>
           ) : null}
 
           {sessions.map((item) => (
-            <article key={item.id} className="rounded-xl border border-slate-200 dark:border-white/6 p-4">
+            <article key={item.id} className="rounded-xl border border-subtle p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">{item.deck_name}</h3>
+                    <h3 className="font-semibold text-content">{item.deck_name}</h3>
                   </div>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{formatSessionDate(item.started_at)}</p>
+                  <p className="mt-1 text-sm text-content-subtle">{formatSessionDate(item.started_at)}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-right text-sm">
                   <div>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{item.cards_studied || 0}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">cards</p>
+                    <p className="font-semibold text-content">{item.cards_studied || 0}</p>
+                    <p className="text-xs text-content-subtle">cards</p>
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">{formatMinutes(item.duration_minutes)}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">time</p>
+                    <p className="font-semibold text-content">{formatMinutes(item.duration_minutes)}</p>
+                    <p className="text-xs text-content-subtle">time</p>
                   </div>
                 </div>
               </div>

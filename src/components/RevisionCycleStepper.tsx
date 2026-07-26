@@ -15,7 +15,7 @@ const STAGES: { key: RevisionCycleStage; label: string; href: string; icon: type
 
 export function RevisionCycleStepper({ current }: { current?: RevisionCycleStage }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-white/6 dark:bg-[#131B2E]">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-subtle bg-surface px-3 py-2.5 text-sm">
       {STAGES.map((stage, index) => {
         const Icon = stage.icon;
         const active = stage.key === current;
@@ -26,14 +26,14 @@ export function RevisionCycleStepper({ current }: { current?: RevisionCycleStage
               className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 font-semibold transition-colors ${
                 active
                   ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-sm shadow-indigo-500/20"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-white/6 dark:hover:text-white"
+                  : "text-content-subtle hover:bg-slate-100 hover:text-content-muted dark:hover:bg-surface/6 dark:hover:text-white"
               }`}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
               {stage.label}
             </Link>
             {index < STAGES.length - 1 && (
-              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-slate-600" />
+              <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-300 dark:text-content-muted" />
             )}
           </div>
         );

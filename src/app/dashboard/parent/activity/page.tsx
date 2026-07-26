@@ -19,7 +19,7 @@ const dayKey = (d: Date) => {
 };
 
 function heatColor(count: number) {
-  if (count === 0) return 'bg-slate-100 dark:bg-white/5';
+  if (count === 0) return 'bg-slate-100 dark:bg-surface/5';
   if (count === 1) return 'bg-indigo-200 dark:bg-indigo-500/30';
   if (count <= 3) return 'bg-indigo-400 dark:bg-indigo-500/60';
   return 'bg-indigo-600 dark:bg-indigo-400';
@@ -116,43 +116,43 @@ export default function ParentActivityPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <Flame className="h-3.5 w-3.5 text-orange-500" />
             Study streak
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{stats.streak}d</p>
+          <p className="mt-2 text-2xl font-bold text-content dark:text-white">{stats.streak}d</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <Clock className="h-3.5 w-3.5 text-indigo-500" />
             Total study time
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
+          <p className="mt-2 text-2xl font-bold text-content dark:text-white">
             {hours > 0 ? `${hours}h ` : ''}
             {minutes}m
           </p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <CalendarDays className="h-3.5 w-3.5 text-emerald-500" />
             Sessions this week
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{stats.sessionsThisWeek}</p>
+          <p className="mt-2 text-2xl font-bold text-content dark:text-white">{stats.sessionsThisWeek}</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <Target className="h-3.5 w-3.5 text-purple-500" />
             Practice this week
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{stats.attemptsThisWeek}</p>
+          <p className="mt-2 text-2xl font-bold text-content dark:text-white">{stats.attemptsThisWeek}</p>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+      <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2.5">
           <CalendarDays className="h-5 w-5 text-indigo-500" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Activity — last {WEEKS_SHOWN} weeks</h2>
+          <h2 className="text-lg font-bold text-content dark:text-white">Activity — last {WEEKS_SHOWN} weeks</h2>
         </div>
         <div className="overflow-x-auto">
           <div className="flex gap-1">
@@ -169,9 +169,9 @@ export default function ParentActivityPage() {
             ))}
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+        <div className="mt-4 flex items-center gap-2 text-xs text-content-subtle">
           <span>Less</span>
-          <div className="h-3 w-3 rounded-sm bg-slate-100 dark:bg-white/5" />
+          <div className="h-3 w-3 rounded-sm bg-slate-100 dark:bg-surface/5" />
           <div className="h-3 w-3 rounded-sm bg-indigo-200 dark:bg-indigo-500/30" />
           <div className="h-3 w-3 rounded-sm bg-indigo-400 dark:bg-indigo-500/60" />
           <div className="h-3 w-3 rounded-sm bg-indigo-600 dark:bg-indigo-400" />

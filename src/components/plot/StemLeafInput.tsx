@@ -42,12 +42,12 @@ export function StemLeafInput({ spec, value, onChange, readOnly = false, correct
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-slate-500 dark:text-slate-400">Key: {spec.key}</p>
+      <p className="text-xs text-content-subtle">Key: {spec.key}</p>
       <table className="w-full border-collapse text-sm">
         <tbody>
           {stems.map((stem) => (
-            <tr key={stem} className="border-b border-slate-200 dark:border-white/10">
-              <td className="w-12 py-1 pr-2 font-medium text-slate-700 dark:text-slate-300">{stem}</td>
+            <tr key={stem} className="border-b border-subtle dark:border-white/10">
+              <td className="w-12 py-1 pr-2 font-medium text-content-muted dark:text-slate-300">{stem}</td>
               <td className="py-1">
                 {readOnly ? (
                   <span className="text-amber-600 dark:text-amber-400">{(submittedByStem.get(stem) ?? []).join(' ') || '—'}</span>
@@ -57,7 +57,7 @@ export function StemLeafInput({ spec, value, onChange, readOnly = false, correct
                     value={drafts[stem] ?? ''}
                     onChange={(event) => handleChange(stem, event.target.value)}
                     placeholder="e.g. 2 5 7"
-                    className="w-full rounded border border-slate-300 bg-transparent px-2 py-1 text-sm dark:border-white/10"
+                    className="w-full rounded border border-subtle bg-transparent px-2 py-1 text-sm"
                   />
                 )}
               </td>
@@ -69,7 +69,7 @@ export function StemLeafInput({ spec, value, onChange, readOnly = false, correct
         </tbody>
       </table>
       {correctValues ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -80,7 +80,7 @@ export function StemLeafInput({ spec, value, onChange, readOnly = false, correct
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">Enter the leaf digits for each stem, in ascending order, separated by spaces.</p>
+        <p className="text-xs text-content-subtle">Enter the leaf digits for each stem, in ascending order, separated by spaces.</p>
       )}
     </div>
   );

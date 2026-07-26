@@ -25,7 +25,7 @@ import { getQualificationConfig, getQualifications, type Country } from '@/lib/a
 import { resolveSpecificationId } from '@/lib/ai/studentSubjects';
 
 const selectClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
+  'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
 
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars (0/O, 1/I/L)
 
@@ -333,8 +333,8 @@ export default function TeacherDashboardPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Classes</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          <h1 className="text-2xl font-bold text-content dark:text-white">My Classes</h1>
+          <p className="mt-1 text-sm text-content-muted">
             Each class gets a code your students use to join. Once they&apos;re in, you can set them AI-generated practice assignments.
           </p>
         </div>
@@ -361,24 +361,24 @@ export default function TeacherDashboardPage() {
         ].map((stat) => (
           <div
             key={stat.label}
-            className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]"
+            className="flex items-center gap-3 rounded-2xl border border-subtle bg-surface p-5 shadow-sm"
           >
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${stat.from} ${stat.to} shadow-md`}>
               <stat.icon className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</p>
+              <p className="text-2xl font-bold text-content dark:text-white">{stat.value}</p>
+              <p className="text-xs text-content-subtle">{stat.label}</p>
             </div>
           </div>
         ))}
       </div>
 
       {showCreateForm && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+        <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Class name</label>
+              <label className="text-xs font-medium text-content-subtle">Class name</label>
               <input
                 type="text"
                 value={name}
@@ -388,7 +388,7 @@ export default function TeacherDashboardPage() {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Academic year</label>
+              <label className="text-xs font-medium text-content-subtle">Academic year</label>
               <input
                 type="text"
                 value={academicYear}
@@ -400,7 +400,7 @@ export default function TeacherDashboardPage() {
           </div>
 
           <div className="mt-3 space-y-1">
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Description (optional)</label>
+            <label className="text-xs font-medium text-content-subtle">Description (optional)</label>
             <input
               type="text"
               value={description}
@@ -409,14 +409,14 @@ export default function TeacherDashboardPage() {
             />
           </div>
 
-          <div className="mt-5 border-t border-slate-200 pt-4 dark:border-white/6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">What will this class study?</p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-500">This decides the exam board and specification AIDemic uses to generate practice questions.</p>
+          <div className="mt-5 border-t border-subtle pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">What will this class study?</p>
+            <p className="mt-0.5 text-xs text-content-subtle dark:text-content-subtle">This decides the exam board and specification AIDemic uses to generate practice questions.</p>
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="flex items-center gap-2">
-              <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Qualification</label>
+              <label className="shrink-0 text-xs font-medium text-content-subtle">Qualification</label>
               <select
                 value={effectiveQualId}
                 onChange={(e) => {
@@ -436,7 +436,7 @@ export default function TeacherDashboardPage() {
             {!isComingSoon && (
               <>
                 <div className="flex items-center gap-2">
-                  <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Exam Board</label>
+                  <label className="shrink-0 text-xs font-medium text-content-subtle">Exam Board</label>
                   <select
                     value={board}
                     onChange={(e) => {
@@ -454,7 +454,7 @@ export default function TeacherDashboardPage() {
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Subject</label>
+                  <label className="shrink-0 text-xs font-medium text-content-subtle">Subject</label>
                   <select
                     value={subject}
                     onChange={(e) => {
@@ -484,11 +484,11 @@ export default function TeacherDashboardPage() {
           ) : (
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {specEntries.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+                <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-subtle dark:bg-surface/3">
                   No specification options for this combination.
                 </div>
               ) : specEntries.length === 1 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
+                <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-muted dark:bg-surface/3 dark:text-slate-300">
                   {specEntries[0].name}
                 </div>
               ) : (
@@ -540,9 +540,9 @@ export default function TeacherDashboardPage() {
       )}
 
       {classes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 dark:border-white/10 dark:bg-white/3">
-          <p className="text-center text-sm font-medium text-slate-700 dark:text-slate-300">You haven&apos;t created a class yet. Here&apos;s how it works:</p>
-          <ol className="mx-auto mt-4 max-w-md space-y-3 text-sm text-slate-600 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 dark:bg-surface/3">
+          <p className="text-center text-sm font-medium text-content-muted dark:text-slate-300">You haven&apos;t created a class yet. Here&apos;s how it works:</p>
+          <ol className="mx-auto mt-4 max-w-md space-y-3 text-sm text-content-muted">
             <li className="flex items-start gap-3">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">1</span>
               Click &quot;Create class&quot; and pick the subject and exam board your students study.
@@ -562,9 +562,9 @@ export default function TeacherDashboardPage() {
           </ol>
         </div>
       ) : visibleClasses.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">
           All your classes are archived.{' '}
-          <button type="button" onClick={() => setShowArchived(true)} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <button type="button" onClick={() => setShowArchived(true)} className="font-medium text-accent hover:underline">
             Show archived
           </button>
         </div>
@@ -585,8 +585,8 @@ export default function TeacherDashboardPage() {
                 href={`/dashboard/teacher/classes/${cls.id}`}
                 className={`block rounded-2xl border p-5 shadow-sm transition ${
                   isArchived
-                    ? 'border-dashed border-slate-300 bg-slate-50 opacity-70 hover:border-slate-400 dark:border-white/10 dark:bg-white/3'
-                    : 'border-slate-200 bg-white hover:border-indigo-300 dark:border-white/6 dark:bg-[#131B2E] dark:hover:border-indigo-500/40'
+                    ? 'border-dashed border-subtle bg-surface-sunken opacity-70 hover:border-slate-400 dark:bg-surface/3'
+                    : 'border-subtle bg-surface hover:border-indigo-300 dark:hover:border-indigo-500/40'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -601,7 +601,7 @@ export default function TeacherDashboardPage() {
                           if (e.key === 'Enter') void handleRenameSave(cls.id);
                           if (e.key === 'Escape') setEditingClassId(null);
                         }}
-                        className="w-full rounded-md border border-indigo-300 bg-white px-2 py-1 text-sm font-semibold text-slate-900 outline-none dark:border-indigo-500/50 dark:bg-[#0A0F1E] dark:text-slate-100"
+                        className="w-full rounded-md border border-indigo-300 bg-surface px-2 py-1 text-sm font-semibold text-content outline-none dark:border-indigo-500/50"
                       />
                       <button
                         type="button"
@@ -620,14 +620,14 @@ export default function TeacherDashboardPage() {
                           e.preventDefault();
                           setEditingClassId(null);
                         }}
-                        className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        className="shrink-0 text-content-subtle hover:text-content-muted dark:hover:text-slate-200"
                         aria-label="Cancel rename"
                       >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (
-                    <h3 className="font-semibold text-slate-900 dark:text-slate-100">{cls.name}</h3>
+                    <h3 className="font-semibold text-content">{cls.name}</h3>
                   )}
                   {!isEditing && needsAttention && (
                     <span className="flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
@@ -636,45 +636,45 @@ export default function TeacherDashboardPage() {
                     </span>
                   )}
                 </div>
-                <p className="mt-1 flex flex-wrap gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-1 flex flex-wrap gap-1.5 text-xs text-content-subtle">
                   {qualification ? <span>{qualification.name}</span> : null}
                   {board ? <span>· {board.name}</span> : null}
                   {subjectChain ? <span>· {subjectChain.name}</span> : null}
                 </p>
-                <div className="mt-3 flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+                <div className="mt-3 flex items-center gap-1.5 text-sm text-content-muted">
                   <Users className="h-4 w-4" />
                   {cls.class_students?.[0]?.count ?? 0} students
                 </div>
 
                 {analytics && analytics.assignments > 0 ? (
                   <div className="mt-3 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center justify-between text-xs text-content-subtle">
                       <span>Completion</span>
                       <span className={`font-semibold ${scoreTextTone(analytics.completionRate)}`}>{analytics.completionRate ?? 0}%</span>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-surface/10">
                       <div
                         className={`h-full rounded-full ${scoreBarTone(analytics.completionRate)}`}
                         style={{ width: `${analytics.completionRate ?? 0}%` }}
                       />
                     </div>
                     {analytics.avgScore !== null && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-content-subtle">
                         Avg score: <span className={`font-semibold ${scoreTextTone(analytics.avgScore)}`}>{analytics.avgScore}%</span>
                       </p>
                     )}
                   </div>
                 ) : (
-                  <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">No assignments yet</p>
+                  <p className="mt-3 text-xs text-content-subtle dark:text-content-subtle">No assignments yet</p>
                 )}
 
-                <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 dark:bg-white/3">
+                <div className="mt-3 flex items-center justify-between rounded-lg bg-surface-sunken px-3 py-2 dark:bg-surface/3">
                   <div>
-                    <p className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="flex items-center gap-1 text-[11px] text-content-subtle">
                       <Share2 className="h-3 w-3" />
                       Invite code
                     </p>
-                    <span className="font-mono text-sm font-semibold tracking-widest text-slate-800 dark:text-slate-100">
+                    <span className="font-mono text-sm font-semibold tracking-widest text-content-muted text-content">
                       {cls.invite_code}
                     </span>
                   </div>
@@ -684,7 +684,7 @@ export default function TeacherDashboardPage() {
                       e.preventDefault();
                       void handleCopyCode(cls.invite_code);
                     }}
-                    className="text-slate-400 transition hover:text-indigo-500"
+                    className="text-content-subtle transition hover:text-indigo-500"
                     aria-label="Copy invite code"
                   >
                     <Copy className="h-4 w-4" />
@@ -701,7 +701,7 @@ export default function TeacherDashboardPage() {
                           e.preventDefault();
                           setPendingDeleteId(null);
                         }}
-                        className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                        className="text-xs font-medium text-content-subtle hover:text-content-muted dark:hover:text-slate-200"
                       >
                         Cancel
                       </button>
@@ -726,7 +726,7 @@ export default function TeacherDashboardPage() {
                         setEditingClassId(cls.id);
                         setEditingName(cls.name);
                       }}
-                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
+                      className="flex items-center gap-1 text-xs text-content-subtle hover:text-accent dark:hover:text-indigo-400"
                     >
                       <Pencil className="h-3 w-3" />
                       Rename
@@ -737,7 +737,7 @@ export default function TeacherDashboardPage() {
                         e.preventDefault();
                         void handleToggleArchive(cls);
                       }}
-                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400"
+                      className="flex items-center gap-1 text-xs text-content-subtle hover:text-accent dark:hover:text-indigo-400"
                     >
                       {isArchived ? <ArchiveRestore className="h-3 w-3" /> : <Archive className="h-3 w-3" />}
                       {isArchived ? 'Unarchive' : 'Archive'}
@@ -748,7 +748,7 @@ export default function TeacherDashboardPage() {
                         e.preventDefault();
                         setPendingDeleteId(cls.id);
                       }}
-                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
+                      className="flex items-center gap-1 text-xs text-content-subtle hover:text-red-600 dark:hover:text-red-400"
                     >
                       <Trash2 className="h-3 w-3" />
                       Delete

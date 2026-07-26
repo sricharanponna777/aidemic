@@ -20,8 +20,8 @@ export function TopicInput({
   suggestions,
   isValidSelection = true,
   placeholder,
-  className = 'block text-sm font-medium text-slate-700 dark:text-slate-300',
-  inputClassName = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100',
+  className = 'block text-sm font-medium text-content-muted dark:text-slate-300',
+  inputClassName = 'mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content',
 }: TopicInputProps) {
   const inputId = useId();
   const [isFocused, setIsFocused] = useState(false);
@@ -58,7 +58,7 @@ export function TopicInput({
           }`}
         />
         {isFocused && visibleSuggestions.length > 0 ? (
-          <div className="absolute left-0 right-0 top-full z-30 overflow-hidden rounded-b-lg border border-t-0 border-slate-300 bg-white shadow-lg shadow-slate-900/10 dark:border-slate-600 dark:bg-[#0A0F1E] dark:shadow-black/30">
+          <div className="absolute left-0 right-0 top-full z-30 overflow-hidden rounded-b-lg border border-t-0 border-subtle bg-surface shadow-lg shadow-slate-900/10 dark:shadow-black/30">
             {visibleSuggestions.map((topic) => (
               <button
                 key={topic}
@@ -68,7 +68,7 @@ export function TopicInput({
                   onChange(topic);
                   setIsFocused(false);
                 }}
-                className="flex w-full items-center px-3 py-2 text-left text-sm font-normal text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/8"
+                className="flex w-full items-center px-3 py-2 text-left text-sm font-normal text-content-muted transition hover:bg-slate-100 dark:hover:bg-surface/8"
               >
                 {topic}
               </button>

@@ -23,8 +23,8 @@ export function SearchSelect({
   options,
   onChange,
   placeholder = 'Search...',
-  className = 'block text-sm font-medium text-slate-700 dark:text-slate-300',
-  inputClassName = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100',
+  className = 'block text-sm font-medium text-content-muted dark:text-slate-300',
+  inputClassName = 'mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content',
 }: SearchSelectProps) {
   const inputId = useId();
   const [isFocused, setIsFocused] = useState(false);
@@ -67,7 +67,7 @@ export function SearchSelect({
           className={`${inputClassName} ${isFocused && visibleOptions.length > 0 ? 'rounded-b-none' : ''}`}
         />
         {isFocused && visibleOptions.length > 0 ? (
-          <div className="absolute left-0 right-0 top-full z-40 overflow-hidden rounded-b-lg border border-t-0 border-slate-300 bg-white shadow-lg shadow-slate-900/10 dark:border-slate-600 dark:bg-[#0A0F1E] dark:shadow-black/30">
+          <div className="absolute left-0 right-0 top-full z-40 overflow-hidden rounded-b-lg border border-t-0 border-subtle bg-surface shadow-lg shadow-slate-900/10 dark:shadow-black/30">
             {visibleOptions.map((option) => (
               <button
                 key={`${option.value}-${option.label}`}
@@ -78,7 +78,7 @@ export function SearchSelect({
                   setQuery(option.label);
                   setIsFocused(false);
                 }}
-                className="flex w-full items-center px-3 py-2 text-left text-sm font-normal text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/8"
+                className="flex w-full items-center px-3 py-2 text-left text-sm font-normal text-content-muted transition hover:bg-slate-100 dark:hover:bg-surface/8"
               >
                 {option.label}
               </button>

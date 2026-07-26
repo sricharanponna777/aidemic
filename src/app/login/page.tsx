@@ -3,7 +3,9 @@
 import { createClient } from '@/lib/supabase-client';
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Zap } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { Alert, Label, fieldStyles } from '@/components/ui/field';
 
 function LoginContent() {
   const [email, setEmail] = useState('');
@@ -125,37 +127,48 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-indigo-500 via-purple-600 to-fuchsia-700 dark:from-indigo-950 dark:via-purple-950 dark:to-fuchsia-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-center mb-2 text-gray-900 dark:text-gray-100">AIDemic</h1>
-        <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-          AI-Powered Study Companion
-        </p>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas p-4">
+      {/* Brand wash */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_500px_at_15%_-10%,var(--t-accent-muted),transparent_60%),radial-gradient(700px_450px_at_85%_110%,var(--t-accent-muted),transparent_55%)]"
+      />
+
+      <div className="relative w-full max-w-md rounded-card border border-subtle bg-surface p-8 shadow-raised">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-control bg-linear-to-br from-accent to-accent-2 text-white shadow-raised">
+            <Zap className="h-6 w-6" />
+          </span>
+        <h1 className="text-display text-content">AIDemic</h1>
+        <p className="mt-1 text-body text-content-subtle">
+            {isSignUp ? 'Create your account to start revising' : 'Welcome back — pick up where you left off'}
+          </p>
+        </div>
 
         {envError && (
-          <div className="mb-6 p-4 rounded-lg bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-sm border border-yellow-300 dark:border-yellow-700">
+          <Alert tone="warning" className="mb-6">
             {envError}
-          </div>
+          </Alert>
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
           {isSignUp && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                I am a...
-              </label>
-              <div className="grid grid-cols-3 gap-2">
+              <Label>I am a…</Label>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Account type">
                 {(['student', 'teacher', 'parent'] as const).map((option) => (
                   <button
                     key={option}
                     type="button"
+                    role="radio"
+                    aria-checked={role === option}
                     onClick={() => setRole(option)}
                     disabled={isLoading || !!envError}
-                    className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition-colors ${
-                      role === option
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
+                    className={buttonStyles({
+                      variant: role === option ? 'primary' : 'secondary',
+                      size: 'sm',
+                      className: 'capitalize',
+                    })}
                   >
                     {option}
                   </button>
@@ -167,30 +180,28 @@ function LoginContent() {
           {isSignUp && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  First name
-                </label>
+                <Label htmlFor="firstName">First name</Label>
                 <input
+                  id="firstName"
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="John"
                   disabled={isLoading || !!envError}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  className={fieldStyles()}
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Last name
-                </label>
+                <Label htmlFor="lastName">Last name</Label>
                 <input
+                  id="lastName"
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Doe"
                   disabled={isLoading || !!envError}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                  className={fieldStyles()}
                   required
                 />
               </div>
@@ -199,10 +210,9 @@ function LoginContent() {
 
           {isSignUp && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Username
-              </label>
+              <Label htmlFor="username">Username</Label>
               <input
+                id="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -210,66 +220,63 @@ function LoginContent() {
                 disabled={isLoading || !!envError}
                 pattern="[a-zA-Z0-9_]{3,20}"
                 title="3-20 characters: letters, numbers, and underscores only"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+                className={fieldStyles()}
                 required
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Email
-            </label>
+            <Label htmlFor="email">Email</Label>
             <input
+              id="email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               disabled={isLoading || !!envError}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+              className={fieldStyles()}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Password
-            </label>
+            <Label htmlFor="password">Password</Label>
             <input
+              id="password"
               type="password"
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="********"
               disabled={isLoading || !!envError}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 dark:disabled:bg-gray-600"
+              className={fieldStyles()}
               required
             />
           </div>
 
-          {error && (
-            <div className="p-3 rounded-lg text-sm bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-300 dark:border-red-700">
-              {error}
-            </div>
-          )}
+          {error && <Alert tone="danger">{error}</Alert>}
 
           <button
             type="submit"
             disabled={isLoading || !!envError}
             className={buttonStyles({ variant: 'primary', className: 'w-full' })}
           >
-            {isLoading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            {isLoading ? 'Processing…' : isSignUp ? 'Sign Up' : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
+          <p className="text-body text-content-subtle">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
             <button
+              type="button"
               onClick={() => {
                 setIsSignUpOverride(!isSignUp);
                 setError('');
               }}
-              className={buttonStyles({ variant: 'ghost', size: 'none', className: 'inline-flex px-2 py-1 align-baseline' })}
+              className={buttonStyles({ variant: 'ghost', size: 'none', className: 'inline-flex px-2 py-1 align-baseline text-accent' })}
             >
               {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>

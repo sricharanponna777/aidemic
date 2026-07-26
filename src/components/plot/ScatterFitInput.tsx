@@ -163,8 +163,8 @@ export function ScatterFitInput({ spec, value, onChange, readOnly = false, corre
               onClick={() => emit({ ...local, fitShape: shape })}
               className={`rounded-full border px-3 py-1 ${
                 local.fitShape === shape
-                  ? 'border-indigo-500 bg-indigo-500/10 text-indigo-600 dark:text-indigo-300'
-                  : 'border-slate-300 text-slate-500 dark:border-white/10 dark:text-slate-400'
+                  ? 'border-indigo-500 bg-indigo-500/10 text-accent dark:text-indigo-300'
+                  : 'border-subtle text-content-subtle'
               }`}
             >
               {label}
@@ -173,7 +173,7 @@ export function ScatterFitInput({ spec, value, onChange, readOnly = false, corre
         </div>
       ) : null}
       {correctValue ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -184,7 +184,7 @@ export function ScatterFitInput({ spec, value, onChange, readOnly = false, corre
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">Drag each point to its position, then choose whether the data needs a straight line or a curve of best fit.</p>
+        <p className="text-xs text-content-subtle">Drag each point to its position, then choose whether the data needs a straight line or a curve of best fit.</p>
       )}
     </div>
   );

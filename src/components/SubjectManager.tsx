@@ -31,12 +31,15 @@ import {
 } from '@/lib/ai/studentSubjects';
 
 const selectClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
+  'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
 
 export function SubjectManager() {
   const { session, profile } = useAuth();
   const supabase = createClient();
   const [subjects, setSubjects] = useState<UserSubject[]>([]);
+  // Exam date + target grade live on the student_subjects row itself (not in the
+  // joined UserSubject shape), so we track them in a parallel map keyed by id.
+  const [subjectMeta, setSubjectMeta] = useState<Record<string, { examDate: string; targetGrade: string }>>({});
   const [subjectsLoading, setSubjectsLoading] = useState(true);
   const [newQualId, setNewQualId] = useState('gcse');
   const [newSubject, setNewSubject] = useState<SupportedSubject>('biology');
@@ -90,6 +93,18 @@ export function SubjectManager() {
         setSubjectError('Could not load your saved subjects.');
       } else {
         setSubjects(((data as unknown as StudentSubjectRow[]) ?? []).map(mapStudentSubjectRow));
+      }
+
+      const { data: metaRows } = await supabase
+        .from('student_subjects')
+        .select('id, exam_date, target_grade')
+        .eq('user_id', session.user.id);
+      if (isMounted && metaRows) {
+        const map: Record<string, { examDate: string; targetGrade: string }> = {};
+        for (const row of metaRows as { id: string; exam_date: string | null; target_grade: string | null }[]) {
+          map[row.id] = { examDate: row.exam_date ?? '', targetGrade: row.target_grade ?? '' };
+        }
+        setSubjectMeta(map);
       }
       setSubjectsLoading(false);
     };
@@ -160,6 +175,15 @@ export function SubjectManager() {
     setSubjects((prev) => prev.filter((s) => s.id !== id));
   };
 
+  const handleMetaChange = async (id: string, field: 'examDate' | 'targetGrade', value: string) => {
+    setSubjectMeta((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+    const column = field === 'examDate' ? 'exam_date' : 'target_grade';
+    await supabase
+      .from('student_subjects')
+      .update({ [column]: value || null })
+      .eq('id', id);
+  };
+
   const resetSubjectFields = () => {
     setNewSubject('biology');
     setNewBoard('aqa');
@@ -168,10 +192,10 @@ export function SubjectManager() {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E] dark:shadow-none">
+    <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
       <div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Your subjects</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        <h2 className="text-xl font-bold text-content">Your subjects</h2>
+        <p className="mt-1 text-sm text-content-muted">
           Save the exact qualifications you study so AI content matches your course.
         </p>
       </div>
@@ -180,52 +204,78 @@ export function SubjectManager() {
         {subjectsLoading ? (
           <PageLoader text="Loading subjects..." />
         ) : subjects.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+          <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-4 text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
             No subjects added yet.
           </p>
         ) : (
           subjects.map((subject) => (
             <div
               key={subject.id}
-              className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-4 py-2.5 dark:border-white/6"
+              className="rounded-lg border border-subtle px-4 py-2.5"
             >
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                  {getSubjectLabel(subject.subject)}
-                </span>
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-indigo-500/15 dark:text-blue-300">
-                  {getExamBoardLabel(subject.exam_board)}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                  {subject.exam_type === 'a-level' ? 'A-Level' : 'GCSE'}
-                </span>
-                {buildSpecString(subject.spec_name ?? '', subject.spec_tier ?? '', '') ? (
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                    {buildSpecString(subject.spec_name ?? '', subject.spec_tier ?? '', '')}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-semibold text-content">
+                    {getSubjectLabel(subject.subject)}
                   </span>
-                ) : null}
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-indigo-500/15 dark:text-blue-300">
+                    {getExamBoardLabel(subject.exam_board)}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-content-muted dark:bg-slate-700">
+                    {subject.exam_type === 'a-level' ? 'A-Level' : 'GCSE'}
+                  </span>
+                  {buildSpecString(subject.spec_name ?? '', subject.spec_tier ?? '', '') ? (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                      {buildSpecString(subject.spec_name ?? '', subject.spec_tier ?? '', '')}
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSubject(subject.id)}
+                  className="text-content-subtle transition hover:text-red-500 dark:hover:text-red-400"
+                  aria-label="Remove subject"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleRemoveSubject(subject.id)}
-                className="text-slate-400 transition hover:text-red-500 dark:hover:text-red-400"
-                aria-label="Remove subject"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-content-subtle">
+                <label className="flex items-center gap-1.5">
+                  Exam date
+                  <input
+                    type="date"
+                    value={subjectMeta[subject.id]?.examDate ?? ''}
+                    onChange={(e) => handleMetaChange(subject.id, 'examDate', e.target.value)}
+                    className="rounded-md border border-subtle bg-surface px-2 py-1 text-content outline-none focus:border-accent"
+                    aria-label={`Exam date for ${getSubjectLabel(subject.subject)}`}
+                  />
+                </label>
+                <label className="flex items-center gap-1.5">
+                  Target grade
+                  <input
+                    type="text"
+                    value={subjectMeta[subject.id]?.targetGrade ?? ''}
+                    onChange={(e) => handleMetaChange(subject.id, 'targetGrade', e.target.value)}
+                    placeholder="e.g. 7"
+                    maxLength={4}
+                    className="w-16 rounded-md border border-subtle bg-surface px-2 py-1 text-content outline-none focus:border-accent"
+                    aria-label={`Target grade for ${getSubjectLabel(subject.subject)}`}
+                  />
+                </label>
+              </div>
             </div>
           ))
         )}
       </div>
 
-      <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
-        Country: <span className="font-semibold text-slate-900 dark:text-slate-100">{COUNTRY_LABELS[userCountry]}</span>
+      <div className="mt-5 rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 text-sm text-content-muted dark:bg-surface/3">
+        Country: <span className="font-semibold text-content">{COUNTRY_LABELS[userCountry]}</span>
       </div>
 
       {/* Qualification + Exam Board + Subject */}
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="flex items-center gap-2">
-          <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Qualification</label>
+          <label className="shrink-0 text-xs font-medium text-content-subtle">Qualification</label>
           <select
             value={effectiveQualId}
             onChange={(event) => {
@@ -244,7 +294,7 @@ export function SubjectManager() {
         {!isComingSoon && (
           <>
             <div className="flex items-center gap-2">
-              <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Exam Board</label>
+              <label className="shrink-0 text-xs font-medium text-content-subtle">Exam Board</label>
               <select
                 value={newBoard}
                 onChange={(event) => {
@@ -262,7 +312,7 @@ export function SubjectManager() {
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">Subject</label>
+              <label className="shrink-0 text-xs font-medium text-content-subtle">Subject</label>
               <select
                 value={newSubject}
                 onChange={(event) => {
@@ -294,11 +344,11 @@ export function SubjectManager() {
           {/* Specification + Tier + Add */}
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
             {specEntries.length === 0 ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+              <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-subtle dark:bg-surface/3">
                 No specification options available for this combination.
               </div>
             ) : specEntries.length === 1 ? (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-white/6 dark:bg-white/3 dark:text-slate-300">
+              <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-muted dark:bg-surface/3 dark:text-slate-300">
                 {specEntries[0].name}
               </div>
             ) : (
@@ -344,7 +394,7 @@ export function SubjectManager() {
           </div>
 
           {selectedSpecLabel ? (
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-xs text-content-subtle">
               AI generation will use {selectedSpecLabel}.
             </p>
           ) : null}

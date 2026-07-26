@@ -15,6 +15,7 @@ import {
 } from '@/lib/ai/json';
 import { normalizeMathNotation } from '@/lib/ai/math';
 import { normalizePlotSpec } from '@/lib/ai/plotSpec';
+import { normalizeDiagramTemplateSelection, resolveDiagramSpec } from '@/lib/ai/diagramTemplate';
 import { MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
 import {
   normalizeBoard,
@@ -25,10 +26,11 @@ import {
   type SupportedSubject,
 } from '@/lib/ai/validation';
 import { markPlotAnswer } from '@/lib/plotMarking';
-import type { PlotSpec } from '@/types';
+import { markDiagramAnswer } from '@/lib/diagramMarking';
+import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
 
 type MarkingQuestion = {
-  questionType: 'open' | 'mcq' | 'plot';
+  questionType: 'open' | 'mcq' | 'plot' | 'diagram';
   question: string;
   marks: number;
   commandWord: string;
@@ -42,6 +44,8 @@ type MarkingQuestion = {
   sourceTitle: string;
   sourceUrl: string;
   plotSpec: PlotSpec | null;
+  diagramSpec: DiagramSpec | null;
+  diagramTemplate: DiagramTemplateSelection | null;
 };
 
 type MarkedAnswer = {
@@ -236,13 +240,27 @@ const normalizeQuestion = (value: unknown, subject: string): MarkingQuestion | n
   const question = value as Partial<MarkingQuestion>;
   const marks = parseMarks(question.marks);
   if (marks === null) return null;
-  const questionType = question.questionType === 'mcq' ? 'mcq' : question.questionType === 'plot' ? 'plot' : 'open';
+  const questionType =
+    question.questionType === 'mcq'
+      ? 'mcq'
+      : question.questionType === 'plot'
+        ? 'plot'
+        : question.questionType === 'diagram'
+          ? 'diagram'
+          : 'open';
   const options = questionType === 'mcq' ? normalizeOptions(question.options, subject) : [];
   const correctOption = txt((question.correctOption || '').toUpperCase(), 1) as MarkingQuestion['correctOption'];
   const plotSpec = questionType === 'plot' ? normalizePlotSpec(question.plotSpec) : null;
+  const diagramTemplateSelection = questionType === 'diagram' ? normalizeDiagramTemplateSelection(question.diagramTemplate) : null;
+  const diagramSpec = questionType === 'diagram' ? resolveDiagramSpec(question.diagramSpec, diagramTemplateSelection) : null;
 
   const normalized: MarkingQuestion = {
-    questionType: questionType === 'plot' && !plotSpec ? 'open' : questionType,
+    questionType:
+      questionType === 'plot' && !plotSpec
+        ? 'open'
+        : questionType === 'diagram' && !diagramSpec
+          ? 'open'
+          : questionType,
     question: txt(normalizeMathNotation(safe(question.question || ''), subject), 900),
     marks,
     commandWord: txt(safe(question.commandWord || ''), 80),
@@ -256,6 +274,8 @@ const normalizeQuestion = (value: unknown, subject: string): MarkingQuestion | n
     sourceTitle: txt(safe(question.sourceTitle || ''), 160),
     sourceUrl: sanitizeFigureUrl(question.sourceUrl || ''),
     plotSpec,
+    diagramSpec,
+    diagramTemplate: diagramTemplateSelection && diagramTemplateSelection.templateId && diagramSpec ? diagramTemplateSelection : null,
   };
 
   if (!normalized.question || normalized.markScheme.length === 0 || !normalized.modelAnswer) return null;
@@ -356,6 +376,31 @@ const normalizeMarkedAnswers = (aiReport: AIMarkingReport | null, questions: Mar
         }
       })();
       const result = markPlotAnswer(question.plotSpec, parsedSubmission, question.marks);
+      return { questionIndex: index, ...result };
+    }
+
+    if (question.questionType === 'diagram') {
+      if (!question.diagramSpec) {
+        return {
+          questionIndex: index,
+          marksAwarded: 0,
+          maxMarks: question.marks,
+          band: 'No answer',
+          feedback: 'This diagram question could not be marked (missing diagram data).',
+          strengths: [],
+          improvements: [],
+          weaknessTags: [],
+          exemplarAnswer: question.modelAnswer,
+        };
+      }
+      const parsedSubmission = (() => {
+        try {
+          return JSON.parse(answers[index] || '');
+        } catch {
+          return null;
+        }
+      })();
+      const result = markDiagramAnswer(question.diagramSpec, parsedSubmission, question.marks);
       return { questionIndex: index, ...result };
     }
 
@@ -484,6 +529,9 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
     payload.questions.some((question) => question.questionType === 'plot')
       ? 'Some questions were chart-plotting questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference chart-drawing skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
       : '',
+    payload.questions.some((question) => question.questionType === 'diagram')
+      ? 'Some questions were diagram-completion questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference diagram-labelling skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
+      : '',
     'If a question earns full marks, leave its improvements and weaknessTags empty.',
     'Calculations: credit correct method+working+answer+units; wording not required.',
     'Open: reward knowledge, application, analysis, evaluation per mark value.',
@@ -512,7 +560,7 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
       modelAnswer: question.modelAnswer,
       studentAnswer: payload.answers[index] || '',
     }))
-    .filter((item) => item.questionType !== 'plot');
+    .filter((item) => item.questionType !== 'plot' && item.questionType !== 'diagram');
 
   const user = [
     `Topic: ${payload.topic}`,

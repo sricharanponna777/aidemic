@@ -95,14 +95,20 @@ export type PracticeGradeInput = {
   predicted_grade?: string | null;
   total_marks_awarded?: number | null;
   total_available_marks?: number | null;
+  attempt_mode?: string | null;
 };
 
 export const weightedPredictedGrade = (
-  attempts: PracticeGradeInput[],
+  allAttempts: PracticeGradeInput[],
   examType: string | null | undefined,
   specTier?: string | null,
   examBoard?: string | null
 ) => {
+  // Blurting (free recall) records a coverage %, not a mark-scheme score, so it
+  // must never contribute to a predicted exam grade even if a future change
+  // gives it marks. Exclude it explicitly rather than relying on absent fields.
+  const attempts = allAttempts.filter((attempt) => attempt.attempt_mode !== 'blurt');
+
   const markAttempts = attempts.filter(
     (attempt) =>
       typeof attempt.total_marks_awarded === 'number' &&

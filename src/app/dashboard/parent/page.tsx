@@ -142,46 +142,46 @@ export default function ParentOverviewPage() {
   return (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <Flame className="h-3.5 w-3.5 text-orange-500" />
             Study streak
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{metrics.studyStreak}d</p>
+          <p className="mt-2 text-2xl font-bold text-content dark:text-white">{metrics.studyStreak}d</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
             Retention rate
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{Math.round(metrics.retentionRate)}%</p>
+          <p className="mt-2 text-2xl font-bold text-content dark:text-white">{Math.round(metrics.retentionRate)}%</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
             <ClipboardCheck className="h-3.5 w-3.5 text-emerald-500" />
             Assignments completed
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{metrics.assignmentsCompleted}</p>
+          <p className="mt-2 text-2xl font-bold text-content dark:text-white">{metrics.assignmentsCompleted}</p>
         </div>
       </div>
 
       <div>
         <div className="mb-3 flex items-center gap-2.5">
           <Trophy className="h-5 w-5 text-emerald-500" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Predicted grades</h2>
+          <h2 className="text-lg font-bold text-content dark:text-white">Predicted grades</h2>
         </div>
         {metrics.subjectGrades.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+          <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">
             No exam practice completed yet.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+          <div className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm">
             <div className="divide-y divide-slate-100 dark:divide-white/6">
               {metrics.subjectGrades.map((item) => (
                 <div key={`${item.subject}-${item.examType ?? 'na'}`} className="flex items-center justify-between px-5 py-3.5">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{getSubjectLabel(item.subject)}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{item.attempts} attempts analysed</p>
+                    <p className="text-sm font-semibold text-content dark:text-white">{getSubjectLabel(item.subject)}</p>
+                    <p className="text-xs text-content-subtle">{item.attempts} attempts analysed</p>
                   </div>
                   <span
                     className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({
@@ -201,10 +201,10 @@ export default function ParentOverviewPage() {
       <div>
         <div className="mb-3 flex items-center gap-2.5">
           <AlertTriangle className="h-5 w-5 text-amber-500" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Recurring weak areas</h2>
+          <h2 className="text-lg font-bold text-content dark:text-white">Recurring weak areas</h2>
         </div>
         {metrics.topWeaknesses.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+          <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">
             No recurring weaknesses detected yet.
           </p>
         ) : (

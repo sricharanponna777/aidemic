@@ -13,7 +13,7 @@ import { AssignmentForm, type CreatedAssignment } from '@/components/teacher/Ass
 import { buildAssignmentStats } from '@/lib/teacherAnalytics';
 
 const selectClass =
-  'rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100';
+  'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
 
 type ClassOption = {
   id: string;
@@ -203,8 +203,8 @@ export default function TeacherAssignmentsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Assignments</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Create, schedule, and review assignments across all your classes.</p>
+          <h1 className="text-2xl font-bold text-content dark:text-white">Assignments</h1>
+          <p className="mt-1 text-sm text-content-muted">Create, schedule, and review assignments across all your classes.</p>
         </div>
         <button
           type="button"
@@ -218,16 +218,16 @@ export default function TeacherAssignmentsPage() {
       </div>
 
       {classes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-white/10 dark:bg-white/3 dark:text-slate-400">
+        <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">
           You need a class before you can create assignments.{' '}
-          <Link href="/dashboard/teacher/classes" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href="/dashboard/teacher/classes" className="font-medium text-accent hover:underline">
             Create a class
           </Link>
         </div>
       ) : (
         <>
           {showForm && teacherId && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
               <AssignmentForm
                 teacherId={teacherId}
                 classes={activeClasses}
@@ -237,9 +237,9 @@ export default function TeacherAssignmentsPage() {
             </div>
           )}
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+          <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">All assignments</h2>
+              <h2 className="text-lg font-semibold text-content">All assignments</h2>
               {classes.length > 1 && (
                 <select value={filterClassId} onChange={(e) => setFilterClassId(e.target.value)} className={selectClass}>
                   <option value="all">All classes</option>
@@ -253,7 +253,7 @@ export default function TeacherAssignmentsPage() {
             </div>
 
             {visibleAssignments.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No assignments yet.</p>
+              <p className="mt-4 text-sm text-content-subtle">No assignments yet.</p>
             ) : (
               <div className="mt-4 space-y-2">
                 {visibleAssignments.map((assignment) => {
@@ -263,21 +263,21 @@ export default function TeacherAssignmentsPage() {
                   const classRoster = rosterByClass.get(assignment.class_id) ?? [];
                   const classAttempts = attemptsByAssignment.get(assignment.id) ?? [];
                   return (
-                    <div key={assignment.id} className="rounded-lg border border-slate-200 dark:border-white/6">
+                    <div key={assignment.id} className="rounded-lg border border-subtle">
                       <button
                         type="button"
                         onClick={() => setExpandedId(isExpanded ? null : assignment.id)}
                         className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-left text-sm"
                       >
                         <div>
-                          <p className="font-medium text-slate-900 dark:text-slate-100">{assignment.title}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 capitalize">
+                          <p className="font-medium text-content">{assignment.title}</p>
+                          <p className="text-xs text-content-subtle capitalize">
                             {cls?.name ?? 'Unknown class'}
                             {assignment.topics?.name ? ` · ${assignment.topics.name}` : ''}
                             {assignment.due_date ? ` · due ${new Date(assignment.due_date).toLocaleDateString()}` : ''}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center gap-3 text-xs text-content-subtle">
                           <span>
                             {stats?.completedCount ?? 0}/{stats?.rosterSize ?? 0} completed
                           </span>
@@ -288,14 +288,14 @@ export default function TeacherAssignmentsPage() {
                         </div>
                       </button>
                       {stats && stats.completionRate !== null && (
-                        <div className="mx-4 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                        <div className="mx-4 h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-surface/10">
                           <div className={`h-full rounded-full ${scoreBarTone(stats.completionRate)}`} style={{ width: `${stats.completionRate}%` }} />
                         </div>
                       )}
                       {isExpanded && (
-                        <div className="border-t border-slate-200 px-4 py-3 dark:border-white/6">
+                        <div className="border-t border-subtle px-4 py-3">
                           {classRoster.length === 0 ? (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">No students in this class yet.</p>
+                            <p className="text-xs text-content-subtle">No students in this class yet.</p>
                           ) : (
                             <div className="space-y-1.5">
                               {classRoster.map((student) => {
@@ -303,8 +303,8 @@ export default function TeacherAssignmentsPage() {
                                 const status = attempt?.status ?? 'not started';
                                 return (
                                   <div key={student.id} className="flex items-center justify-between text-xs">
-                                    <span className="text-slate-700 dark:text-slate-300">{student.full_name || student.email || 'Student'}</span>
-                                    <span className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                                    <span className="text-content-muted dark:text-slate-300">{student.full_name || student.email || 'Student'}</span>
+                                    <span className="flex items-center gap-2 text-content-subtle">
                                       <span className="capitalize">{status.replace('_', ' ')}</span>
                                       {typeof attempt?.percentage === 'number' && (
                                         <span className={`font-semibold ${scoreTextTone(attempt.percentage)}`}>{attempt.percentage}%</span>
@@ -327,7 +327,7 @@ export default function TeacherAssignmentsPage() {
       )}
 
       {classes.length > 0 && assignments.length === 0 && (
-        <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500 dark:bg-white/3 dark:text-slate-400">
+        <div className="flex items-center gap-2 rounded-lg bg-surface-sunken px-4 py-3 text-xs text-content-subtle dark:bg-surface/3">
           <ClipboardList className="h-4 w-4 shrink-0" />
           Create your first assignment above — AIDemic generates the practice questions for you.
         </div>

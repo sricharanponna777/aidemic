@@ -11,8 +11,10 @@ import {
 } from '@/lib/ai/json';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { normalizeMathNotation } from '@/lib/ai/math';
-import { cleanText, dedupe, extractFigureUrls, isChartPlottingTopic, isDataAnalysisObjective, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
+import { cleanText, dedupe, extractFigureUrls, isChartPlottingTopic, isDataAnalysisObjective, isDiagramCompletionTopic, MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
 import { normalizePlotSpec, PLOT_SPEC_JSON_SCHEMA } from '@/lib/ai/plotSpec';
+import { DIAGRAM_SPEC_JSON_SCHEMA } from '@/lib/ai/diagramSpec';
+import { buildDiagramTemplateCatalog, DIAGRAM_TEMPLATE_JSON_SCHEMA, normalizeDiagramTemplateSelection, resolveDiagramSpec } from '@/lib/ai/diagramTemplate';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import {
   clampCount,
@@ -23,9 +25,9 @@ import {
   SUPPORTED_SUBJECTS,
   type SupportedSubject,
 } from '@/lib/ai/validation';
-import type { PlotSpec } from '@/types';
+import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
 
-type QuestionType = 'open' | 'mcq' | 'plot';
+type QuestionType = 'open' | 'mcq' | 'plot' | 'diagram';
 type CorrectOption = '' | 'A' | 'B' | 'C' | 'D';
 
 interface GenerateQuestionsPayload {
@@ -43,6 +45,7 @@ interface GenerateQuestionsPayload {
   allowMcq?: boolean;
   allowCalculation?: boolean;
   allowPlot?: boolean;
+  allowDiagram?: boolean;
   useOnlineResources?: boolean;
 }
 
@@ -61,6 +64,8 @@ export type ExamQuestion = {
   sourceTitle: string;
   sourceUrl: string;
   plotSpec: PlotSpec | null;
+  diagramSpec: DiagramSpec | null;
+  diagramTemplate: DiagramTemplateSelection | null;
 };
 
 type SourceReference = {
@@ -113,9 +118,11 @@ const SCHEMA = {
           'sourceTitle',
           'sourceUrl',
           'plotSpec',
+          'diagramSpec',
+          'diagramTemplate',
         ],
         properties: {
-          questionType: { type: 'string', enum: ['open', 'mcq', 'plot'] },
+          questionType: { type: 'string', enum: ['open', 'mcq', 'plot', 'diagram'] },
           question: { type: 'string' },
           marks: { type: 'number' },
           commandWord: { type: 'string' },
@@ -138,6 +145,8 @@ const SCHEMA = {
           sourceTitle: { type: 'string' },
           sourceUrl: { type: 'string' },
           plotSpec: PLOT_SPEC_JSON_SCHEMA,
+          diagramSpec: DIAGRAM_SPEC_JSON_SCHEMA,
+          diagramTemplate: DIAGRAM_TEMPLATE_JSON_SCHEMA,
         },
       },
     },
@@ -282,6 +291,7 @@ const normalizePayload = (raw: GenerateQuestionsPayload) => {
   const learningObjective = txt(raw.learningObjective || '', 300);
   const subject = txt((raw.subject || '').toLowerCase(), 60);
   const requestedAllowPlot = raw.allowPlot !== false;
+  const requestedAllowDiagram = raw.allowDiagram === true;
 
   return {
     topic,
@@ -300,6 +310,8 @@ const normalizePayload = (raw: GenerateQuestionsPayload) => {
     // Gated server-side: the client flag is a request, not authority — only relevant
     // subject/topic/subtopic/learningObjective combinations may ever request plot questions.
     allowPlot: requestedAllowPlot && isChartPlottingTopic(subject, topic, subtopic, learningObjective),
+    // Same server-side gate posture for interactive diagram-completion questions (sciences only).
+    allowDiagram: requestedAllowDiagram && isDiagramCompletionTopic(subject, topic, subtopic, learningObjective),
     useOnlineResources: raw.useOnlineResources !== false,
   };
 };
@@ -367,8 +379,17 @@ const inferCommandWord = (question: string, fallback: string) => {
   return firstWord || 'Answer';
 };
 
-const normalizeQuestionType = (value: unknown, allowMcq: boolean, allowPlot: boolean, options: string[], answerLike: unknown): QuestionType => {
+const normalizeQuestionType = (
+  value: unknown,
+  allowMcq: boolean,
+  allowPlot: boolean,
+  allowDiagram: boolean,
+  options: string[],
+  answerLike: unknown,
+  hasDiagramTemplate: boolean
+): QuestionType => {
   const cleaned = String(value || '').toLowerCase();
+  if (allowDiagram && (hasDiagramTemplate || /\bdiagram\b/.test(cleaned))) return 'diagram';
   if (allowPlot && /\bplot\b/.test(cleaned)) return 'plot';
   if (allowMcq && /\b(mcq|multiple[-\s]?choice|multiple_choice|choice)\b/.test(cleaned)) return 'mcq';
   if (allowMcq && options.length >= 3 && options.length <= 4 && normalizeCorrectOption(answerLike, options)) return 'mcq';
@@ -438,8 +459,23 @@ const normalizeQuestion = (
   const rawAnswer = readString(record, ['modelAnswer', 'model_answer', 'answer', 'correctAnswer', 'correct_answer', 'explanation', 'rationale']);
   const tentativeOptions = normalizeOptions(readUnknown(record, ['options', 'choices', 'answers']), payload.subject, record);
   const answerLike = readUnknown(record, ['correctOption', 'correct_option', 'answer', 'correctAnswer', 'correct_answer']);
-  const questionType = normalizeQuestionType(readUnknown(record, ['questionType', 'question_type', 'type', 'format']), payload.allowMcq, payload.allowPlot, tentativeOptions, answerLike);
+  const diagramTemplateSelection = payload.allowDiagram
+    ? normalizeDiagramTemplateSelection(readUnknown(record, ['diagramTemplate', 'diagram_template']))
+    : null;
+  const hasDiagramTemplate = Boolean(diagramTemplateSelection?.templateId);
+  const questionType = normalizeQuestionType(
+    readUnknown(record, ['questionType', 'question_type', 'type', 'format']),
+    payload.allowMcq,
+    payload.allowPlot,
+    payload.allowDiagram,
+    tentativeOptions,
+    answerLike,
+    hasDiagramTemplate
+  );
   const plotSpec = questionType === 'plot' ? normalizePlotSpec(readUnknown(record, ['plotSpec', 'plot_spec'])) : null;
+  const diagramSpec =
+    questionType === 'diagram' ? resolveDiagramSpec(readUnknown(record, ['diagramSpec', 'diagram_spec']), diagramTemplateSelection) : null;
+  const diagramTemplate = questionType === 'diagram' && hasDiagramTemplate && diagramSpec ? diagramTemplateSelection : null;
   const marks = inferMarks(record, questionText, questionType);
   const markScheme = normalizeStringList(
     readUnknown(record, ['markScheme', 'mark_scheme', 'markingPoints', 'marking_points', 'markSchemePoints', 'mark_scheme_points']),
@@ -490,6 +526,8 @@ const normalizeQuestion = (
     sourceTitle: cleanText(readString(record, ['sourceTitle', 'source_title', 'source', 'citationTitle', 'citation_title']), 160),
     sourceUrl: sanitizeFigureUrl(readString(record, ['sourceUrl', 'source_url', 'url', 'citationUrl', 'citation_url'])),
     plotSpec,
+    diagramSpec,
+    diagramTemplate,
   };
 
   if (!normalized.question || !normalized.commandWord || normalized.markScheme.length === 0 || !normalized.modelAnswer) {
@@ -505,6 +543,19 @@ const normalizeQuestion = (
         payload.subject === 'english language' ? 9000 : 2600
       ),
       plotSpec: null,
+    };
+  }
+
+  if (normalized.questionType === 'diagram' && !normalized.diagramSpec) {
+    return {
+      ...normalized,
+      questionType: 'open',
+      question: txt(
+        `${normalized.question}\n\n(The diagram could not be structured for interactive completion; describe/sketch the answer instead.)`,
+        payload.subject === 'english language' ? 9000 : 2600
+      ),
+      diagramSpec: null,
+      diagramTemplate: null,
     };
   }
 
@@ -528,13 +579,16 @@ const normalizeQuestion = (
   return normalized;
 };
 
-const referencesFigure = (text: string) => /\bfigure\b/i.test(text);
+const referencesFigure = (text: string) => /\b(figure|diagram)\b/i.test(text);
 
 const applyFigureReferences = (questions: ExamQuestion[], figureUrls: string[]) => {
   if (figureUrls.length === 0) return { questions, missingFigureReference: false };
 
   let pointer = 0;
   const next = questions.map((question) => {
+    // Diagram-completion questions already have their own AI-drawn interactive diagramSpec;
+    // a figureUrl there is a source-image reference alongside it, not a replacement, so it's
+    // only auto-attached when the AI didn't already pick one itself.
     if (!referencesFigure(question.question) || question.figureUrl) return question;
     const figureUrl = figureUrls[Math.min(pointer, figureUrls.length - 1)];
     pointer += 1;
@@ -614,10 +668,29 @@ const buildPrompt = (
       ].join(' ')
     : 'Never set questionType="plot"; leave plotSpec=null on every question.';
 
+  const diagramInstructions = payload.allowDiagram
+    ? [
+        'diagram: for a question that asks the student to COMPLETE an unfinished diagram (label missing parts, place missing symbols, and/or draw missing connections), set questionType="diagram".',
+        'STEP 1 — prefer a template: check the template catalog below. If one matches the topic, set diagramTemplate={templateId, stringParams, numberParams, listParams} with the params it documents, leave diagramSpec=null, and put the parts/slots/connections you want the student to complete into a listParams entry with key "blankPartIds"/"blankSlotIds"/"blankConnectionIds" (values = the ids the template documents as blankable). A template deterministically renders exam-accurate artwork server-side from these params — never guess its geometry yourself.',
+        `Template catalog:\n${buildDiagramTemplateCatalog()}`,
+        'STEP 2 — freehand fallback: only if no template fits, leave diagramTemplate={templateId:"",stringParams:[],numberParams:[],listParams:[]} and populate diagramSpec instead (as below). For every other (non-diagram) question, leave both diagramSpec=null and diagramTemplate={templateId:"",stringParams:[],numberParams:[],listParams:[]}.',
+        'diagramSpec coordinate space: ALL x/y are in a normalized 0..100 grid (0,0 = top-left, 100,100 = bottom-right). diagramSpec.title is a short caption.',
+        'diagramSpec.kind="structural" (PREFERRED for the freehand fallback): a graph of labelled boxes joined by arrows — use for processes/relationships (the carbon/water/nitrogen cycle, a food web/chain, an energy-transfer chain, a reaction pathway, blood/nerve pathways). Set primitives=[]. Place each concept as a node {id (unique short slug), x, y, correctLabel, given}. connections join nodes {from,to (node ids), directed (true=arrowhead), label, given}.',
+        'diagramSpec.kind="pictorial": an AI-drawn base image built ONLY from the primitives whitelist, with callout nodes pinned to features to be labelled, for anything not covered by a template. Keep the drawing SIMPLE and recognizable (a few dozen primitives max).',
+        'primitives = an array of safe drawing elements, each with a "kind": "path" (d = SVG path data, only command letters M L H V C S Q T A Z and numbers), "line" (x1,y1,x2,y2), "circle" (cx,cy,r), "ellipse" (cx,cy,rx,ry), "rect" (x,y,width,height), "polygon"/"polyline" (points=[x1,y1,x2,y2,...]), "text" (x,y,text). Optional stroke/fill are a colour name or #hex only; strokeWidth 1-3. Never emit raw SVG/HTML, scripts, url() or external references.',
+        'The "unfinished" part (freehand only): mark 1-3 nodes given=false (blank — the student fills them) and/or 1-2 connections given=false (missing — the student draws them). Everything given=true is shown pre-completed as scaffolding. Every node needs the true correctLabel even when given=false.',
+        'acceptableLabels (every node): an array of ALSO-correct answers for that node — synonyms and common alternative spellings a student might reasonably type (e.g. correctLabel "Cell membrane" → ["plasma membrane","membrane"]; "Mitochondria" → ["mitochondrion"]). Use [] when the label has no real alternatives. Matching already ignores case and punctuation, so do not list mere case/punctuation variants.',
+        'labelBank (freehand only): list the correct labels of all blank nodes PLUS 1-3 plausible distractors, in shuffled order.',
+        'Set marks = number of gradeable features (blank nodes + missing connections/slots). markScheme: one bullet per blank/missing item. modelAnswer: describe the fully-completed diagram in words.',
+        'figureUrl (diagram questions): if one of the provided Figure URLs is the original source image of the diagram being completed, set figureUrl to it so the student can see the real artwork alongside the interactive version. Never invent one.',
+      ].join(' ')
+    : 'Never set questionType="diagram"; leave diagramSpec=null and diagramTemplate={templateId:"",stringParams:[],numberParams:[],listParams:[]} on every question.';
+
   const system = [
     `Generate ${englishLanguageInstructions ? 'the required fixed-paper set' : payload.questionCount} exam practice questions as strict JSON. Board:${payload.examBoard} Type:${payload.examType} Subject:${payload.subject}.`,
     payload.specification ? `Spec: ${payload.specification}` : '',
     payload.allowPlot ? plotInstructions : '',
+    payload.allowDiagram ? diagramInstructions : '',
     englishLanguageInstructions,
     resourceInstruction,
     formatInstruction,
@@ -625,6 +698,7 @@ const buildPrompt = (
     'MCQ: questionType="mcq", 3 or 4 options (no letters in text), correctOption=A/B/C/D as applicable, modelAnswer explains correct option.',
     'Open: questionType="open", options=[], correctOption="".',
     payload.allowPlot ? '' : plotInstructions,
+    payload.allowDiagram ? '' : diagramInstructions,
     'commandWord: the exact exam command word (e.g. Calculate/Explain/Evaluate/State). Never empty.',
     'isCalculation: true only if numeric calculation required.',
     'modelAnswer: full response earning full marks. Never empty.',
@@ -654,6 +728,9 @@ const buildPrompt = (
       : '',
     payload.allowPlot
       ? `MANDATORY: exactly ${Math.max(1, Math.min(2, Math.round(payload.questionCount * 0.2)))} of the ${payload.questionCount} questions in this set MUST have questionType="plot" with a fully populated plotSpec — this is a hard requirement, not optional. Choose the chart type genuinely implied by the topic/subtopic (e.g. "Scatter graphs and lines of best fit" → chartType="scatter"; "histograms with unequal class widths" → chartType="histogram"; "box plots" → chartType="boxPlot"). Do not skip this requirement.`
+      : '',
+    payload.allowDiagram
+      ? `MANDATORY: at least ${Math.max(1, Math.min(2, Math.round(payload.questionCount * 0.2)))} of the ${payload.questionCount} questions MUST have questionType="diagram" (an unfinished diagram for the student to complete). Prefer a matching diagramTemplate from the catalog above; fall back to freehand diagramSpec (kind="structural" for processes/relationships, kind="pictorial" only for simple recognizable labelled structures) only when no template fits. Do not skip this requirement.`
       : '',
     payload.paper ? `${payload.paper}. Only include content that is assessed on this paper of the specification, not content exclusive to another paper.` : '',
     payload.prompt ? `Prompt requirements: ${payload.prompt}` : '',

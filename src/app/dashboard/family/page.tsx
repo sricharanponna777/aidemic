@@ -137,15 +137,15 @@ export default function FamilyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Family</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+        <h1 className="text-2xl font-bold text-content dark:text-white">Family</h1>
+        <p className="mt-1 text-sm text-content-muted">
           Share an invite code with a parent or guardian so they can view your progress. They can never edit your data.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+      <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-semibold text-slate-800 dark:text-slate-100">Invite a parent</label>
+          <label className="text-sm font-semibold text-content-muted text-content">Invite a parent</label>
           <button type="button" onClick={handleGenerate} disabled={isGenerating} className={buttonStyles({ variant: 'primary', size: 'sm' })}>
             <Plus className="h-3.5 w-3.5" />
             {isGenerating ? 'Generating...' : 'New invite code'}
@@ -153,20 +153,20 @@ export default function FamilyPage() {
         </div>
 
         {pendingLinks.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No pending invite codes.</p>
+          <p className="mt-3 text-sm text-content-subtle">No pending invite codes.</p>
         ) : (
           <div className="mt-3 space-y-2">
             {pendingLinks.map((link) => (
               <div
                 key={link.id}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-white/6 dark:bg-white/3"
+                className="flex items-center justify-between rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 dark:bg-surface/3"
               >
                 <div className="flex flex-col">
-                  <span className="font-mono text-sm font-semibold uppercase tracking-widest text-slate-900 dark:text-slate-100">
+                  <span className="font-mono text-sm font-semibold uppercase tracking-widest text-content">
                     {link.invite_code}
                   </span>
                   {link.link_source === 'teacher' ? (
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Created by your teacher</span>
+                    <span className="text-xs text-content-subtle">Created by your teacher</span>
                   ) : null}
                 </div>
                 <div className="flex items-center gap-2">
@@ -195,9 +195,9 @@ export default function FamilyPage() {
       </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">Linked parents</h2>
+        <h2 className="mb-3 text-lg font-bold text-content dark:text-white">Linked parents</h2>
         {activeLinks.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+          <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
             No parent has linked to your account yet.
           </p>
         ) : (
@@ -205,16 +205,16 @@ export default function FamilyPage() {
             {activeLinks.map((link) => (
               <div
                 key={link.id}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/6 dark:bg-[#131B2E]"
+                className="flex items-center justify-between rounded-2xl border border-subtle bg-surface p-4 shadow-sm"
               >
                 <div className="flex items-center gap-2.5">
                   <Users className="h-4 w-4 text-indigo-500" />
                   <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <span className="text-sm font-semibold text-content">
                       {link.parent_profile?.full_name || link.parent_profile?.email || 'Linked parent'}
                     </span>
                     {link.link_source === 'teacher' ? (
-                      <span className="text-xs text-slate-500 dark:text-slate-400">Linked by your teacher</span>
+                      <span className="text-xs text-content-subtle">Linked by your teacher</span>
                     ) : null}
                   </div>
                 </div>

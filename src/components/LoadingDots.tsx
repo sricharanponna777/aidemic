@@ -14,7 +14,7 @@ export function LoadingDots() {
 /** Full-viewport centered loading state, matching the app background. */
 export function LoadingScreen() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef2fb] dark:bg-[#0A0F1E]">
+    <main className="flex min-h-screen items-center justify-center bg-canvas">
       <LoadingDots />
     </main>
   );

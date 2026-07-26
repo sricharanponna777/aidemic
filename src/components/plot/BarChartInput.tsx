@@ -133,7 +133,7 @@ export function BarChartInput({ spec, value, axisChoice, onChange, readOnly = fa
         <CategoryLabels spec={spec} />
       </PlotCanvas>
       {correctValues ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -144,7 +144,7 @@ export function BarChartInput({ spec, value, axisChoice, onChange, readOnly = fa
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">Drag each bar&apos;s handle up or down to the correct height.</p>
+        <p className="text-xs text-content-subtle">Drag each bar&apos;s handle up or down to the correct height.</p>
       )}
     </div>
   );

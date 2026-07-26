@@ -106,7 +106,7 @@ export function FrequencyPolygonInput({ spec, value, onChange, readOnly = false,
         )}
       </PlotCanvas>
       {correctValues ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-xs text-content-subtle">
           {readOnly && !value
             ? 'No answer was submitted for this question.'
             : (
@@ -117,7 +117,7 @@ export function FrequencyPolygonInput({ spec, value, onChange, readOnly = false,
             )}
         </p>
       ) : (
-        <p className="text-xs text-slate-500 dark:text-slate-400">Drag each point to (class midpoint, frequency), then they&apos;ll be joined into a polygon.</p>
+        <p className="text-xs text-content-subtle">Drag each point to (class midpoint, frequency), then they&apos;ll be joined into a polygon.</p>
       )}
     </div>
   );

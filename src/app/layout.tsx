@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Geist_Mono } from "next/font/google";
 import "katex/dist/katex.min.css";
 import "./globals.css";
@@ -17,8 +17,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AIDemic - AI-Powered Study Companion",
-  description: "Study smarter with AI-powered learning tools, flashcards, and personalized Flashcard reviews.",
+  metadataBase: new URL("https://aidemic.app"),
+  title: {
+    default: "AIDemic — AI Revision Coach",
+    template: "%s · AIDemic",
+  },
+  description:
+    "Plan your revision, generate spec-aware notes and flashcards, review with spaced repetition, and practise exam questions with instant AI feedback.",
+  applicationName: "AIDemic",
+  keywords: ["revision", "GCSE", "A-Level", "flashcards", "spaced repetition", "exam practice", "AI tutor"],
+  appleWebApp: {
+    capable: true,
+    title: "AIDemic",
+    statusBarStyle: "black-translucent",
+  },
+  openGraph: {
+    type: "website",
+    siteName: "AIDemic",
+    title: "AIDemic — AI Revision Coach",
+    description:
+      "Plan your revision, generate spec-aware notes and flashcards, review with spaced repetition, and practise exam questions with instant AI feedback.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AIDemic — AI Revision Coach",
+    description:
+      "Plan your revision, generate spec-aware notes and flashcards, review with spaced repetition, and practise exam questions with instant AI feedback.",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#eef2fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#0A0F1E" },
+  ],
 };
 
 const themeInitializer = `

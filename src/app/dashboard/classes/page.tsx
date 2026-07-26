@@ -115,19 +115,19 @@ export default function StudentClassesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Classes</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Join a class with an invite code from your teacher.</p>
+        <h1 className="text-2xl font-bold text-content dark:text-white">My Classes</h1>
+        <p className="mt-1 text-sm text-content-muted">Join a class with an invite code from your teacher.</p>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
-        <label className="text-sm font-semibold text-slate-800 dark:text-slate-100">Join a class</label>
+      <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+        <label className="text-sm font-semibold text-content-muted text-content">Join a class</label>
         <div className="mt-2 flex gap-2">
           <input
             type="text"
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
             placeholder="Enter invite code"
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono uppercase tracking-widest outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+            className="flex-1 rounded-lg border border-subtle px-3 py-2 text-sm font-mono uppercase tracking-widest outline-none focus:border-accent bg-surface text-content"
           />
           <button type="button" onClick={handleJoin} disabled={isJoining} className={buttonStyles({ variant: 'primary' })}>
             <LogIn className="h-4 w-4" />
@@ -138,7 +138,7 @@ export default function StudentClassesPage() {
       </div>
 
       {classes.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+        <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
           You haven&apos;t joined any classes yet.
         </p>
       ) : (
@@ -153,13 +153,13 @@ export default function StudentClassesPage() {
               <Link
                 key={cls.id}
                 href={`/dashboard/classes/${cls.id}`}
-                className="block rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-indigo-300 dark:border-white/6 dark:bg-[#131B2E] dark:hover:border-indigo-500/40"
+                className="block rounded-2xl border border-subtle bg-surface p-5 shadow-sm transition hover:border-indigo-300 dark:hover:border-indigo-500/40"
               >
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-indigo-500" />
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">{cls.name}</h3>
+                  <h3 className="font-semibold text-content">{cls.name}</h3>
                 </div>
-                <p className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-content-subtle">
                   {qualification ? <span>{qualification.name}</span> : null}
                   {board ? <span>· {board.name}</span> : null}
                   {subjectChain ? <span>· {subjectChain.name}</span> : null}

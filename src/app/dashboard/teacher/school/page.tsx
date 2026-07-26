@@ -163,29 +163,29 @@ export default function SchoolAdminPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/teacher/classes" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100">
+      <Link href="/dashboard/teacher/classes" className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100">
         <ArrowLeft className="h-3.5 w-3.5" />
         My Classes
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{schoolName}</h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Approve teachers requesting to join your school.</p>
+        <h1 className="text-2xl font-bold text-content dark:text-white">{schoolName}</h1>
+        <p className="mt-1 text-sm text-content-muted">Approve teachers requesting to join your school.</p>
       </div>
 
       {actionError ? <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p> : null}
 
       {pendingTeachers.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+        <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
           No pending teachers.
         </p>
       ) : (
         <div className="space-y-2">
           {pendingTeachers.map((teacher) => (
-            <div key={teacher.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+            <div key={teacher.id} className="flex items-center justify-between rounded-xl border border-subtle bg-surface px-4 py-3 shadow-sm">
               <div>
-                <p className="font-medium text-slate-900 dark:text-slate-100">{teacher.full_name || teacher.email || 'Teacher'}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="font-medium text-content">{teacher.full_name || teacher.email || 'Teacher'}</p>
+                <p className="text-xs text-content-subtle">
                   {teacher.email}
                   {teacher.department ? ` · ${teacher.department}` : ''}
                   {teacher.qualification_level ? ` · ${teacher.qualification_level}` : ''}
@@ -203,7 +203,7 @@ export default function SchoolAdminPage() {
                 <button
                   type="button"
                   onClick={() => handleDecision(teacher.id, 'rejected')}
-                  className="flex items-center gap-1 rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-300 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+                  className="flex items-center gap-1 rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-content-muted hover:bg-slate-300 dark:bg-surface/10 dark:hover:bg-surface/20"
                 >
                   <X className="h-3.5 w-3.5" />
                   Reject
@@ -215,10 +215,10 @@ export default function SchoolAdminPage() {
       )}
 
       <div>
-        <h2 className="mb-3 text-lg font-bold text-slate-900 dark:text-white">School roster</h2>
-        <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">Link a parent to any student at your school.</p>
+        <h2 className="mb-3 text-lg font-bold text-content dark:text-white">School roster</h2>
+        <p className="mb-3 text-sm text-content-muted">Link a parent to any student at your school.</p>
         {students.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+          <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
             No students enrolled yet.
           </p>
         ) : (
@@ -226,11 +226,11 @@ export default function SchoolAdminPage() {
             {students.map((student) => {
               const isExpanded = expandedParentStudentId === student.student_id;
               return (
-                <div key={student.student_id} className="rounded-lg border border-slate-200 dark:border-white/6">
+                <div key={student.student_id} className="rounded-lg border border-subtle">
                   <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                     <div>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{student.full_name || student.email || 'Student'}</span>
-                      <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{student.class_name}</span>
+                      <span className="font-medium text-content">{student.full_name || student.email || 'Student'}</span>
+                      <span className="ml-2 text-xs text-content-subtle">{student.class_name}</span>
                     </div>
                     <button
                       type="button"
@@ -242,7 +242,7 @@ export default function SchoolAdminPage() {
                     </button>
                   </div>
                   {isExpanded && (
-                    <div className="border-t border-slate-200 p-3 dark:border-white/6">
+                    <div className="border-t border-subtle p-3">
                       <ParentLinksPanel studentId={student.student_id} />
                     </div>
                   )}

@@ -20,26 +20,26 @@ type ButtonStyleOptions = {
 };
 
 const baseStyles =
-  'inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-[#0A0F1E] active:scale-[0.97]';
+  'inline-flex items-center justify-center gap-2 rounded-control text-body font-semibold transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.97]';
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'border border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg hover:shadow-indigo-500/40 dark:hover:shadow-indigo-500/60',
+    'border border-transparent bg-accent text-accent-fg shadow-card hover:bg-accent-hover hover:shadow-raised',
   secondary:
-    'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:border-white/15',
+    'border border-subtle bg-surface text-content-muted shadow-card hover:bg-surface-sunken hover:border-strong hover:text-content',
   subtle:
-    'border border-transparent bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/8 dark:text-slate-200 dark:hover:bg-white/12',
+    'border border-transparent bg-surface-sunken text-content-muted hover:bg-accent-muted hover:text-content',
   ghost:
-    'border border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/8 dark:hover:text-white',
+    'border border-transparent bg-transparent text-content-muted hover:bg-surface-sunken hover:text-content',
   danger:
-    'border border-red-600 bg-red-600 text-white shadow-sm hover:bg-red-700 hover:border-red-700',
+    'border border-transparent bg-danger text-white shadow-card hover:brightness-110 hover:shadow-raised',
   'danger-ghost':
-    'border border-transparent bg-transparent text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300',
+    'border border-transparent bg-transparent text-danger hover:bg-danger-muted',
   plain: '',
   default:
-    'border border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 hover:from-indigo-700 hover:to-purple-700',
+    'border border-transparent bg-accent text-accent-fg shadow-card hover:bg-accent-hover hover:shadow-raised',
   outline:
-    'border border-indigo-200 bg-white text-indigo-700 shadow-sm hover:bg-indigo-50 hover:border-indigo-300 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 dark:hover:border-indigo-500/40',
+    'border border-strong bg-accent-muted text-accent shadow-card hover:bg-accent hover:text-accent-fg hover:border-transparent',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

@@ -22,6 +22,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  PenLine,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -60,12 +61,14 @@ const STUDENT_NAV_GROUPS = [
     label: "Review",
     items: [
       { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
+      { href: "/dashboard/planner", label: "Planner", icon: CalendarDays },
     ],
   },
   {
     label: "Practice",
     items: [
       { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
+      { href: "/dashboard/blurt", label: "Blurting", icon: PenLine },
     ],
   },
   {
@@ -169,7 +172,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     navGroups.map((group, groupIndex) => (
       <div key={group.label ?? `group-${groupIndex}`} className={groupIndex === 0 ? undefined : "mt-2.5"}>
         {group.label && (
-          <p className="px-2.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">
+          <p className="px-2.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-content-subtle dark:text-content-subtle">
             {group.label}
           </p>
         )}
@@ -185,16 +188,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-all duration-200 group ${
                   active
                     ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 dark:shadow-indigo-500/40 dark:ring-1 dark:ring-indigo-400/30"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 hover:text-slate-900 dark:hover:text-white"
+                    : "text-content-muted hover:bg-slate-100 dark:hover:bg-surface/6 hover:text-content dark:hover:text-white"
                 }`}
               >
                 <Icon
                   className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                    active ? "text-white" : "text-slate-500 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-white"
+                    active ? "text-white" : "text-content-subtle dark:text-content-subtle group-hover:text-content-muted dark:group-hover:text-white"
                   }`}
                 />
                 {item.label}
-                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-white/70" />}
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-surface/70" />}
               </Link>
             );
           })}
@@ -204,7 +207,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A0F1E]">
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-indigo-500 animate-bounce" />
           <div className="h-2 w-2 rounded-full bg-purple-500 animate-bounce [animation-delay:0.15s]" />
@@ -219,20 +222,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const displayName = session.user.email?.split("@")[0] || "?";
 
   return (
-    <div className="min-h-screen bg-[#eef2fb] dark:bg-[#0A0F1E]">
+    <div className="min-h-screen bg-canvas">
 
       {/* Fixed sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col max-lg:hidden bg-white dark:bg-[#0D1324] border-r border-slate-200 dark:border-indigo-500/20 shadow-[2px_0_16px_-4px_rgba(99,102,241,0.08)] dark:shadow-[2px_0_28px_-4px_rgba(99,102,241,0.25)]">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col max-lg:hidden bg-surface dark:bg-[#0D1324] border-r border-subtle dark:border-indigo-500/20 shadow-[2px_0_16px_-4px_rgba(99,102,241,0.08)] dark:shadow-[2px_0_28px_-4px_rgba(99,102,241,0.25)]">
 
         {/* Brand */}
-        <div className="border-b border-slate-200 dark:border-white/6 px-5 py-5">
+        <div className="border-b border-subtle px-5 py-5">
           <Link href={homeHref} className="flex items-center gap-3 group">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30 group-hover:shadow-indigo-500/50 transition-shadow dark:animate-glow-pulse">
               <Zap className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-[17px] font-bold leading-none text-slate-900 dark:text-white">AIDemic</p>
-              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-400">
+              <p className="text-[17px] font-bold leading-none text-content dark:text-white">AIDemic</p>
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
                 AI Revision Coach
               </p>
             </div>
@@ -245,18 +248,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
 
         {/* User footer */}
-        <div className="border-t border-slate-200 dark:border-white/6 p-4">
+        <div className="border-t border-subtle p-4">
           <div className="mb-3 flex min-w-0 items-center gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-purple-600 text-xs font-bold uppercase text-white">
               {displayName[0]}
             </div>
-            <p className="truncate text-xs text-slate-600 dark:text-slate-400">{session.user.email}</p>
+            <p className="truncate text-xs text-content-muted">{session.user.email}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 hover:text-slate-700 dark:hover:text-white transition-all"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-content-subtle hover:bg-slate-100 dark:hover:bg-surface/6 hover:text-content-muted dark:hover:text-white transition-all"
               aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
               {theme === "dark" ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5 text-indigo-500" />}
@@ -265,7 +268,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               type="button"
               onClick={handleSignOut}
-              className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-all"
+              className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-content-subtle hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-all"
             >
               <LogOut className="h-3.5 w-3.5" />
               Sign out
@@ -275,7 +278,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Mobile top bar */}
-      <div className="lg:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-slate-200 dark:border-white/6 bg-white/90 dark:bg-[#0D1324]/90 backdrop-blur-xl px-4 py-3">
+      <div className="lg:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-subtle bg-surface/90 dark:bg-[#0D1324]/90 backdrop-blur-xl px-4 py-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -283,7 +286,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             aria-label="Open menu"
             aria-expanded={isMobileNavOpen}
             aria-controls="mobile-nav-drawer"
-            className="flex items-center justify-center rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 transition-colors"
+            className="flex items-center justify-center rounded-lg p-2 text-content-subtle hover:bg-slate-100 dark:hover:bg-surface/6 transition-colors"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -291,14 +294,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-indigo-500 to-purple-600">
               <Zap className="h-4 w-4 text-white" />
             </div>
-            <span className="text-base font-bold text-slate-900 dark:text-white">AIDemic</span>
+            <span className="text-base font-bold text-content dark:text-white">AIDemic</span>
           </Link>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={toggleTheme}
-            className="flex items-center justify-center rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 transition-colors"
+            className="flex items-center justify-center rounded-lg p-2 text-content-subtle hover:bg-slate-100 dark:hover:bg-surface/6 transition-colors"
             aria-label="Toggle theme"
           >
             {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-indigo-500" />}
@@ -306,7 +309,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <button
             type="button"
             onClick={handleSignOut}
-            className="flex items-center justify-center rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            className="flex items-center justify-center rounded-lg p-2 text-content-subtle hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-500 dark:hover:text-red-400 transition-colors"
             aria-label="Sign out"
           >
             <LogOut className="h-4 w-4" />
@@ -325,20 +328,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           />
           <div
             id="mobile-nav-drawer"
-            className="animate-slide-in-left absolute inset-y-0 left-0 flex w-72 max-w-[80vw] flex-col bg-white dark:bg-[#0D1324] shadow-2xl"
+            className="animate-slide-in-left absolute inset-y-0 left-0 flex w-72 max-w-[80vw] flex-col bg-surface dark:bg-[#0D1324] shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/6 px-5 py-5">
+            <div className="flex items-center justify-between border-b border-subtle px-5 py-5">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30">
                   <Zap className="h-5 w-5 text-white" />
                 </div>
-                <p className="text-[17px] font-bold leading-none text-slate-900 dark:text-white">AIDemic</p>
+                <p className="text-[17px] font-bold leading-none text-content dark:text-white">AIDemic</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsMobileNavOpen(false)}
                 aria-label="Close menu"
-                className="flex items-center justify-center rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/6 transition-colors"
+                className="flex items-center justify-center rounded-lg p-2 text-content-subtle hover:bg-slate-100 dark:hover:bg-surface/6 transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>

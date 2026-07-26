@@ -140,11 +140,11 @@ export default function ParentSubjectsPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-2.5">
         <BookOpen className="h-5 w-5 text-indigo-500" />
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Subjects</h2>
+        <h2 className="text-lg font-bold text-content dark:text-white">Subjects</h2>
       </div>
 
       {cards.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+        <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">
           No exam practice completed yet.
         </p>
       ) : (
@@ -152,12 +152,12 @@ export default function ParentSubjectsPage() {
           {cards.map((card) => (
             <div
               key={card.key}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]"
+              className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{getSubjectLabel(card.subject)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{card.attempts} attempts analysed</p>
+                  <p className="text-sm font-semibold text-content dark:text-white">{getSubjectLabel(card.subject)}</p>
+                  <p className="text-xs text-content-subtle">{card.attempts} attempts analysed</p>
                 </div>
                 <span
                   className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({
@@ -171,20 +171,20 @@ export default function ParentSubjectsPage() {
 
               <div className="mt-4 flex items-center gap-4 text-sm">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Avg score</p>
-                  <p className="font-semibold text-slate-900 dark:text-white">
+                  <p className="text-xs uppercase tracking-wide text-content-subtle dark:text-content-subtle">Avg score</p>
+                  <p className="font-semibold text-content dark:text-white">
                     {card.avgPercentage !== null ? `${card.avgPercentage}%` : '—'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Trend</p>
+                  <p className="text-xs uppercase tracking-wide text-content-subtle dark:text-content-subtle">Trend</p>
                   <p
                     className={`flex items-center gap-1 font-semibold ${
                       card.trend === 'improving'
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : card.trend === 'declining'
                           ? 'text-red-600 dark:text-red-400'
-                          : 'text-slate-500 dark:text-slate-400'
+                          : 'text-content-subtle'
                     }`}
                   >
                     {card.trend === 'improving' ? (
@@ -201,7 +201,7 @@ export default function ParentSubjectsPage() {
 
               {card.weakAreas.length > 0 ? (
                 <div className="mt-4">
-                  <p className="mb-2 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Weak areas</p>
+                  <p className="mb-2 text-xs uppercase tracking-wide text-content-subtle dark:text-content-subtle">Weak areas</p>
                   <div className="flex flex-wrap gap-1.5">
                     {card.weakAreas.map((w) => (
                       <span
@@ -221,12 +221,12 @@ export default function ParentSubjectsPage() {
 
       {notStarted.length > 0 ? (
         <div>
-          <p className="mb-2 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">Enrolled, no practice yet</p>
+          <p className="mb-2 text-xs uppercase tracking-wide text-content-subtle dark:text-content-subtle">Enrolled, no practice yet</p>
           <div className="flex flex-wrap gap-1.5">
             {notStarted.map((subject) => (
               <span
                 key={subject}
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
+                className="rounded-full border border-subtle bg-surface-sunken px-2.5 py-1 text-xs font-medium text-content-subtle dark:border-white/10 dark:bg-surface/5"
               >
                 {getSubjectLabel(subject)}
               </span>

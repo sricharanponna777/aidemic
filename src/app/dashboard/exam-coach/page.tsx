@@ -170,15 +170,15 @@ export default function ExamCoachPage() {
     <main className="space-y-6" aria-labelledby="exam-coach-title">
       <RevisionCycleStepper current="improve" />
 
-      <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Exam technique</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Exam technique</p>
             <div className="mt-2 flex items-center gap-3">
-              <Compass className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-              <h1 id="exam-coach-title" className="text-3xl font-bold text-slate-900 dark:text-white">Exam Coach</h1>
+              <Compass className="h-7 w-7 text-accent" />
+              <h1 id="exam-coach-title" className="text-3xl font-bold text-content dark:text-white">Exam Coach</h1>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+            <p className="mt-2 max-w-2xl text-sm text-content-muted">
               Patterns in why you keep losing marks, drawn from every Smart Practice attempt you&apos;ve marked so far.
             </p>
           </div>
@@ -189,9 +189,9 @@ export default function ExamCoachPage() {
       </section>
 
       {isLoading ? (
-        <p className="text-sm text-slate-500 dark:text-slate-400">Loading your practice history…</p>
+        <p className="text-sm text-content-subtle">Loading your practice history…</p>
       ) : !hasEnoughData ? (
-        <section className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600 dark:border-white/10 dark:bg-white/3 dark:text-slate-300">
+        <section className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-sm text-content-muted dark:bg-surface/3">
           Mark at least one Smart Practice attempt first — the coach needs real performance data to work from.
           <div className="mt-4">
             <Link href="/dashboard/ai-questions" className={buttonStyles({ variant: 'primary' })}>Go to Smart Practice</Link>
@@ -199,15 +199,15 @@ export default function ExamCoachPage() {
         </section>
       ) : (
         <>
-          <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Band distribution</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Across {analysis.totalQuestions} marked questions from your last {attempts.length} attempts.</p>
+          <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+            <h2 className="text-lg font-bold text-content">Band distribution</h2>
+            <p className="mt-1 text-sm text-content-muted">Across {analysis.totalQuestions} marked questions from your last {attempts.length} attempts.</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {analysis.bandDistribution.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">No per-question band data yet.</p>
+                <p className="text-sm text-content-subtle">No per-question band data yet.</p>
               ) : (
                 analysis.bandDistribution.map(({ band, count }) => (
-                  <span key={band} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${BAND_COLORS[band] || 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-200'}`}>
+                  <span key={band} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${BAND_COLORS[band] || 'bg-slate-100 text-content-muted dark:bg-surface/10'}`}>
                     {band}: {count}
                   </span>
                 ))
@@ -217,25 +217,25 @@ export default function ExamCoachPage() {
             {analysis.subjectStats.length > 0 ? (
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {analysis.subjectStats.map((s) => (
-                  <div key={s.subject} className="rounded-xl border border-slate-200 dark:border-white/6 p-3">
+                  <div key={s.subject} className="rounded-xl border border-subtle p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">{getSubjectLabel(s.subject)}</p>
+                      <p className="font-semibold text-content">{getSubjectLabel(s.subject)}</p>
                       {s.trend === 'improving' ? (
                         <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                       ) : s.trend === 'declining' ? (
                         <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
                       ) : null}
                     </div>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{s.avgPercentage}% avg · {s.attempts} attempt{s.attempts === 1 ? '' : 's'}</p>
+                    <p className="mt-1 text-sm text-content-muted">{s.avgPercentage}% avg · {s.attempts} attempt{s.attempts === 1 ? '' : 's'}</p>
                   </div>
                 ))}
               </div>
             ) : null}
           </section>
 
-          <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
+          <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Your report</h2>
+              <h2 className="text-lg font-bold text-content">Your report</h2>
               <button className={buttonStyles({ variant: 'primary' })} onClick={handleGenerate} disabled={isGenerating}>
                 <Sparkles className="h-4 w-4" />
                 {isGenerating ? 'Analysing...' : report ? 'Regenerate report' : 'Generate my exam-technique report'}
@@ -244,10 +244,10 @@ export default function ExamCoachPage() {
 
             {report ? (
               <div className="mt-5 space-y-5">
-                <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{report.headline}</p>
+                <p className="text-base font-semibold text-content">{report.headline}</p>
 
                 <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Why you&apos;re losing marks</h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-content-subtle">Why you&apos;re losing marks</h3>
                   <ul className="mt-2 space-y-2">
                     {report.patterns.map((pattern, index) => (
                       <li key={index} className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/20 dark:text-amber-200">
@@ -258,7 +258,7 @@ export default function ExamCoachPage() {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Do this next</h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-content-subtle">Do this next</h3>
                   <ul className="mt-2 space-y-2">
                     {report.nextSteps.map((step, index) => (
                       <li key={index} className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-900 dark:border-emerald-700/40 dark:bg-emerald-950/20 dark:text-emerald-200">
@@ -270,21 +270,21 @@ export default function ExamCoachPage() {
                 </div>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+              <p className="mt-4 text-sm text-content-muted">
                 Generate a report to see the recurring, mark-scheme-language patterns behind your lost marks and what to do about them this week.
               </p>
             )}
           </section>
 
           {analysis.topWeaknesses.length > 0 ? (
-            <section className="rounded-2xl border border-slate-200 dark:border-white/6 bg-white dark:bg-[#131B2E] p-6 shadow-sm dark:shadow-none">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Recurring weak areas</h2>
+            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+              <h2 className="text-lg font-bold text-content">Recurring weak areas</h2>
               <div className="mt-4 space-y-2">
                 {analysis.topWeaknesses.map((w) => (
-                  <div key={w.tag} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 dark:border-white/6 px-3 py-2">
-                    <span className="text-sm text-slate-800 dark:text-slate-200">{w.tag}</span>
+                  <div key={w.tag} className="flex items-center justify-between gap-3 rounded-lg border border-subtle px-3 py-2">
+                    <span className="text-sm text-content-muted dark:text-slate-200">{w.tag}</span>
                     <div className="flex shrink-0 items-center gap-2">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-content-muted dark:bg-surface/10">
                         seen {w.count}×
                       </span>
                       <Link

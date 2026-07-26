@@ -34,7 +34,7 @@ function Sparkline({ values }: { values: number[] }) {
   const height = 48;
   if (values.length < 2) {
     return (
-      <div className="flex h-12 items-center text-xs text-slate-400 dark:text-slate-500">
+      <div className="flex h-12 items-center text-xs text-content-subtle dark:text-content-subtle">
         Not enough attempts to chart a trend yet.
       </div>
     );
@@ -124,11 +124,11 @@ export default function ParentProgressPage() {
     <div className="space-y-4">
       <div className="flex items-center gap-2.5">
         <TrendingUp className="h-5 w-5 text-indigo-500" />
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Progress over time</h2>
+        <h2 className="text-lg font-bold text-content dark:text-white">Progress over time</h2>
       </div>
 
       {trends.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500 dark:border-white/6 dark:bg-white/3 dark:text-slate-400">
+        <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">
           No exam practice completed yet. Trends will appear here once your child starts practising.
         </p>
       ) : (
@@ -136,12 +136,12 @@ export default function ParentProgressPage() {
           {trends.map((item) => (
             <div
               key={item.key}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/6 dark:bg-[#131B2E]"
+              className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{getSubjectLabel(item.subject)}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-sm font-semibold text-content dark:text-white">{getSubjectLabel(item.subject)}</p>
+                  <p className="text-xs text-content-subtle">
                     {item.series.length} scored {item.series.length === 1 ? 'attempt' : 'attempts'}
                   </p>
                 </div>
@@ -160,7 +160,7 @@ export default function ParentProgressPage() {
               </div>
 
               <div className="mt-3 flex items-center justify-between text-xs">
-                <span className="text-slate-500 dark:text-slate-400">
+                <span className="text-content-subtle">
                   Latest: {item.latestPercentage !== null ? `${Math.round(item.latestPercentage)}%` : '—'}
                 </span>
                 {item.delta !== null ? (
@@ -170,7 +170,7 @@ export default function ParentProgressPage() {
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : item.delta < 0
                           ? 'text-red-600 dark:text-red-400'
-                          : 'text-slate-500 dark:text-slate-400'
+                          : 'text-content-subtle'
                     }`}
                   >
                     {item.delta > 0 ? '▲' : item.delta < 0 ? '▼' : '■'} {Math.abs(item.delta)}% since first

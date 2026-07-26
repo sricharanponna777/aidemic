@@ -105,7 +105,7 @@ export default function TeacherOnboardingPage() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#eef2fb] dark:bg-[#0A0F1E]">
+      <main className="flex min-h-screen items-center justify-center bg-canvas">
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 animate-bounce rounded-full bg-indigo-500" />
           <div className="h-2 w-2 animate-bounce rounded-full bg-purple-500 [animation-delay:0.15s]" />
@@ -118,19 +118,19 @@ export default function TeacherOnboardingPage() {
   if (!session) return null;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef2fb] px-4 py-8 dark:bg-[#0A0F1E] sm:px-6">
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-8 sm:px-6">
       <div className="w-full max-w-3xl">
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-white/6 dark:bg-[#131B2E]">
+        <section className="overflow-hidden rounded-2xl border border-subtle bg-surface p-8 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25 dark:animate-glow-pulse">
                 <Zap className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
                   Welcome to AIDemic
                 </p>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Tell us about your school.</h1>
+                <h1 className="text-3xl font-bold text-content dark:text-white">Tell us about your school.</h1>
               </div>
             </div>
             <button type="button" onClick={handleSignOut} className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
@@ -141,21 +141,21 @@ export default function TeacherOnboardingPage() {
 
           <div className="mt-8 space-y-4">
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                <SchoolIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <label className="flex items-center gap-2 text-sm font-semibold text-content-muted text-content">
+                <SchoolIcon className="h-4 w-4 text-accent" />
                 School
               </label>
 
               {selectedSchool ? (
-                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-white/6 dark:bg-white/3">
-                  <span className="font-medium text-slate-900 dark:text-slate-100">{selectedSchool.name}</span>
+                <div className="flex items-center justify-between rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 text-sm dark:bg-surface/3">
+                  <span className="font-medium text-content">{selectedSchool.name}</span>
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedSchool(null);
                       setSchoolQuery('');
                     }}
-                    className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                    className="text-xs font-medium text-accent hover:underline"
                   >
                     Change school
                   </button>
@@ -163,24 +163,24 @@ export default function TeacherOnboardingPage() {
               ) : (
                 <>
                   <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-subtle" />
                     <input
                       type="text"
                       value={schoolQuery}
                       onChange={(event) => setSchoolQuery(event.target.value)}
                       placeholder="Search for your school"
-                      className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                      className="w-full rounded-lg border border-subtle bg-surface py-2 pl-9 pr-3 text-sm text-content outline-none focus:border-accent"
                     />
                   </div>
 
                   {visibleSearchResults.length > 0 && (
-                    <div className="space-y-1 rounded-lg border border-slate-200 p-1.5 dark:border-white/6">
+                    <div className="space-y-1 rounded-lg border border-subtle p-1.5">
                       {visibleSearchResults.map((school) => (
                         <button
                           key={school.id}
                           type="button"
                           onClick={() => setSelectedSchool(school)}
-                          className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/6"
+                          className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm text-content-muted hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-surface/6"
                         >
                           {school.name}
                           {school.status === 'pending' ? (
@@ -195,7 +195,7 @@ export default function TeacherOnboardingPage() {
                     <button
                       type="button"
                       onClick={() => setShowRegisterForm(true)}
-                      className="text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                      className="text-xs font-medium text-accent hover:underline"
                     >
                       Can&apos;t find your school? Register it
                     </button>
@@ -206,7 +206,7 @@ export default function TeacherOnboardingPage() {
                         value={newSchoolName}
                         onChange={(event) => setNewSchoolName(event.target.value)}
                         placeholder="School name"
-                        className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                        className="flex-1 rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-content outline-none focus:border-accent"
                       />
                       <button
                         type="button"
@@ -223,7 +223,7 @@ export default function TeacherOnboardingPage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="department" className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <label htmlFor="department" className="text-sm font-semibold text-content-muted text-content">
                 Department
               </label>
               <input
@@ -232,12 +232,12 @@ export default function TeacherOnboardingPage() {
                 value={department}
                 onChange={(event) => setDepartment(event.target.value)}
                 placeholder="e.g. Science"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                className="w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-content outline-none focus:border-accent"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="qualificationLevel" className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <label htmlFor="qualificationLevel" className="text-sm font-semibold text-content-muted text-content">
                 Qualification level you teach
               </label>
               <input
@@ -246,7 +246,7 @@ export default function TeacherOnboardingPage() {
                 value={qualificationLevel}
                 onChange={(event) => setQualificationLevel(event.target.value)}
                 placeholder="e.g. GCSE, A-Level"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 dark:border-slate-600 dark:bg-[#0A0F1E] dark:text-slate-100"
+                className="w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-content outline-none focus:border-accent"
               />
             </div>
           </div>

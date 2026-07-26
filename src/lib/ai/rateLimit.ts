@@ -12,6 +12,7 @@ export const AI_DAILY_LIMITS = {
   studyChat: 100,
   classSummary: 20,
   examCoach: 15,
+  blurtReview: 20,
 } as const;
 
 // When the rate-limit RPC errors we fail OPEN by default: a transient DB hiccup

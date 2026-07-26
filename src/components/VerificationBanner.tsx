@@ -11,8 +11,8 @@ interface VerificationBannerProps {
 
 /** Shown on teacher dashboard pages while the teacher or their school hasn't
  * cleared verification yet. Students can't join classes until then (enforced
- * server-side by join_class_by_invite_code) -- this just explains why. A
- * teacher rejected at the account level can re-request review from here. */
+  * server-side by join_class_by_invite_code) -- this just explains why. A
+  * teacher rejected at the account level can re-request review from here. */
 export function VerificationBanner({ verificationStatus, schoolStatus }: VerificationBannerProps) {
   const [resubmitState, setResubmitState] = useState<'idle' | 'loading' | 'done'>('idle');
   const [resubmitError, setResubmitError] = useState('');
@@ -68,7 +68,7 @@ export function VerificationBanner({ verificationStatus, schoolStatus }: Verific
             type="button"
             onClick={handleResubmit}
             disabled={resubmitState === 'loading'}
-            className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700/50 dark:bg-transparent dark:text-amber-200 dark:hover:bg-amber-900/30"
+            className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-surface px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-60 dark:border-amber-700/50 dark:bg-transparent dark:text-amber-200 dark:hover:bg-amber-900/30"
           >
             {resubmitState === 'loading' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             Resubmit for review
