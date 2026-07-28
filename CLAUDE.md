@@ -5,15 +5,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-bun run dev      # Start dev server at http://localhost:3000
-bun run build    # Production build
-bun run start    # Start production server
-bun run lint     # ESLint 9 with Next.js config
+bun run dev        # Start dev server at http://localhost:3000
+bun run build      # Production build
+bun run start      # Start production server
+bun run lint       # ESLint 9 with Next.js config
+bun run typecheck  # tsc --noEmit
+bun run test       # Vitest, tests colocated as src/**/*.test.ts
 ```
 
 The package manager is **Bun** (not npm/yarn). Always use `bun` for installing packages.
 
-There is no test suite configured.
+Tests run on **Vitest** ([vitest.config.ts](vitest.config.ts)), colocated beside the module under test. `evals/` holds model-accuracy gates that only run with `RUN_EVALS=1`.
 
 ## Architecture
 

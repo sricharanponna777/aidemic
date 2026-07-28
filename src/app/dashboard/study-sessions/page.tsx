@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Brain, Clock3, Layers, Play, Rocket, RotateCcw }
 import { StudySession, FlashcardDeck, Flashcard } from '@/types';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase-client';
-import { updateSpacedRepetition, formatInterval, previewNextReview } from '@/lib/spacedRepetition';
+import { formatInterval, previewNextReview } from '@/lib/spacedRepetition';
 import { useAuth } from '@/hooks/useAuth';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
@@ -355,23 +355,21 @@ export default function StudySessions() {
     const card = cardsToReview[currentCardIndex];
     if (!card) return;
 
-    const prev = {
-      ease_factor: card.ease_factor || 2.5,
-      interval_days: card.interval_days || 0,
-      repetition_count: card.repetition_count || 0,
-      consecutive_correct: card.consecutive_correct || 0,
-      last_studied_at: card.last_studied_at || null,
-      next_review_date: card.next_review_date || null,
-      times_studied: card.times_studied || 0,
-      times_correct: card.times_correct || 0,
-    };
-    const updated = updateSpacedRepetition(prev, quality);
-    const supabase = createClient();
-    await supabase.from('flashcards').update(updated).eq('id', card.id).eq('deck_id', selectedDeckId);
+    // Graded server-side so the review can also emit Learning Spine evidence,
+    // which needs the service role the browser client does not have. The route
+    // returns the SM-2 update it applied so local state stays in step.
+    const response = await fetch('/api/flashcards/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardId: card.id, quality }),
+    });
+    const updated = response.ok ? (await response.json()).update : null;
 
-    setCardsToReview((prevCards) =>
-      prevCards.map((item, index) => (index === currentCardIndex ? { ...item, ...updated } : item))
-    );
+    if (updated) {
+      setCardsToReview((prevCards) =>
+        prevCards.map((item, index) => (index === currentCardIndex ? { ...item, ...updated } : item))
+      );
+    }
 
     const nextCardsStudied = cardsStudied + 1;
     const nextIndex = currentCardIndex + 1;
@@ -405,13 +403,12 @@ export default function StudySessions() {
 
   return (
     <main className="space-y-6" aria-labelledby="study-sessions-title">
-      <RevisionCycleStepper current="recall" />
+      <RevisionCycleStepper current="review" />
 
       <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 4 of 5</p>
-            <div className="mt-2 flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <Brain className="h-7 w-7 text-accent" />
               <h1 id="study-sessions-title" className="text-3xl font-bold text-content dark:text-white">Flashcard Revision</h1>
             </div>

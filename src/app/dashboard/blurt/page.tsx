@@ -71,6 +71,8 @@ export default function BlurtPage() {
           subject: getSubjectLabel(selectedSubject.subject),
           topic: topic.trim(),
           brainDump: dump.trim(),
+          examBoard: selectedSubject.exam_board,
+          examType: selectedSubject.exam_type,
         }),
       });
       const data = await response.json();

@@ -66,6 +66,3 @@ export const DIAGRAM_SYMBOL_PALETTES: Record<string, DiagramPalette> = {
 };
 
 export const getDiagramPalette = (paletteId: string): DiagramPalette | null => DIAGRAM_SYMBOL_PALETTES[paletteId] ?? null;
-
-export const isValidPaletteOption = (paletteId: string, optionId: string): boolean =>
-  getDiagramPalette(paletteId)?.options.some((option) => option.id === optionId) ?? false;

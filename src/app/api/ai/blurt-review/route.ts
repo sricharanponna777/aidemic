@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { tryCreateAdminClient } from '@/lib/supabase-admin';
+import { recordBlurtEvidence } from '@/lib/mastery/fromBlurt';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import {
   extractFromResponsesBody,
@@ -15,6 +17,9 @@ type BlurtPayload = {
   subject?: string;
   topic?: string;
   brainDump?: string;
+  /** Learning Spine resolution only; not part of the review prompt. */
+  examBoard?: string;
+  examType?: string;
 };
 
 type BlurtResult = {
@@ -76,6 +81,8 @@ export async function POST(request: Request) {
     const subject = txt(rawBody.subject || '', 80);
     const topic = txt(rawBody.topic || '', 160);
     const brainDump = txt(rawBody.brainDump || '', MAX_DUMP_CHARS);
+    const examBoard = txt(rawBody.examBoard || '', 40);
+    const examType = txt(rawBody.examType || '', 40);
 
     if (!topic) return NextResponse.json({ error: 'A topic is required.' }, { status: 400 });
     if (brainDump.trim().length < 20) {
@@ -158,10 +165,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'AI did not return a valid recall review.' }, { status: 502 });
     }
 
+    const covered = result.covered.slice(0, 10).map((s) => txt(s, 200));
+    const missed = result.missed.slice(0, 10).map((s) => txt(s, 200));
+    const misconceptions = result.misconceptions.slice(0, 6).map((s) => txt(s, 240));
+
+    // Dual-write to the Learning Spine. Deferred with after() because it makes a
+    // classification model call the student must not wait on, and skipped
+    // entirely without an exam board -- resolveTopic cannot scope a topic name
+    // to one specification without it, and a mis-scoped subtopic is worse than
+    // no evidence at all.
+    const spineClient = examBoard && examType ? tryCreateAdminClient() : null;
+    if (spineClient) {
+      const userId = authData.user.id;
+      after(() =>
+        recordBlurtEvidence(spineClient, userId, {
+          subject,
+          examBoard,
+          examType,
+          topic,
+          covered,
+          missed,
+          misconceptions,
+        })
+      );
+    }
+
     return NextResponse.json({
-      covered: result.covered.slice(0, 10).map((s) => txt(s, 200)),
-      missed: result.missed.slice(0, 10).map((s) => txt(s, 200)),
-      misconceptions: result.misconceptions.slice(0, 6).map((s) => txt(s, 240)),
+      covered,
+      missed,
+      misconceptions,
       coverageScore: result.coverageScore,
       summary: txt(result.summary, 240),
     });

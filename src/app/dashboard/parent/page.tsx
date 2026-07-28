@@ -8,10 +8,12 @@ import { calculateRetentionRate, calculateStudyStreak } from '@/lib/spacedRepeti
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { gradeBadgeTone } from '@/lib/gradeTone';
+import { rankWeaknesses, trendLabel, type RankedWeakness } from '@/lib/weaknesses';
 import { useLinkedChildren } from './ParentChildContext';
 
 type AttemptRow = {
   subject: string;
+  created_at?: string | null;
   exam_type?: string | null;
   weakness_tags?: string[] | null;
   weakness_analysis?: string[] | null;
@@ -32,7 +34,7 @@ type ChildMetrics = {
   studyStreak: number;
   retentionRate: number;
   assignmentsCompleted: number;
-  topWeaknesses: { tag: string; count: number }[];
+  topWeaknesses: RankedWeakness[];
 };
 
 const emptyMetrics: ChildMetrics = {
@@ -42,14 +44,6 @@ const emptyMetrics: ChildMetrics = {
   assignmentsCompleted: 0,
   topWeaknesses: [],
 };
-
-const normalizeInsightLabel = (value: string) =>
-  value
-    .replace(/^Main pattern to fix:\s*/i, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\.$/, '')
-    .trim()
-    .slice(0, 70);
 
 export default function ParentOverviewPage() {
   const supabase = createClient();
@@ -67,7 +61,7 @@ export default function ParentOverviewPage() {
       const [attemptsResponse, sessionsResponse, cardsResponse, attemptStatusResponse] = await Promise.all([
         supabase
           .from('exam_practice_attempts')
-          .select('subject, exam_type, weakness_tags, weakness_analysis, predicted_grade, total_marks_awarded, total_available_marks')
+          .select('subject, created_at, exam_type, weakness_tags, weakness_analysis, predicted_grade, total_marks_awarded, total_available_marks')
           .eq('user_id', selectedStudentId)
           .order('created_at', { ascending: false })
           .limit(50),
@@ -82,7 +76,7 @@ export default function ParentOverviewPage() {
       const deckIds = ((cardsResponse.data ?? []) as Array<{ id: string }>).map((d) => d.id);
       const cardsRows =
         deckIds.length > 0
-          ? await supabase.from('flashcards').select('repetition_count, consecutive_correct').in('deck_id', deckIds)
+          ? await supabase.from('flashcards').select('times_studied, times_correct').in('deck_id', deckIds)
           : { data: [] };
 
       const subjectGroups = new Map<string, AttemptRow[]>();
@@ -99,19 +93,14 @@ export default function ParentOverviewPage() {
         .filter((item) => item.grade !== 'N/A')
         .sort((a, b) => a.subject.localeCompare(b.subject));
 
-      const tagMap = new Map<string, number>();
-      for (const attempt of attempts) {
-        const rawInsights = (attempt.weakness_tags?.length ? attempt.weakness_tags : attempt.weakness_analysis) ?? [];
-        for (const tag of rawInsights) {
-          const norm = normalizeInsightLabel(tag);
-          if (!norm) continue;
-          tagMap.set(norm, (tagMap.get(norm) ?? 0) + 1);
-        }
-      }
-      const topWeaknesses = [...tagMap.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([tag, count]) => ({ tag, count }));
+      const topWeaknesses = rankWeaknesses(
+        attempts.map((attempt) => ({
+          createdAt: attempt.created_at ?? null,
+          subject: attempt.subject,
+          tags: (attempt.weakness_tags?.length ? attempt.weakness_tags : attempt.weakness_analysis) ?? [],
+        })),
+        { limit: 5 }
+      );
 
       const sessionDates = ((sessionsResponse.data ?? []) as Array<{ started_at: string | null }>)
         .map((s) => (s.started_at ? new Date(s.started_at).getTime() : NaN))
@@ -119,7 +108,7 @@ export default function ParentOverviewPage() {
       const studyStreak = calculateStudyStreak(sessionDates);
 
       const retentionRate = calculateRetentionRate(
-        (cardsRows.data ?? []) as Array<{ repetition_count: number; consecutive_correct: number }>
+        (cardsRows.data ?? []) as Array<{ times_studied: number; times_correct: number }>
       );
 
       const assignmentsCompleted = ((attemptStatusResponse.data ?? []) as Array<{ status: string }>).filter(
@@ -214,7 +203,7 @@ export default function ParentOverviewPage() {
                 key={weakness.tag}
                 className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-300"
               >
-                {weakness.tag} · {weakness.count}×
+                {weakness.tag} · {weakness.count}× · {trendLabel(weakness.trend)}
               </span>
             ))}
           </div>

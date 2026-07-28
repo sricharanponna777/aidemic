@@ -200,6 +200,7 @@ export default function AIFlashcardsPage() {
           name: deckName.trim() || undefined,
           description: description.trim(),
           topic: topic.trim(),
+          topicId: selectedTopicOption?.id ?? undefined,
           subtopic: subtopic.trim() || undefined,
           learningObjective: learningObjective || undefined,
           paper: paper || undefined,
@@ -237,8 +238,7 @@ export default function AIFlashcardsPage() {
       <section className="overflow-hidden rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 3 of 5</p>
-            <div className="mt-2 flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <Sparkles className="h-7 w-7 text-accent" />
               <h1 id="ai-flashcards-title" className="text-3xl font-bold text-content dark:text-white">
                 AI Flashcards

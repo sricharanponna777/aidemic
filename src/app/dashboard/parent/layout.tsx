@@ -91,7 +91,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
           <Users className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-content-muted" />
           <p className="font-semibold text-content-muted dark:text-slate-200">No linked children yet</p>
           <p className="mt-1 text-sm text-content-subtle">
-            Ask your child to open Family in their AIDemic dashboard and share their invite code, then add it above.
+            Ask your child to open Invite Parent in their AIDemic dashboard and share their invite code, then add it above.
           </p>
         </div>
       ) : (

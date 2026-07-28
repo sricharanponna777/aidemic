@@ -1,13 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import { buildClassStats, buildStudentStats, buildTopicStats } from '@/lib/teacherAnalytics';
 import { scoreBadgeTone, scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
+import { MASTERY_LABEL, masteryBadgeTone } from '@/lib/masteryTone';
+import { readClassMastery, readSpecificationTopics, type ClassMastery } from '@/lib/mastery/read';
+import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
 
 type Tab = 'class' | 'individual' | 'predictions';
+
+type SpecTopic = { topicId: string; topicName: string };
+
+/** Module-level so "no data" keeps a stable identity across renders. */
+const EMPTY_MASTERY: ClassMastery = { subtopics: [], cells: new Map() };
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'class', label: 'Class reports' },
@@ -28,10 +36,10 @@ export default function TeacherReportsPage() {
 
   const activeClasses = classes.filter((c) => c.status !== 'archived');
   const effectiveClassId = classId || activeClasses[0]?.id || '';
-  const topicStats = useMemo(
-    () => (loading || !effectiveClassId ? [] : buildTopicStats(data, effectiveClassId)),
-    [loading, data, effectiveClassId]
-  );
+  // Not hand-memoized: effectiveClassId now also feeds the subtopic-mastery
+  // fetch below, and React Compiler cannot preserve a manual useMemo whose
+  // dependency crosses into an opaque call. It memoizes this automatically.
+  const topicStats = loading || !effectiveClassId ? [] : buildTopicStats(data, effectiveClassId);
   const classStudents = studentStats.filter((s) => s.class_id === effectiveClassId);
   const effectiveStudentId = studentId || classStudents[0]?.student_id || '';
   const selectedStudent = classStudents.find((s) => s.student_id === effectiveStudentId);
@@ -69,6 +77,64 @@ export default function TeacherReportsPage() {
       .sort((a, b) => a.points[a.points.length - 1].percentage - b.points[b.points.length - 1].percentage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveStudentId, effectiveClassId, assignments, attempts]);
+
+  // Subtopic mastery heatmap. Scoped to one topic at a time: a GCSE
+  // specification runs to a few hundred subtopics, and showing every one would
+  // be unreadable, while showing only those with evidence would hide the most
+  // useful cell of all -- a subtopic you taught that nobody has been measured on.
+  const selectedClass = activeClasses.find((c) => c.id === effectiveClassId);
+  const specificationId = selectedClass?.specification_id ?? '';
+
+  // Both fetches stash what they were fetched FOR alongside the result, so the
+  // render can tell fresh data from stale rather than an effect having to clear
+  // it. That keeps every setState inside an async callback -- a synchronous
+  // setState in an effect body makes the React Compiler bail on the component.
+  const [topicsFetch, setTopicsFetch] = useState<{ specId: string; topics: SpecTopic[] }>({
+    specId: '',
+    topics: [],
+  });
+  const [masteryFetch, setMasteryFetch] = useState<{ key: string; value: ClassMastery }>({
+    key: '',
+    value: EMPTY_MASTERY,
+  });
+  const [masteryTopicId, setMasteryTopicId] = useState('');
+
+  const specTopics = topicsFetch.specId === specificationId ? topicsFetch.topics : [];
+  // A joined string rather than the array: classStudents is rebuilt every
+  // render, so a stable primitive is what keeps the fetch from re-running.
+  const rosterKey = classStudents.map((s) => s.student_id).join(',');
+  // Falls back to the first topic whenever the selection is not in this
+  // class's list, which is what makes switching class need no reset.
+  const effectiveMasteryTopicId = specTopics.some((t) => t.topicId === masteryTopicId)
+    ? masteryTopicId
+    : specTopics[0]?.topicId ?? '';
+  const masteryKey = `${effectiveMasteryTopicId}|${rosterKey}`;
+  const classMastery = masteryFetch.key === masteryKey ? masteryFetch.value : EMPTY_MASTERY;
+
+  useEffect(() => {
+    if (!specificationId) return;
+    let cancelled = false;
+    void readSpecificationTopics(createClient(), specificationId).then((topics) => {
+      if (!cancelled) setTopicsFetch({ specId: specificationId, topics });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [specificationId]);
+
+  useEffect(() => {
+    if (!effectiveMasteryTopicId || !rosterKey) return;
+    let cancelled = false;
+    void readClassMastery(createClient(), {
+      topicId: effectiveMasteryTopicId,
+      studentIds: rosterKey.split(','),
+    }).then((value) => {
+      if (!cancelled) setMasteryFetch({ key: `${effectiveMasteryTopicId}|${rosterKey}`, value });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveMasteryTopicId, rosterKey]);
 
   const weaknessHeatmap = useMemo(() => {
     if (loading) return { topics: [], classNames: [] as string[], cellByKey: new Map<string, number | null>() };
@@ -225,6 +291,106 @@ export default function TeacherReportsPage() {
                             })}
                           </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+
+              {/* Subtopic mastery: measured per student from every practice
+                  surface, not just the assignments this class was set. */}
+              <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-lg font-semibold text-content">Subtopic mastery</h2>
+                    <p className="mt-1 text-sm text-content-subtle">
+                      Where each student stands on every subtopic of one topic.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <select value={effectiveClassId} onChange={(e) => setClassId(e.target.value)} className={selectClass}>
+                      {activeClasses.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={effectiveMasteryTopicId}
+                      onChange={(e) => setMasteryTopicId(e.target.value)}
+                      className={selectClass}
+                      disabled={specTopics.length === 0}
+                    >
+                      {specTopics.map((topic) => (
+                        <option key={topic.topicId} value={topic.topicId}>
+                          {topic.topicName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {!selectedClass?.specification_id ? (
+                  <p className="mt-4 text-sm text-content-subtle">
+                    This class has no specification set, so there are no subtopics to measure against.
+                  </p>
+                ) : classStudents.length === 0 ? (
+                  <p className="mt-4 text-sm text-content-subtle">No students in this class yet.</p>
+                ) : classMastery.subtopics.length === 0 ? (
+                  <p className="mt-4 text-sm text-content-subtle">No subtopics found for this topic.</p>
+                ) : (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full min-w-130 text-sm">
+                      <thead>
+                        <tr className="border-b border-subtle text-left text-xs uppercase tracking-wide text-content-subtle">
+                          <th className="pb-2 pr-4 font-medium">Subtopic</th>
+                          {classStudents.map((student) => (
+                            <th key={student.student_id} className="pb-2 pr-4 text-center font-medium">
+                              {student.name || student.email || 'Student'}
+                            </th>
+                          ))}
+                          <th className="pb-2 font-medium">Class</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {classMastery.subtopics.map((subtopic) => {
+                          const cells = classStudents.map((student) =>
+                            classMastery.cells.get(`${student.student_id}:${subtopic.subtopicId}`)
+                          );
+                          const weak = cells.filter((cell) => cell?.band === 'weak').length;
+                          const unmeasured = cells.filter((cell) => !cell || cell.band === 'unknown').length;
+
+                          return (
+                            <tr key={subtopic.subtopicId} className="border-b border-slate-100 last:border-0 dark:border-white/4">
+                              <td className="py-2.5 pr-4 font-medium text-content-muted dark:text-slate-200">
+                                {subtopic.subtopicName}
+                              </td>
+                              {cells.map((cell, index) => (
+                                <td key={classStudents[index].student_id} className="py-2 pr-4 text-center">
+                                  <span
+                                    className={`inline-block min-w-12 rounded-full px-2 py-0.5 text-xs font-semibold ${masteryBadgeTone(
+                                      cell?.band ?? 'unknown'
+                                    )}`}
+                                    title={cell ? MASTERY_LABEL[cell.band] : MASTERY_LABEL.unknown}
+                                  >
+                                    {/* Grey dash for anything below the confidence
+                                        floor: untested must not read as weak. */}
+                                    {!cell || cell.band === 'unknown'
+                                      ? '—'
+                                      : `${Math.round(cell.retrievability * 100)}%`}
+                                  </span>
+                                </td>
+                              ))}
+                              {/* Counts, not a mean: averaging across students
+                                  whose estimates carry different confidence
+                                  would invent precision the model does not have. */}
+                              <td className="py-2 text-xs text-content-subtle">
+                                {weak > 0 ? `${weak} weak` : 'none weak'}
+                                {unmeasured > 0 ? ` · ${unmeasured} not measured` : ''}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

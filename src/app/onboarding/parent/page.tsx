@@ -90,7 +90,7 @@ export default function ParentOnboardingPage() {
               Family invite code
             </label>
             <p className="text-sm text-content-muted">
-              Ask your child to open Family in their AIDemic dashboard and share their invite code with you.
+              Ask your child to open Invite Parent in their AIDemic dashboard and share their invite code with you.
             </p>
             <input
               id="inviteCode"

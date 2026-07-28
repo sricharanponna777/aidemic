@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ToastProvider';
 import { createClient } from '@/lib/supabase-client';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { rankWeaknesses, trendLabel } from '@/lib/weaknesses';
 
 const ATTEMPT_LOOKBACK = 40;
 const RECENT_WINDOW = 5;
@@ -36,14 +37,6 @@ type AttemptRow = {
 };
 
 type CoachResult = { headline: string; patterns: string[]; nextSteps: string[] };
-
-const normalizeInsightLabel = (value: string) =>
-  value
-    .replace(/^Main pattern to fix:\s*/i, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\.$/, '')
-    .trim()
-    .slice(0, 90);
 
 export default function ExamCoachPage() {
   const { session } = useAuth();
@@ -79,7 +72,6 @@ export default function ExamCoachPage() {
 
   const analysis = useMemo(() => {
     const bandCounts = new Map<string, number>();
-    const weaknessMap = new Map<string, { count: number; subjects: Set<string> }>();
     const subjectGroups = new Map<string, AttemptRow[]>();
     let totalQuestions = 0;
 
@@ -91,26 +83,22 @@ export default function ExamCoachPage() {
         totalQuestions += 1;
         if (answer.band) bandCounts.set(answer.band, (bandCounts.get(answer.band) || 0) + 1);
       }
-
-      const rawInsights = (attempt.weakness_tags?.length ? attempt.weakness_tags : attempt.weakness_analysis) ?? [];
-      for (const tag of rawInsights) {
-        const norm = normalizeInsightLabel(tag);
-        if (!norm) continue;
-        const entry = weaknessMap.get(norm) ?? { count: 0, subjects: new Set<string>() };
-        entry.count += 1;
-        entry.subjects.add(attempt.subject);
-        weaknessMap.set(norm, entry);
-      }
     }
 
     const bandDistribution = BAND_ORDER
       .map((band) => ({ band, count: bandCounts.get(band) || 0 }))
       .filter((entry) => entry.count > 0);
 
-    const topWeaknesses = [...weaknessMap.entries()]
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 8)
-      .map(([tag, { count, subjects }]) => ({ tag, count, subjects: [...subjects] }));
+    // Recency-weighted, so coaching targets what is still going wrong rather
+    // than whatever was most common across the student's whole history.
+    const topWeaknesses = rankWeaknesses(
+      attempts.map((attempt) => ({
+        createdAt: attempt.created_at,
+        subject: attempt.subject,
+        tags: (attempt.weakness_tags?.length ? attempt.weakness_tags : attempt.weakness_analysis) ?? [],
+      })),
+      { limit: 8 }
+    );
 
     const subjectStats = [...subjectGroups.entries()].map(([subject, group]) => {
       const sorted = [...group].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
@@ -285,7 +273,7 @@ export default function ExamCoachPage() {
                     <span className="text-sm text-content-muted dark:text-slate-200">{w.tag}</span>
                     <div className="flex shrink-0 items-center gap-2">
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-content-muted dark:bg-surface/10">
-                        seen {w.count}×
+                        seen {w.count}× · {trendLabel(w.trend)}
                       </span>
                       <Link
                         href={`/dashboard/ai-questions?topic=${encodeURIComponent(w.tag)}`}

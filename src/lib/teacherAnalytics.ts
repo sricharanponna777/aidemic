@@ -63,9 +63,11 @@ export function buildStudentStats(data: Data): StudentStat[] {
   return data.students.map((student) => {
     const classAssignments = assignmentsByClass.get(student.class_id) ?? [];
     const scores: number[] = [];
-    const grades: string[] = [];
     let completedCount = 0;
     let lastActivity: Date | null = null;
+    // Track the grade alongside when it was earned: `classAssignments` arrives
+    // newest-first, so picking by array position surfaced the oldest grade.
+    let latestGrade: { grade: string; at: number } | null = null;
 
     for (const assignment of classAssignments) {
       const attempt = (attemptsByAssignment.get(assignment.id) ?? []).find((a) => a.student_id === student.student_id);
@@ -78,7 +80,13 @@ export function buildStudentStats(data: Data): StudentStat[] {
       if (attempt.status !== 'completed') continue;
       completedCount += 1;
       if (typeof attempt.percentage === 'number') scores.push(attempt.percentage);
-      if (attempt.predicted_grade) grades.push(attempt.predicted_grade);
+      if (attempt.predicted_grade) {
+        const completedAt = new Date(attempt.completed_at ?? attempt.started_at ?? 0).getTime();
+        const at = Number.isFinite(completedAt) ? completedAt : 0;
+        // Strict `>` so that when timestamps tie (or are all missing) the
+        // newest assignment wins, matching the newest-first input order.
+        if (!latestGrade || at > latestGrade.at) latestGrade = { grade: attempt.predicted_grade, at };
+      }
     }
 
     return {
@@ -90,7 +98,7 @@ export function buildStudentStats(data: Data): StudentStat[] {
       assignedCount: classAssignments.length,
       completedCount,
       avgScore: average(scores),
-      predictedGrade: grades.length > 0 ? grades[grades.length - 1] : null,
+      predictedGrade: latestGrade?.grade ?? null,
       lastActivity,
     };
   });
@@ -130,7 +138,9 @@ export function buildClassStats(data: Data): ClassStat[] {
       status: cls.status,
       rosterSize,
       assignmentCount,
-      completionRate: expected > 0 ? Math.round(((completed?.completed ?? 0) / expected) * 100) : null,
+      // Clamped: a student who completes work and then leaves the class keeps
+      // their attempt while the roster shrinks, which can push this over 100%.
+      completionRate: expected > 0 ? Math.min(100, Math.round(((completed?.completed ?? 0) / expected) * 100)) : null,
       avgScore: average(completed?.scores ?? []),
     };
   });
@@ -209,7 +219,7 @@ export function buildAssignmentStats(data: Data): Map<string, AssignmentStat> {
       assignment_id: a.id,
       completedCount: completed.length,
       rosterSize,
-      completionRate: rosterSize > 0 ? Math.round((completed.length / rosterSize) * 100) : null,
+      completionRate: rosterSize > 0 ? Math.min(100, Math.round((completed.length / rosterSize) * 100)) : null,
       avgScore: average(completed.filter((att) => typeof att.percentage === 'number').map((att) => att.percentage as number)),
     });
   }

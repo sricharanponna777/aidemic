@@ -128,7 +128,7 @@ export default function FamilyPage() {
   };
 
   if (isLoading || linksLoading) {
-    return <PageLoader text="Loading your family settings..." />;
+    return <PageLoader text="Loading your invite settings..." />;
   }
 
   const activeLinks = links.filter((link) => link.status === 'active');
@@ -137,7 +137,7 @@ export default function FamilyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">Family</h1>
+        <h1 className="text-2xl font-bold text-content dark:text-white">Invite Parent</h1>
         <p className="mt-1 text-sm text-content-muted">
           Share an invite code with a parent or guardian so they can view your progress. They can never edit your data.
         </p>

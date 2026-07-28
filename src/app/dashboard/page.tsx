@@ -24,6 +24,7 @@ import { RevisionCycleStepper } from "@/components/RevisionCycleStepper";
 import { DEFAULT_STUDY_GOALS, fetchStudyGoals } from "@/lib/studyGoals";
 import { BarChart } from "@/components/ui/charts";
 import { countLeeches } from "@/lib/leeches";
+import { rankWeaknesses, trendLabel, type RankedWeakness } from "@/lib/weaknesses";
 
 type RecentSession = {
   id: string;
@@ -47,11 +48,7 @@ type RecentPracticeAttempt = {
   attemptMode: string | null;
 };
 
-type WeaknessEntry = {
-  tag: string;
-  count: number;
-  subjects: string[];
-};
+type WeaknessEntry = RankedWeakness;
 
 type SubjectPredictedGrade = {
   subject: string;
@@ -117,7 +114,7 @@ type DashboardSubjectRow = {
 };
 
 type DashboardDeckRow = Pick<FlashcardDeck, "id" | "card_count">;
-type DashboardCardRow = Pick<Flashcard, "deck_id" | "next_review_date" | "times_studied" | "repetition_count" | "consecutive_correct">;
+type DashboardCardRow = Pick<Flashcard, "deck_id" | "next_review_date" | "times_studied" | "times_correct" | "repetition_count" | "consecutive_correct">;
 type DashboardSessionRow = Pick<StudySession, "id" | "started_at" | "duration_minutes" | "cards_studied"> & {
   flashcard_decks?: { name?: string } | Array<{ name?: string }> | null;
 };
@@ -226,13 +223,20 @@ const buildActivitySeries = (
   return series;
 };
 
-const normalizeInsightLabel = (value: string) =>
-  value
-    .replace(/^Main pattern to fix:\s*/i, "")
-    .replace(/\s+/g, " ")
-    .replace(/\.$/, "")
-    .trim()
-    .slice(0, 70);
+const weaknessTrendStyles = (trend: RankedWeakness["trend"]) => {
+  const tone =
+    trend === "worsening"
+      ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+      : trend === "improving"
+        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+        : trend === "new"
+          ? "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300"
+          : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200";
+  return `shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone}`;
+};
+
+const formatLastSeen = (daysAgo: number) =>
+  daysAgo <= 0 ? "last seen today" : daysAgo === 1 ? "last seen yesterday" : `last seen ${daysAgo}d ago`;
 
 export default function Dashboard() {
   const { session, profile, isLoading: isAuthLoading } = useAuth();
@@ -274,7 +278,7 @@ export default function Dashboard() {
           deckIds.length > 0
             ? supabase
                 .from("flashcards")
-                .select("deck_id, next_review_date, times_studied, repetition_count, consecutive_correct")
+                .select("deck_id, next_review_date, times_studied, times_correct, repetition_count, consecutive_correct")
                 .in("deck_id", deckIds)
             : Promise.resolve({ data: [], error: null }),
           supabase
@@ -312,22 +316,15 @@ export default function Dashboard() {
         ) as DashboardSubjectRow[];
         const latestAttempt = attempts[0];
         const primaryExamType = (attempts[0]?.exam_type === "a-level" ? "a-level" : attempts.length > 0 ? "gcse" : null) as "gcse" | "a-level" | null;
-        const tagMap = new Map<string, { count: number; subjects: Set<string> }>();
-        for (const attempt of attempts) {
-          const rawInsights = (attempt.weakness_tags?.length ? attempt.weakness_tags : attempt.weakness_analysis) ?? [];
-          for (const tag of rawInsights) {
-            const norm = normalizeInsightLabel(tag);
-            if (!norm) continue;
-            const entry = tagMap.get(norm) ?? { count: 0, subjects: new Set() };
-            entry.count += 1;
-            entry.subjects.add(attempt.subject);
-            tagMap.set(norm, entry);
-          }
-        }
-        const topWeaknesses: WeaknessEntry[] = [...tagMap.entries()]
-          .sort((a, b) => b[1].count - a[1].count)
-          .slice(0, 6)
-          .map(([tag, { count, subjects }]) => ({ tag, count, subjects: [...subjects] }));
+        // Recency-weighted so the headline weakness reflects what is costing
+        // marks now, not whatever was most common over the student's lifetime.
+        const topWeaknesses: WeaknessEntry[] = rankWeaknesses(
+          attempts.map((attempt) => ({
+            createdAt: attempt.created_at ?? null,
+            subject: attempt.subject,
+            tags: (attempt.weakness_tags?.length ? attempt.weakness_tags : attempt.weakness_analysis) ?? [],
+          }))
+        );
         const recentPracticeAttempts: RecentPracticeAttempt[] = attempts.slice(0, 5).map((attempt) => ({
           id: attempt.id,
           topic: attempt.topic || "Practice attempt",
@@ -419,7 +416,7 @@ export default function Dashboard() {
           sessions.map((s) => new Date(s.startedAt).getTime()).filter((t) => Number.isFinite(t))
         );
         const retentionRate = calculateRetentionRate(
-          cards.map((c) => ({ repetition_count: c.repetition_count || 0, consecutive_correct: c.consecutive_correct || 0 }))
+          cards.map((c) => ({ times_studied: c.times_studied || 0, times_correct: c.times_correct || 0 }))
         );
         const todayKey = now.toDateString();
         const cardsStudiedToday = sessions
@@ -791,11 +788,17 @@ export default function Dashboard() {
                 <div className="mt-5 flex-1">
                   {metrics.topWeaknesses[0] ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/25 dark:bg-amber-500/10">
-                      <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                        Your most common weak area: &ldquo;{metrics.topWeaknesses[0].tag}&rdquo;
-                      </p>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                          Focus on this next: &ldquo;{metrics.topWeaknesses[0].tag}&rdquo;
+                        </p>
+                        <span className={weaknessTrendStyles(metrics.topWeaknesses[0].trend)}>
+                          {trendLabel(metrics.topWeaknesses[0].trend)}
+                        </span>
+                      </div>
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                        {metrics.topWeaknesses[0].subjects.map(getSubjectLabel).join(", ")} · seen {metrics.topWeaknesses[0].count}×
+                        {metrics.topWeaknesses[0].subjects.map(getSubjectLabel).join(", ")} · seen {metrics.topWeaknesses[0].count}× ·{" "}
+                        {formatLastSeen(metrics.topWeaknesses[0].lastSeenDaysAgo)}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button

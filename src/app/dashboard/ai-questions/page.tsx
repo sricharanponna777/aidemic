@@ -206,12 +206,18 @@ function ssWrite(key: string, value: unknown) {
 // recommendation) can link here with ?subjectId=...&topic=... to jump straight into a
 // pre-filled practice setup. Read once via lazy useState initializers below, so the
 // deep link overrides whatever was restored from sessionStorage without needing an effect.
-function readDeepLinkParams(): { subjectId: string; topic: string } {
+function readDeepLinkParams(): { subjectId: string; topic: string; subtopic: string } {
   try {
     const params = new URLSearchParams(window.location.search);
-    return { subjectId: params.get('subjectId') || '', topic: params.get('topic') || '' };
+    return {
+      subjectId: params.get('subjectId') || '',
+      topic: params.get('topic') || '',
+      // Daily Review sends this when the Learning Spine identified the gap at
+      // subtopic level, so practice starts on the exact weak subtopic.
+      subtopic: params.get('subtopic') || '',
+    };
   } catch {
-    return { subjectId: '', topic: '' };
+    return { subjectId: '', topic: '', subtopic: '' };
   }
 }
 
@@ -345,7 +351,9 @@ export default function AIQuestionsPage() {
   const [form, setForm] = useState<AIGenerateForm>(() => {
     const deepLink = readDeepLinkParams();
     const base = ssRead<AIGenerateForm>(SS_FORM, defaultForm);
-    return deepLink.topic ? { ...base, topic: deepLink.topic } : base;
+    return deepLink.topic
+      ? { ...base, topic: deepLink.topic, subtopic: deepLink.subtopic }
+      : base;
   });
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -598,6 +606,7 @@ export default function AIQuestionsPage() {
           subject: meta.subject,
           examBoard: meta.examBoard,
           examType: meta.examType,
+          attemptMode: isMockExam ? 'mock' : 'practice',
           specification: meta.specification,
           sourceMaterial,
           questions,
@@ -730,8 +739,7 @@ export default function AIQuestionsPage() {
       <section className="overflow-hidden rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 5 of 5</p>
-            <div className="mt-2 flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <Rocket className="h-7 w-7 text-accent" />
               <h1 id="ai-questions-title" className="text-3xl font-bold text-content dark:text-white">Smart Practice</h1>
             </div>

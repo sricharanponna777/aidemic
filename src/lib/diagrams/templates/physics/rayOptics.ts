@@ -87,7 +87,6 @@ export function buildRayOptics(scenario: RayOpticsScenario): DiagramTemplateBuil
   return { title, primitives: extraPrimitives, nodes, connections, slots, labelBank: [] };
 }
 
-export const RAY_OPTICS_BLANKABLE_PART_IDS: string[] = [];
 export const RAY_OPTICS_BLANKABLE_SLOT_IDS = ['image-nature-slot', 'image-orientation-slot', 'image-size-slot'];
 export const RAY_OPTICS_BLANKABLE_CONNECTION_KEYS = [
   'object-tip->kink-parallel',

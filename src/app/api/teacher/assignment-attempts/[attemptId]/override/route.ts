@@ -58,6 +58,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Establish the caller is a teacher before touching the attempt. RLS still
+    // scopes the SELECT below to this teacher's own classes; doing the role
+    // check up front just turns a student's call into a 403 instead of a 500.
+    const { data: teacherRow } = await supabase.from('teachers').select('id').eq('user_id', authData.user.id).maybeSingle();
+    if (!teacherRow) {
+      return NextResponse.json({ error: 'Only teachers can override marks.' }, { status: 403 });
+    }
+
     const body = (await request.json()) as OverridePayload;
     const overrides = Array.isArray(body.overrides) ? body.overrides : [];
     if (overrides.length === 0) {
@@ -131,11 +139,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
       percentage,
       predictedGrade,
     };
-
-    const { data: teacherRow } = await supabase.from('teachers').select('id').eq('user_id', authData.user.id).maybeSingle();
-    if (!teacherRow) {
-      return NextResponse.json({ error: 'Could not resolve your teacher record.' }, { status: 500 });
-    }
 
     const adminClient = createAdminClient();
     const { data: updated, error: updateError } = await adminClient

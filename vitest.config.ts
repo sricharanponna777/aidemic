@@ -8,6 +8,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // evals/ holds accuracy suites that call the live model; they self-skip
+    // unless RUN_EVALS=1, so collecting them here costs nothing by default.
+    include: ['src/**/*.test.ts', 'evals/**/*.test.ts'],
   },
 });

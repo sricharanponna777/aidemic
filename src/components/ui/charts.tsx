@@ -111,22 +111,3 @@ export function BarChart({
     </svg>
   );
 }
-
-/** Compact inline sparkline (no axis), for trend chips inside cards. */
-export function Sparkline({ values, ariaLabel }: { values: number[]; ariaLabel: string }) {
-  if (values.length < 2) return null;
-  const width = 80;
-  const height = 24;
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const range = max - min || 1;
-  const stepX = width / (values.length - 1);
-  const path = values
-    .map((v, i) => `${i === 0 ? "M" : "L"}${i * stepX},${height - ((v - min) / range) * height}`)
-    .join(" ");
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-6 w-20" role="img" aria-label={ariaLabel}>
-      <path d={path} fill="none" stroke={LINE} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}

@@ -332,8 +332,7 @@ export default function NotesPage() {
       <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Step 2 of 5</p>
-            <div className="mt-2 flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <BookOpen className="h-7 w-7 text-accent" />
               <h1 id="notes-title" className="text-3xl font-bold text-content dark:text-white">Learn</h1>
             </div>

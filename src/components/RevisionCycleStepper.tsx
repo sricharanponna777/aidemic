@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Brain, Compass, ListChecks, Target, ChevronRight } from "lucide-react";
+import { BookOpen, Compass, ListChecks, Target, ChevronRight } from "lucide-react";
 
-export type RevisionCycleStage = "learn" | "recall" | "review" | "practice" | "improve";
+export type RevisionCycleStage = "learn" | "review" | "practice" | "improve";
 
 const STAGES: { key: RevisionCycleStage; label: string; href: string; icon: typeof BookOpen }[] = [
   { key: "learn", label: "Learn", href: "/dashboard/notes", icon: BookOpen },
-  { key: "recall", label: "Recall", href: "/dashboard/study-sessions", icon: Brain },
   { key: "review", label: "Review", href: "/dashboard/daily-review", icon: ListChecks },
   { key: "practice", label: "Practice", href: "/dashboard/ai-questions", icon: Target },
   { key: "improve", label: "Improve", href: "/dashboard/exam-coach", icon: Compass },

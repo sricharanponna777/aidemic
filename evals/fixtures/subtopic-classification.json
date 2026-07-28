@@ -1,0 +1,60 @@
+{
+  "description": "Golden set for closed-set subtopic classification. Candidates are the real AQA GCSE subtopics for each topic; questions are written in the concrete style students actually see, so lexical overlap with the subtopic name is usually zero. Expected values are the candidate ids.",
+  "cases": [
+    {
+      "topic": "Bonding, structure and properties of matter",
+      "candidates": [
+        { "id": "ionic", "name": "Ionic bonding (formation, structure, properties of ionic compounds)" },
+        { "id": "covalent", "name": "Covalent bonding (formation, simple molecular structures, properties)" },
+        { "id": "giant", "name": "Giant covalent structures (diamond, graphite, silicon dioxide)" },
+        { "id": "metallic", "name": "Metallic bonding (structure, properties of metals and alloys)" },
+        { "id": "states", "name": "States of matter (solids, liquids, gases) and state changes" },
+        { "id": "particle", "name": "Limitations of simple particle model, nanoparticles" }
+      ],
+      "questions": [
+        { "text": "Explain why sodium chloride has a high melting point.", "expected": "ionic" },
+        { "text": "Explain why graphite can conduct electricity but diamond cannot.", "expected": "giant" },
+        { "text": "Describe how the delocalised electrons in copper allow it to be a good conductor.", "expected": "metallic" },
+        { "text": "Explain why an alloy is harder than the pure metal it is made from.", "expected": "metallic" },
+        { "text": "Water boils at 100 degrees Celsius. Describe what happens to the particles as it boils.", "expected": "states" },
+        { "text": "Explain why chlorine exists as Cl2 and describe the bond between the two atoms.", "expected": "covalent" },
+        { "text": "Suggest one reason why the simple particle model does not fully represent a real gas.", "expected": "particle" },
+        { "text": "Magnesium oxide is formed when magnesium burns in oxygen. Describe the transfer of electrons that occurs.", "expected": "ionic" }
+      ]
+    },
+    {
+      "topic": "Cell biology",
+      "candidates": [
+        { "id": "eukaryotic", "name": "Eukaryotic and prokaryotic cells" },
+        { "id": "animal-plant", "name": "Animal and plant cells (sub-cellular structures)" },
+        { "id": "specialisation", "name": "Cell specialisation and differentiation" },
+        { "id": "microscopy", "name": "Microscopy and magnification calculations" },
+        { "id": "division", "name": "Cell division and the cell cycle (mitosis)" },
+        { "id": "transport", "name": "Transport in cells (diffusion, osmosis, active transport)" }
+      ],
+      "questions": [
+        { "text": "A sperm cell has many mitochondria. Explain how this helps it carry out its function.", "expected": "specialisation" },
+        { "text": "An image of a cell is 50 mm wide. The real cell is 100 micrometres wide. Calculate the magnification.", "expected": "microscopy" },
+        { "text": "Describe how water moves into a plant root hair cell from dilute soil water.", "expected": "transport" },
+        { "text": "Bacteria do not have a nucleus. Describe where their genetic material is found.", "expected": "eukaryotic" },
+        { "text": "Describe what happens to the chromosomes during mitosis.", "expected": "division" }
+      ]
+    },
+    {
+      "topic": "Waves",
+      "candidates": [
+        { "id": "properties", "name": "Wave properties (amplitude, wavelength, frequency, period)" },
+        { "id": "transverse", "name": "Transverse and longitudinal waves" },
+        { "id": "em-spectrum", "name": "The electromagnetic spectrum and its uses" },
+        { "id": "reflection", "name": "Reflection and refraction of waves" },
+        { "id": "sound", "name": "Sound waves and hearing" }
+      ],
+      "questions": [
+        { "text": "A wave has a frequency of 50 Hz and a wavelength of 6 m. Calculate its speed.", "expected": "properties" },
+        { "text": "Explain why light bends as it passes from air into glass.", "expected": "reflection" },
+        { "text": "Describe one use of microwaves and one danger of ultraviolet radiation.", "expected": "em-spectrum" },
+        { "text": "In a slinky spring, the coils move backwards and forwards along the direction of travel. Name this type of wave.", "expected": "transverse" }
+      ]
+    }
+  ]
+}

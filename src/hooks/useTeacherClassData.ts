@@ -9,6 +9,8 @@ export type TeacherClass = {
   id: string;
   name: string;
   status: 'active' | 'archived';
+  /** Drives the subtopic mastery heatmap's topic list. */
+  specification_id: string | null;
   specifications: {
     name: string;
     tier: string | null;
@@ -115,7 +117,7 @@ export function useTeacherClassData(): TeacherClassData {
       const { data: classRows } = await supabase
         .from('classes')
         .select(
-          'id, name, status, specifications ( name, tier, subjects ( id, name, exam_boards ( name, qualifications ( name ) ) ) )'
+          'id, name, status, specification_id, specifications ( name, tier, subjects ( id, name, exam_boards ( name, qualifications ( name ) ) ) )'
         )
         .eq('teacher_id', typed.id)
         .order('created_at', { ascending: false });

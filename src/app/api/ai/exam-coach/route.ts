@@ -12,7 +12,7 @@ import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { MAX_AI_ERROR_TEXT, txt } from '@/lib/ai/text';
 
 type BandCount = { band?: string; count?: number };
-type WeaknessInput = { tag?: string; count?: number; subjects?: string[] };
+type WeaknessInput = { tag?: string; count?: number; subjects?: string[]; trend?: string; lastSeenDaysAgo?: number };
 type SubjectStatInput = { subject?: string; attempts?: number; avgPercentage?: number; trend?: string };
 
 type CoachPayload = {
@@ -24,6 +24,10 @@ type CoachPayload = {
 };
 
 type CoachResult = { headline: string; patterns: string[]; nextSteps: string[] };
+
+/** Mirrors WeaknessTrend in @/lib/weaknesses; anything else is treated as
+ *  'persistent' so a malformed client payload can't reach the model. */
+const WEAKNESS_TRENDS = ['new', 'worsening', 'persistent', 'improving'];
 
 const MAX_WEAKNESSES = 10;
 const MAX_SUBJECTS = 12;
@@ -72,6 +76,8 @@ const normalizePayload = (raw: CoachPayload) => ({
     tag: txt(w.tag || 'Weakness', 120),
     count: Number.isFinite(w.count) ? Math.max(0, Math.round(w.count as number)) : 0,
     subjects: (Array.isArray(w.subjects) ? w.subjects : []).slice(0, 5).map((s) => txt(s, 60)),
+    trend: WEAKNESS_TRENDS.includes(w.trend as string) ? (w.trend as string) : 'persistent',
+    lastSeenDaysAgo: Number.isFinite(w.lastSeenDaysAgo) ? Math.max(0, Math.round(w.lastSeenDaysAgo as number)) : null,
   })),
   subjects: (Array.isArray(raw.subjects) ? raw.subjects : []).slice(0, MAX_SUBJECTS).map((s) => ({
     subject: txt(s.subject || 'Subject', 60),
@@ -106,6 +112,7 @@ export async function POST(request: Request) {
       'You are an exam-technique coach for a GCSE/A-Level student, working only from already-computed performance statistics (no raw answers are given to you).',
       'Identify recurring, mark-scheme-language patterns in why this student loses marks (e.g. "not using command-word-appropriate depth", "answers lack named evidence", "skips evaluation/judgement steps"), grounded only in the weakness tags and band distribution provided.',
       'Return strict JSON only: a one-sentence headline, 3-6 "patterns" (each a specific, mark-scheme-flavoured diagnosis referencing the data given), and 3-6 "nextSteps" (concrete, actionable revision steps the student can take this week).',
+      'Each weakness carries a trend: "worsening" (costing more marks lately), "new" (only just appeared), "persistent" (recurring at a steady rate), "improving" (fading), plus lastSeenDaysAgo. Prioritise worsening and persistent weaknesses in nextSteps, treat new ones as worth checking early, and credit improving ones as progress rather than prescribing more work on them.',
       'Be specific and encouraging, not generic. Do not invent data not present in the input. Reference subjects/topics by name where useful.',
     ].join('\n');
 

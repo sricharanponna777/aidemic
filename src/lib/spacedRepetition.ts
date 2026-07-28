@@ -14,8 +14,13 @@ export type CardSRState = CardSR & {
   times_correct?: number;
 };
 
-type CardRetentionStats = Pick<CardSR, "repetition_count" | "consecutive_correct">;
-type CardEaseStats = Pick<CardSR, "ease_factor">;
+/** Lifetime review tallies. These are the only card counters that survive a
+ *  lapse (`repetition_count` is reset to 0 by `computeNextState`), so every
+ *  retention/accuracy metric must be derived from these two fields. */
+export type CardRetentionStats = {
+  times_studied?: number | null;
+  times_correct?: number | null;
+};
 
 const MIN_INTERVAL_DAYS = 1 / 1440; // 1 minute
 const HARD_INTERVAL = 1.2;
@@ -206,68 +211,80 @@ export function formatInterval(days: number): string {
   return `${Number(years.toFixed(1))}y`;
 }
 
+/**
+ * Share of all reviews the student actually recalled, as a percentage.
+ *
+ * Derived from the lifetime `times_studied`/`times_correct` tallies rather than
+ * `repetition_count - consecutive_correct`: that older proxy could not see
+ * lapses at all, because a lapse resets `repetition_count` to 0 in lockstep
+ * with `consecutive_correct`, so a card failed ten times still reported zero
+ * lapses and the dashboard showed 100% retention for a struggling student.
+ */
 export function calculateRetentionRate(cards: CardRetentionStats[]): number {
   if (cards.length === 0) return 0;
 
-  const totalReviews = cards.reduce((sum, card) => sum + (card.repetition_count || 0), 0);
+  const totalReviews = cards.reduce((sum, card) => sum + Math.max(0, card.times_studied || 0), 0);
   if (totalReviews === 0) return 0;
 
-  const totalLapses = cards.reduce(
-    (sum, card) => sum + Math.max(0, (card.repetition_count || 0) - (card.consecutive_correct || 0)),
+  const totalCorrect = cards.reduce(
+    (sum, card) => sum + Math.min(Math.max(0, card.times_correct || 0), Math.max(0, card.times_studied || 0)),
     0
   );
 
-  return ((totalReviews - totalLapses) / totalReviews) * 100;
+  return (totalCorrect / totalReviews) * 100;
 }
 
+/** Local midnight of the calendar day before `ts`. Uses date arithmetic rather
+ *  than subtracting 24h so the walk doesn't drift across a DST boundary. */
+function previousDay(ts: number): number {
+  const d = new Date(ts);
+  d.setDate(d.getDate() - 1);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+/**
+ * Consecutive calendar days with at least one review, counting back from the
+ * most recent one.
+ *
+ * A streak stays alive until a whole day is missed, so it anchors on today when
+ * the student has already studied and otherwise on yesterday. Anchoring only on
+ * today made a 30-day streak display as 0 from midnight until the next session
+ * was logged.
+ */
 export function calculateStudyStreak(reviewDates: number[]): number {
   if (reviewDates.length === 0) return 0;
 
   const uniqueDays = new Set<number>();
   for (const reviewDate of reviewDates) {
+    if (!Number.isFinite(reviewDate)) continue;
     const day = new Date(reviewDate);
     day.setHours(0, 0, 0, 0);
     uniqueDays.add(day.getTime());
   }
 
-  const sortedDays = Array.from(uniqueDays).sort((a, b) => b - a);
-  let streak = 0;
-  let expectedDay = new Date();
-  expectedDay.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTs = today.getTime();
+  const yesterdayTs = previousDay(todayTs);
 
+  // Drop days stamped in the future (clock skew or bad rows) before walking back.
+  const sortedDays = Array.from(uniqueDays)
+    .filter((ts) => ts <= todayTs)
+    .sort((a, b) => b - a);
+
+  const newest = sortedDays[0];
+  if (newest === undefined || newest < yesterdayTs) return 0;
+
+  let streak = 0;
+  let expected = newest;
   for (const dayTs of sortedDays) {
-    if (dayTs === expectedDay.getTime()) {
-      streak += 1;
-      expectedDay = new Date(expectedDay.getTime() - 86400000);
-      continue;
-    }
-    if (dayTs < expectedDay.getTime()) break;
+    if (dayTs !== expected) break;
+    streak += 1;
+    expected = previousDay(expected);
   }
 
   return streak;
-}
-
-export function getOptimalDailyLimit(cards: CardRetentionStats[], targetRetention = 85): number {
-  const retentionRate = calculateRetentionRate(cards);
-
-  if (retentionRate >= targetRetention) return 50;
-  if (retentionRate >= 70) return 30;
-  return 15;
-}
-
-export function getDifficultyDistribution(cards: CardEaseStats[]): { easy: number; medium: number; hard: number } {
-  let easy = 0;
-  let medium = 0;
-  let hard = 0;
-
-  for (const card of cards) {
-    const ease = card.ease_factor || 2.5;
-    if (ease >= 2.6) easy += 1;
-    else if (ease >= 2.0) medium += 1;
-    else hard += 1;
-  }
-
-  return { easy, medium, hard };
 }
 
 export function getMotivationMessage(streak: number, retentionRate: number): string {

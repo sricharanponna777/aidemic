@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
-import { createAdminClient } from '@/lib/supabase-admin';
+import { createAdminClient, tryCreateAdminClient } from '@/lib/supabase-admin';
+import { recordMarkingEvidence } from '@/lib/mastery/fromMarking';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { estimateGrade, getGcseTier, type GcseTier } from '@/lib/ai/gradeEstimate';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
@@ -69,6 +70,8 @@ type AIMarkingReport = {
 
 interface MarkAnswersPayload {
   assignmentId?: string;
+  /** 'mock' | 'practice'. Only used to weight Learning Spine evidence. */
+  attemptMode?: string;
   topic?: string;
   subject?: string;
   examBoard?: string;
@@ -654,6 +657,12 @@ export async function POST(request: Request) {
 
     const rawBody = (await request.json()) as MarkAnswersPayload;
     const assignmentId = typeof rawBody.assignmentId === 'string' ? txt(rawBody.assignmentId, 64) : '';
+    // Spine weighting only: a timed mock is stronger evidence than casual
+    // practice. Client-supplied and therefore forgeable, but at the same trust
+    // level as exam_practice_attempts.attempt_mode, which the client already
+    // writes directly. Deliberately not part of normalizePayload -- it is not
+    // marking-prompt input, and assignment mode ignores it entirely.
+    const attemptMode = rawBody.attemptMode === 'mock' ? 'mock' : 'practice';
 
     let payload: ReturnType<typeof normalizePayload>;
     let adminClient: ReturnType<typeof createAdminClient> | null = null;
@@ -768,6 +777,34 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
+    }
+
+    // Dual-write to the Learning Spine: resolve each marked question onto a
+    // curriculum subtopic and log it as evidence. Deferred with after() because
+    // it makes a classification model call -- the student's marking must not
+    // wait on it, and a dropped event is recoverable by replaying the log.
+    //
+    // Self-practice has no assignment row to persist, so no admin client exists
+    // yet; create one here, where a missing service key costs only the spine
+    // write rather than the whole marking response.
+    const spineClient = adminClient ?? tryCreateAdminClient();
+    if (spineClient) {
+      const userId = authData.user.id;
+      // Captured after the validation guards above, which TypeScript cannot
+      // narrow through the closure.
+      const { subject, examBoard, examType, topic } = payload;
+      after(() =>
+        recordMarkingEvidence(spineClient, userId, {
+          subject,
+          examBoard: examBoard ?? '',
+          examType: examType ?? '',
+          topic,
+          source: assignmentId ? 'assignment' : attemptMode === 'mock' ? 'mock' : 'exam_practice',
+          sourceId: assignmentId ?? null,
+          questions: payload.questions,
+          markedAnswers: report.markedAnswers,
+        })
+      );
     }
 
     return NextResponse.json({

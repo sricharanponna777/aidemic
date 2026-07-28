@@ -237,11 +237,6 @@ body {
   background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
 @keyframes gradient-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -265,12 +260,6 @@ body {
 @keyframes slide-in-left {
   from { transform: translateX(-100%); }
   to   { transform: translateX(0); }
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.06) 50%, transparent 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.8s ease-in-out infinite;
 }
 
 .animate-gradient {

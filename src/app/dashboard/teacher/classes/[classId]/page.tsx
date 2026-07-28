@@ -200,7 +200,7 @@ export default function TeacherClassPage() {
 
   const analyticsData = useMemo(() => {
     if (!classInfo) return null;
-    const classesArr: TeacherClass[] = [{ id: classInfo.id, name: classInfo.name, status: classInfo.status, specifications: classInfo.specifications }];
+    const classesArr: TeacherClass[] = [{ id: classInfo.id, name: classInfo.name, status: classInfo.status, specification_id: classInfo.specification_id, specifications: classInfo.specifications }];
     const studentsArr: TeacherStudent[] = roster.map((r) => ({
       id: r.id,
       student_id: r.student_id,

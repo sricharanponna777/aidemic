@@ -17,11 +17,17 @@ import {
   SUPPORTED_SUBJECTS,
   type SupportedSubject,
 } from '@/lib/ai/validation';
+import { pickBestSubtopic, type SubtopicCandidate } from '@/lib/curriculum/subtopicMatch';
+import { classifyQuestionsToSubtopics } from '@/lib/ai/classifySubtopic';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type FlashcardPayload = {
   name?: string;
   description?: string;
   topic?: string;
+  /** topics.id for the chosen topic. Learning Spine linkage only, not prompt
+   *  input. Null for subjects whose topic list is static (English Literature). */
+  topicId?: string;
   subtopic?: string;
   learningObjective?: string;
   paper?: string;
@@ -106,6 +112,7 @@ const normalizePayload = (raw: FlashcardPayload) => ({
   name: txt(raw.name || '', 120),
   description: txt(raw.description || '', 280),
   topic: txt(raw.topic || '', 200),
+  topicId: txt(raw.topicId || '', 64),
   subtopic: txt(raw.subtopic || '', 200),
   learningObjective: txt(raw.learningObjective || '', 300),
   paper: txt(raw.paper || '', 30),
@@ -116,6 +123,57 @@ const normalizePayload = (raw: FlashcardPayload) => ({
   prompt: txt(raw.prompt || '', 2000),
   cardCount: clampCount(raw.cardCount, MIN_CARDS, MAX_CARDS, 12),
 });
+
+/**
+ * Map each generated card onto a curriculum subtopic, for the Learning Spine.
+ *
+ * The client already holds a real `topics.id` -- it is what populated the
+ * subtopic dropdown -- so there is no free-text specification to resolve here,
+ * unlike the marking path. When the student picked a subtopic, every card
+ * inherits it and no model call is needed; otherwise the cards are classified
+ * individually, which is better than tagging a whole deck with one subtopic
+ * that only some of its cards actually test.
+ *
+ * Returns nulls throughout on any failure: a card without a subtopic simply
+ * emits no evidence, whereas a wrong subtopic corrupts the belief state.
+ */
+const resolveCardSubtopics = async (
+  db: SupabaseClient,
+  topicId: string,
+  subtopicName: string,
+  fronts: string[]
+): Promise<(string | null)[]> => {
+  const empty = fronts.map(() => null);
+  if (!topicId) return empty;
+
+  try {
+    const { data } = await db
+      .from('subtopics')
+      .select('id, name')
+      .eq('topic_id', topicId)
+      .order('order_index');
+
+    const subtopics = (data ?? []) as SubtopicCandidate[];
+    if (subtopics.length === 0) return empty;
+
+    if (subtopicName) {
+      const norm = (value: string) => value.trim().toLowerCase();
+      // The dropdown supplied these exact strings, so the equality check is the
+      // common case; pickBestSubtopic only catches hand-typed values.
+      const chosen =
+        subtopics.find((row) => norm(row.name) === norm(subtopicName)) ??
+        subtopics.find((row) => row.id === pickBestSubtopic(subtopics, subtopicName)?.id);
+      if (chosen) return fronts.map(() => chosen.id);
+    }
+
+    const { subtopicIds, error } = await classifyQuestionsToSubtopics(subtopics, fronts);
+    if (error) console.warn(`[spine] flashcard classification: ${error}`);
+    return fronts.map((_, index) => subtopicIds[index] ?? null);
+  } catch (err) {
+    console.error('[spine] resolveCardSubtopics failed', err);
+    return empty;
+  }
+};
 
 const normalizeCard = (item: FlashcardItem, subject: SupportedSubject | null): FlashcardItem | null => {
   const front = normalizeMathNotation(safe(item.front || ''), subject);
@@ -350,10 +408,20 @@ export async function POST(request: Request) {
 
     const now = new Date();
 
-    const cardsToInsert = uniqueCards.map((card) => ({
+    // Resolved inline rather than in after(): the ids are needed at insert time,
+    // and the common path (an explicitly chosen subtopic) costs no model call.
+    const cardSubtopicIds = await resolveCardSubtopics(
+      supabase,
+      payload.topicId,
+      payload.subtopic,
+      uniqueCards.map((card) => card.front)
+    );
+
+    const cardsToInsert = uniqueCards.map((card, index) => ({
       deck_id: deckData.id,
       front: card.front,
       back: card.back,
+      subtopic_id: cardSubtopicIds[index] ?? null,
       ai_generated: true,
       ease_factor: 2.5,
       interval_days: 1,

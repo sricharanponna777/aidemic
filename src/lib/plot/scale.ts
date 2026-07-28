@@ -95,13 +95,6 @@ export const snapToStep = (value: number, step: number) => {
   return Math.round(value / minor) * minor;
 };
 
-/** Seeds an axis-scale picker with a clean graph-paper max/step for callers
- * that only know the largest value. Prefer deriveAxisFromValues when the
- * actual plotted values are available, because it can also align minor squares. */
-export const deriveDefaultAxis = (dataMax: number) => {
-  return deriveAxisFromValues([dataMax]);
-};
-
 export const bandScale = (categories: string[], range: [number, number], paddingRatio = 0.2) => {
   const [r0, r1] = range;
   const step = categories.length > 0 ? (r1 - r0) / categories.length : 0;

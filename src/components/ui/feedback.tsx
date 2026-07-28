@@ -32,32 +32,6 @@ export function EmptyState({
   );
 }
 
-/** Single metric tile used across dashboards. */
-export function StatTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  className = '',
-}: {
-  icon?: LucideIcon;
-  label: string;
-  value: ReactNode;
-  hint?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-card border border-subtle bg-surface p-4 shadow-card ${className}`.trim()}>
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 shrink-0 text-accent" />}
-        <p className="text-caption font-semibold uppercase tracking-[0.12em] text-content-subtle">{label}</p>
-      </div>
-      <p className="mt-2 text-2xl font-bold text-content">{value}</p>
-      {hint && <p className="mt-1 text-caption text-content-subtle">{hint}</p>}
-    </div>
-  );
-}
-
 /** Standard page title block. */
 export function PageHeader({
   title,
@@ -81,7 +55,3 @@ export function PageHeader({
   );
 }
 
-/** Shimmering placeholder block for loading states. */
-export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-shimmer rounded-field bg-surface-sunken ${className}`.trim()} />;
-}

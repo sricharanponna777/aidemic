@@ -12,8 +12,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useToast } from '@/components/ToastProvider';
 import { createClient } from '@/lib/supabase-client';
-import { formatInterval, previewNextReview, updateSpacedRepetition } from '@/lib/spacedRepetition';
+import { formatInterval, previewNextReview } from '@/lib/spacedRepetition';
+import { readDueSubtopics } from '@/lib/mastery/read';
+import { MASTERY_LABEL, masteryBadgeTone } from '@/lib/masteryTone';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
+import type { MasteryBand } from '@/lib/mastery';
 import type { Flashcard } from '@/types';
 
 const MAX_DUE_FLASHCARDS = 15;
@@ -31,9 +34,30 @@ type ExamQuestion = {
 
 type QueueItem =
   | { kind: 'flashcard'; id: string; front: string; back: string; card: Flashcard }
-  | { kind: 'microquestion'; id: string; front: string; back: string; weaknessTag: string; subjectLabel: string };
+  | {
+      kind: 'microquestion';
+      id: string;
+      front: string;
+      back: string;
+      weaknessTag: string;
+      subjectLabel: string;
+      questionType: ExamQuestion['questionType'];
+      options: string[];
+      correctOption: '' | 'A' | 'B' | 'C' | 'D';
+      /** Set when the server stored this question and will mark it itself. */
+      itemId?: string;
+    };
 
+/**
+ * A target for one micro-question.
+ *
+ * Two things can produce these. The Learning Spine gives a real curriculum
+ * subtopic with a measured mastery band; before a student has any spine
+ * evidence, the older weakness-tag path gives a free-text label and nothing
+ * else. The spine-only fields are optional so both paths feed one renderer.
+ */
 type WeakTopicSummary = {
+  /** Display label: the subtopic name, or the weakness tag on the fallback path. */
   tag: string;
   count: number;
   subject: string;
@@ -41,6 +65,11 @@ type WeakTopicSummary = {
   examType: string;
   specName: string | null;
   specTier: string | null;
+  /** Set only when this came from the spine. */
+  subtopicId?: string;
+  topicName?: string;
+  subtopicName?: string;
+  band?: MasteryBand;
 };
 
 type Phase = 'idle' | 'loading' | 'reviewing' | 'summary';
@@ -101,6 +130,7 @@ export default function DailyReviewPage() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showBack, setShowBack] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<'' | 'A' | 'B' | 'C' | 'D'>('');
   const [summary, setSummary] = useState<{ flashcardsStudied: number; microAttempted: number; microCorrect: number } | null>(null);
 
   const sessionStartedAtRef = useRef<Date | null>(null);
@@ -138,6 +168,32 @@ export default function DailyReviewPage() {
         }
         setDueFlashcardCount(dueCount);
 
+        // Preferred path: the Learning Spine knows which curriculum subtopics
+        // are due and how weak they are, so the queue can name the actual gap
+        // instead of a recurring phrase from a marking report.
+        const dueSubtopics = await readDueSubtopics(supabase, userId, { limit: MAX_WEAK_TOPICS });
+        if (dueSubtopics.length > 0) {
+          setWeakTopics(
+            dueSubtopics.map((row) => ({
+              tag: row.subtopicName,
+              count: row.state.evidenceCount,
+              subject: row.scope.subject,
+              examBoard: row.scope.examBoard,
+              examType: row.scope.examType,
+              specName: row.scope.specName,
+              specTier: row.scope.specTier,
+              subtopicId: row.subtopicId,
+              topicName: row.topicName,
+              subtopicName: row.subtopicName,
+              band: row.band,
+            }))
+          );
+          return;
+        }
+
+        // Fallback for students with no spine evidence yet -- and permanently
+        // for subjects with no DB curriculum (English Literature), which can
+        // never produce a subtopic id.
         type AttemptRow = { subject: string; weakness_tags?: string[] | null; weakness_analysis?: string[] | null };
         const attempts = (attemptsResponse.data || []) as AttemptRow[];
         const tagMap = new Map<string, { count: number; subjects: Set<string> }>();
@@ -180,7 +236,61 @@ export default function DailyReviewPage() {
     void loadSummary();
   }, [userId, userSubjects]);
 
+  /**
+   * Server-stored question for a subtopic the spine knows about.
+   *
+   * Preferred over the generic generator because the server keeps the question
+   * and marks the answer itself, which is the only way answering it can count
+   * as mastery evidence -- the browser is handed the answer key to render the
+   * reveal panel, so it cannot be trusted to report its own score.
+   */
+  const generateAdjudicatedQuestion = async (topic: WeakTopicSummary): Promise<QueueItem | null> => {
+    try {
+      const response = await fetch('/api/review-queue/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtopicId: topic.subtopicId }),
+      });
+      if (!response.ok) return null;
+      const body = await response.json();
+      const question = body.question as
+        | { question: string; options: string[]; correctOption: 'A' | 'B' | 'C' | 'D'; explanation: string }
+        | undefined;
+      if (!body.itemId || !question) return null;
+
+      const optionText = question.options[['A', 'B', 'C', 'D'].indexOf(question.correctOption)];
+      return {
+        kind: 'microquestion',
+        id: `queue-${body.itemId}`,
+        itemId: body.itemId,
+        front: question.question,
+        back: [
+          `**Correct answer: ${question.correctOption}**${optionText ? ` — ${optionText}` : ''}`,
+          question.explanation,
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        weaknessTag: topic.tag,
+        subjectLabel: getSubjectLabel(topic.subject),
+        questionType: 'mcq',
+        options: question.options,
+        correctOption: question.correctOption,
+      };
+    } catch (err) {
+      console.error('Adjudicated question generation failed', err);
+      return null;
+    }
+  };
+
   const generateMicroQuestion = async (topic: WeakTopicSummary): Promise<QueueItem | null> => {
+    // Spine-backed targets go through the adjudicated path so the answer counts.
+    if (topic.subtopicId) {
+      const adjudicated = await generateAdjudicatedQuestion(topic);
+      if (adjudicated) return adjudicated;
+      // Fall through on failure: a throwaway question still beats a gap in the
+      // queue, it just will not produce evidence.
+    }
+
     try {
       const specification = topic.specName ? `${topic.specName}${topic.specTier ? ` - ${topic.specTier}` : ''}` : '';
       const response = await fetch('/api/ai/generate-questions', {
@@ -191,7 +301,13 @@ export default function DailyReviewPage() {
           examBoard: topic.examBoard,
           examType: topic.examType,
           specification,
-          prompt: `Focus tightly on this specific recurring weakness the student has: "${topic.tag}". Write one quick, focused retrieval-practice question that directly targets fixing it.`,
+          // With spine data the question is scoped by real curriculum ids, so
+          // the model gets the topic and subtopic rather than a phrase lifted
+          // out of a marking report.
+          ...(topic.topicName ? { topic: topic.topicName, subtopic: topic.subtopicName } : {}),
+          prompt: topic.topicName
+            ? `The student is weak on this subtopic. Write one quick, focused retrieval-practice question that directly targets it.`
+            : `Focus tightly on this specific recurring weakness the student has: "${topic.tag}". Write one quick, focused retrieval-practice question that directly targets fixing it.`,
           questionCount: 1,
           allowMcq: true,
           allowCalculation: false,
@@ -210,6 +326,9 @@ export default function DailyReviewPage() {
         back: buildMicroQuestionBack(question),
         weaknessTag: topic.tag,
         subjectLabel: getSubjectLabel(topic.subject),
+        questionType: question.questionType,
+        options: question.options ?? [],
+        correctOption: question.correctOption,
       };
     } catch (err) {
       console.error('Micro-question generation failed', err);
@@ -266,6 +385,7 @@ export default function DailyReviewPage() {
       setQueue(combined);
       setCurrentIndex(0);
       setShowBack(false);
+      setSelectedOption('');
       setSummary(null);
       setPhase('reviewing');
     } catch (err) {
@@ -276,6 +396,8 @@ export default function DailyReviewPage() {
   };
 
   const currentItem = queue[currentIndex];
+  const isMcqItem =
+    currentItem?.kind === 'microquestion' && currentItem.questionType === 'mcq' && currentItem.options.length > 0;
 
   const flashcardPreviews = useMemo(() => {
     if (!currentItem || currentItem.kind !== 'flashcard' || !showBack) return null;
@@ -343,21 +465,25 @@ export default function DailyReviewPage() {
 
     if (item.kind === 'flashcard') {
       const card = item.card;
-      const prev = {
-        ease_factor: card.ease_factor || 2.5,
-        interval_days: card.interval_days || 0,
-        repetition_count: card.repetition_count || 0,
-        consecutive_correct: card.consecutive_correct || 0,
-        last_studied_at: card.last_studied_at || null,
-        next_review_date: card.next_review_date || null,
-        times_studied: card.times_studied || 0,
-        times_correct: card.times_correct || 0,
-      };
-      const updated = updateSpacedRepetition(prev, quality);
-      const supabase = createClient();
-      await supabase.from('flashcards').update(updated).eq('id', card.id);
+      // Graded server-side so the review can also emit Learning Spine evidence,
+      // which needs the service role the browser client does not have.
+      await fetch('/api/flashcards/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: card.id, quality }),
+      });
       deckCountsRef.current.set(card.deck_id, (deckCountsRef.current.get(card.deck_id) || 0) + 1);
     } else {
+      // Only server-stored questions produce evidence. The server re-marks the
+      // selection against the question it saved, so `quality` here stays purely
+      // a local display stat.
+      if (item.itemId && selectedOption) {
+        await fetch('/api/review-queue/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: item.itemId, selectedOption }),
+        });
+      }
       microStatsRef.current = {
         attempted: microStatsRef.current.attempted + 1,
         correct: microStatsRef.current.correct + (quality >= 2 ? 1 : 0),
@@ -370,11 +496,24 @@ export default function DailyReviewPage() {
     } else {
       setCurrentIndex(nextIndex);
       setShowBack(false);
+      setSelectedOption('');
     }
   };
 
+  const handleSelectOption = (letter: 'A' | 'B' | 'C' | 'D') => {
+    if (selectedOption) return;
+    setSelectedOption(letter);
+    setShowBack(true);
+  };
+
+  const handleMcqContinue = () => {
+    if (!currentItem || currentItem.kind !== 'microquestion') return;
+    const isCorrect = selectedOption === currentItem.correctOption;
+    void handleGrade(isCorrect ? 2 : 0);
+  };
+
   useReviewShortcuts({
-    enabled: phase === 'reviewing' && !!currentItem,
+    enabled: phase === 'reviewing' && !!currentItem && !isMcqItem,
     isAnswerShown: showBack,
     onReveal: () => setShowBack(true),
     onGrade: handleGrade,
@@ -385,6 +524,7 @@ export default function DailyReviewPage() {
     setQueue([]);
     setCurrentIndex(0);
     setShowBack(false);
+    setSelectedOption('');
   };
 
   return (
@@ -424,17 +564,46 @@ export default function DailyReviewPage() {
           </div>
 
           {weakTopics.length > 0 ? (
-            <div className="mt-5 flex flex-wrap gap-2">
+            <ul className="mt-5 space-y-2">
               {weakTopics.map((topic) => (
-                <span
+                <li
                   key={topic.tag}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle px-4 py-3"
                 >
-                  <Target className="h-3.5 w-3.5" />
-                  {topic.tag}
-                </span>
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-content">
+                      <Target className="h-3.5 w-3.5 shrink-0 text-accent" />
+                      <span className="truncate">{topic.tag}</span>
+                    </p>
+                    {topic.topicName ? (
+                      <p className="mt-0.5 truncate text-caption text-content-subtle">
+                        {getSubjectLabel(topic.subject)} · {topic.topicName}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {/* masteryBand already returns 'unknown' below the confidence
+                        floor, so there is no threshold to re-check here. */}
+                    {topic.band ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${masteryBadgeTone(topic.band)}`}
+                      >
+                        {MASTERY_LABEL[topic.band]}
+                      </span>
+                    ) : null}
+                    <Link
+                      href={`/dashboard/ai-questions?${new URLSearchParams({
+                        topic: topic.topicName ?? topic.tag,
+                        ...(topic.subtopicName ? { subtopic: topic.subtopicName } : {}),
+                      })}`}
+                      className={buttonStyles({ variant: 'ghost', size: 'chip' })}
+                    >
+                      Practise this
+                    </Link>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ul>
           ) : null}
 
           <div className="mt-6">
@@ -497,6 +666,40 @@ export default function DailyReviewPage() {
               content={hasCloze(currentItem.front) ? maskAllCloze(currentItem.front) : currentItem.front}
             />
 
+            {isMcqItem && currentItem.kind === 'microquestion' ? (
+              <div className="mt-5 grid gap-2" role="group" aria-label="Answer options">
+                {currentItem.options.map((optionText, index) => {
+                  const letter = (['A', 'B', 'C', 'D'] as const)[index];
+                  if (!letter || !optionText) return null;
+                  const isCorrectOption = letter === currentItem.correctOption;
+                  const isSelected = letter === selectedOption;
+                  const answered = !!selectedOption;
+                  const stateClass = !answered
+                    ? 'border-subtle hover:border-accent hover:bg-surface-sunken'
+                    : isCorrectOption
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-200'
+                    : isSelected
+                    ? 'border-red-500 bg-red-50 text-red-900 dark:bg-red-950/35 dark:text-red-200'
+                    : 'border-subtle opacity-60';
+                  return (
+                    <button
+                      key={letter}
+                      type="button"
+                      className={`flex items-center gap-3 rounded-field border px-4 py-3 text-left text-body transition-colors ${stateClass}`}
+                      onClick={() => handleSelectOption(letter)}
+                      disabled={answered}
+                      aria-pressed={isSelected}
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-caption font-semibold">
+                        {letter}
+                      </span>
+                      <MarkdownContent className="prose prose-sm max-w-none" content={optionText} />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
             {showBack ? (
               <>
                 <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-content-subtle">
@@ -507,7 +710,7 @@ export default function DailyReviewPage() {
                   content={hasCloze(currentItem.front) ? revealAllCloze(currentItem.front) : currentItem.back}
                 />
               </>
-            ) : (
+            ) : !isMcqItem ? (
               <button
                 className={buttonStyles({ variant: 'primary', className: 'mt-5' })}
                 onClick={() => setShowBack(true)}
@@ -517,10 +720,19 @@ export default function DailyReviewPage() {
                 Show answer
                 <kbd className="rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-semibold">Space</kbd>
               </button>
-            )}
+            ) : null}
           </div>
 
-          {showBack && (
+          {showBack && isMcqItem && (
+            <div className="space-y-3">
+              <button className={buttonStyles({ variant: 'primary' })} onClick={handleMcqContinue}>
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {showBack && !isMcqItem && (
             <div className="space-y-3" role="group" aria-labelledby="recall-rating-label">
               <p id="recall-rating-label" className="text-body font-medium text-content-muted">
                 Rate your recall

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { createClient } from "@/lib/supabase-client";
@@ -11,10 +12,10 @@ import {
   BookOpen,
   Brain,
   CalendarDays,
+  ChevronRight,
   ClipboardList,
   GraduationCap,
   Headphones,
-  Heart,
   Compass,
   Layers,
   LayoutDashboard,
@@ -31,8 +32,10 @@ import {
   Target,
   TrendingUp,
   Users,
+  UserPlus,
   X,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 
 const STUDENT_NAV_GROUPS = [
@@ -52,15 +55,10 @@ const STUDENT_NAV_GROUPS = [
     ],
   },
   {
-    label: "Recall",
-    items: [
-      { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
-    ],
-  },
-  {
     label: "Review",
     items: [
       { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
+      { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
       { href: "/dashboard/planner", label: "Planner", icon: CalendarDays },
     ],
   },
@@ -81,13 +79,19 @@ const STUDENT_NAV_GROUPS = [
     label: null,
     items: [
       { href: "/dashboard/classes", label: "My Classes", icon: Users },
-      { href: "/dashboard/family", label: "Family", icon: Heart },
+      { href: "/dashboard/family", label: "Invite Parent", icon: UserPlus },
       { href: "/dashboard/settings", label: "Settings", icon: Settings },
     ],
   },
 ];
 
 type StudentNavItem = (typeof STUDENT_NAV_GROUPS)[number]["items"][number];
+
+const GROUP_ICONS: Record<string, LucideIcon> = {
+  Learn: BookOpen,
+  Review: ListChecks,
+  Practice: Target,
+};
 
 const TEACHER_NAV_ITEMS = [
   { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -111,6 +115,97 @@ const PARENT_NAV_ITEMS = [
 function isActiveRoute(item: { href: string; exact?: boolean }, pathname: string) {
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+function GroupFlyout({
+  label,
+  icon: GroupIcon,
+  items,
+  pathname,
+  onNavigate,
+}: {
+  label: string;
+  icon: LucideIcon;
+  items: StudentNavItem[];
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setPosition(null), 150);
+  };
+
+  const open = (target: HTMLElement) => {
+    cancelClose();
+    const rect = target.getBoundingClientRect();
+    setPosition({ top: rect.top, left: rect.right + 4 });
+  };
+
+  const groupActive = items.some((item) => isActiveRoute(item, pathname));
+
+  return (
+    <div
+      className="relative mt-2.5"
+      onMouseEnter={(e) => open(e.currentTarget)}
+      onMouseLeave={scheduleClose}
+      onFocus={(e) => open(e.currentTarget)}
+      onBlur={scheduleClose}
+    >
+      <div
+        tabIndex={0}
+        className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-all duration-200 ${
+          groupActive
+            ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 dark:shadow-indigo-500/40 dark:ring-1 dark:ring-indigo-400/30"
+            : "text-content-muted hover:bg-slate-100 dark:hover:bg-surface/6 hover:text-content dark:hover:text-white"
+        }`}
+      >
+        <GroupIcon className={`h-3.5 w-3.5 shrink-0 ${groupActive ? "text-white" : "text-content-subtle dark:text-content-subtle"}`} />
+        {label}
+        <ChevronRight className={`ml-auto h-3 w-3 shrink-0 ${groupActive ? "text-white/80" : "text-content-subtle"}`} />
+      </div>
+
+      {position &&
+        createPortal(
+          <div
+            style={{ top: position.top, left: position.left, zIndex: 100 }}
+            className="fixed min-w-40 rounded-lg border border-subtle bg-surface dark:bg-[#0D1324] p-1.5 shadow-lg"
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+          >
+            {items.map((item) => {
+              const Icon = item.icon;
+              const active = isActiveRoute(item, pathname);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
+                    active
+                      ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white"
+                      : "text-content-muted hover:bg-slate-100 dark:hover:bg-surface/6 hover:text-content dark:hover:text-white"
+                  }`}
+                >
+                  <Icon className={`h-3.5 w-3.5 shrink-0 ${active ? "text-white" : "text-content-subtle dark:text-content-subtle"}`} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -168,42 +263,60 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push("/");
   };
 
-  const renderNavLinks = (onNavigate?: () => void) =>
-    navGroups.map((group, groupIndex) => (
-      <div key={group.label ?? `group-${groupIndex}`} className={groupIndex === 0 ? undefined : "mt-2.5"}>
-        {group.label && (
-          <p className="px-2.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-content-subtle dark:text-content-subtle">
-            {group.label}
-          </p>
-        )}
-        <div className="space-y-0.5">
-          {group.items.map((item) => {
-            const Icon = item.icon;
-            const active = isActiveRoute(item, pathname);
-            return (
-              <Link
-                key={item.href + item.label}
-                href={item.href}
-                onClick={onNavigate}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-all duration-200 group ${
-                  active
-                    ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 dark:shadow-indigo-500/40 dark:ring-1 dark:ring-indigo-400/30"
-                    : "text-content-muted hover:bg-slate-100 dark:hover:bg-surface/6 hover:text-content dark:hover:text-white"
-                }`}
-              >
-                <Icon
-                  className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                    active ? "text-white" : "text-content-subtle dark:text-content-subtle group-hover:text-content-muted dark:group-hover:text-white"
+  const renderNavLinks = (onNavigate?: () => void, allowFlyouts = true) =>
+    navGroups.map((group, groupIndex) => {
+      const isCollapsibleGroup = allowFlyouts && group.label !== null && group.items.length > 1;
+
+      if (isCollapsibleGroup) {
+        const GroupIcon = GROUP_ICONS[group.label as string] ?? group.items[0].icon;
+        return (
+          <GroupFlyout
+            key={group.label}
+            label={group.label as string}
+            icon={GroupIcon}
+            items={group.items}
+            pathname={pathname}
+            onNavigate={onNavigate}
+          />
+        );
+      }
+
+      return (
+        <div key={group.label ?? `group-${groupIndex}`} className={groupIndex === 0 ? undefined : "mt-2.5"}>
+          {!allowFlyouts && group.label && (
+            <p className="px-2.5 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-content-subtle dark:text-content-subtle">
+              {group.label}
+            </p>
+          )}
+          <div className="space-y-0.5">
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const active = isActiveRoute(item, pathname);
+              return (
+                <Link
+                  key={item.href + item.label}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-all duration-200 group ${
+                    active
+                      ? "bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 dark:shadow-indigo-500/40 dark:ring-1 dark:ring-indigo-400/30"
+                      : "text-content-muted hover:bg-slate-100 dark:hover:bg-surface/6 hover:text-content dark:hover:text-white"
                   }`}
-                />
-                {item.label}
-                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-surface/70" />}
-              </Link>
-            );
-          })}
+                >
+                  <Icon
+                    className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-hover:scale-105 ${
+                      active ? "text-white" : "text-content-subtle dark:text-content-subtle group-hover:text-content-muted dark:group-hover:text-white"
+                    }`}
+                  />
+                  {item.label}
+                  {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-surface/70" />}
+                </Link>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    ));
+      );
+    });
 
   if (isLoading) {
     return (
@@ -347,7 +460,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-              {renderNavLinks(() => setIsMobileNavOpen(false))}
+              {renderNavLinks(() => setIsMobileNavOpen(false), false)}
             </nav>
           </div>
         </div>

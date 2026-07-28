@@ -143,6 +143,8 @@ export interface Flashcard {
   front: string;
   back: string;
   ai_generated?: boolean;
+  /** Curriculum subtopic. Set at AI generation time; null for manual cards. */
+  subtopic_id?: string | null;
   difficulty_rating?: number;
   times_studied?: number;
   times_correct?: number;
@@ -185,17 +187,6 @@ export interface StudySession {
   created_at?: string;
 }
 
-export interface StudySessionResult {
-  id: string;
-  user_id: string;
-  session_id: string;
-  flashcard_id: string;
-  was_correct: boolean;
-  time_to_answer_seconds?: number;
-  confidence_level?: number;
-  created_at?: string;
-}
-
 export interface ExamPracticeAttempt {
   id: string;
   user_id: string;
@@ -213,33 +204,6 @@ export interface ExamPracticeAttempt {
   answers_payload?: string[];
   marking_report?: unknown;
   created_at?: string;
-}
-
-export interface UserStatistics {
-  id: string;
-  user_id: string;
-  total_study_minutes?: number;
-  total_sessions?: number;
-  total_cards_studied?: number;
-  average_score?: number;
-  current_streak_days?: number;
-  longest_streak_days?: number;
-  last_study_date?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface StudyGoal {
-  id: string;
-  user_id: string;
-  deck_id: string;
-  goal_type: string;
-  target_value: number;
-  current_progress?: number;
-  deadline?: string;
-  is_completed?: boolean;
-  created_at?: string;
-  completed_at?: string;
 }
 
 // Interactive chart-plotting question types (shared between generate-questions,
