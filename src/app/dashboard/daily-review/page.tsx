@@ -13,7 +13,7 @@ import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useToast } from '@/components/ToastProvider';
 import { createClient } from '@/lib/supabase-client';
 import { formatInterval, previewNextReview } from '@/lib/spacedRepetition';
-import { readDueSubtopics } from '@/lib/mastery/read';
+import { readDueSubtopics, readStudentMastery } from '@/lib/mastery/read';
 import { MASTERY_LABEL, masteryBadgeTone } from '@/lib/masteryTone';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import type { MasteryBand } from '@/lib/mastery';
@@ -172,9 +172,33 @@ export default function DailyReviewPage() {
         // are due and how weak they are, so the queue can name the actual gap
         // instead of a recurring phrase from a marking report.
         const dueSubtopics = await readDueSubtopics(supabase, userId, { limit: MAX_WEAK_TOPICS });
-        if (dueSubtopics.length > 0) {
+
+        // `?subtopic=` lets the planner (and any other surface) hand a student
+        // straight to one gap. Read from location rather than useSearchParams so
+        // this stays a plain effect -- the hook would force the whole page under
+        // a Suspense boundary for one optional query string. The named subtopic
+        // is deliberately allowed even when it is not due: the student picked it.
+        const requestedSubtopicId =
+          new URLSearchParams(window.location.search).get('subtopic') ?? '';
+        let targets = dueSubtopics;
+        if (requestedSubtopicId) {
+          const requested = (await readStudentMastery(supabase, userId)).find(
+            (row) => row.subtopicId === requestedSubtopicId
+          );
+          if (requested) {
+            // Sliced back to the cap rather than appended: each target costs a
+            // question-generation call, so the requested one should displace the
+            // least urgent due item, not lengthen the queue.
+            targets = [
+              requested,
+              ...dueSubtopics.filter((row) => row.subtopicId !== requestedSubtopicId),
+            ].slice(0, MAX_WEAK_TOPICS);
+          }
+        }
+
+        if (targets.length > 0) {
           setWeakTopics(
-            dueSubtopics.map((row) => ({
+            targets.map((row) => ({
               tag: row.subtopicName,
               count: row.state.evidenceCount,
               subject: row.scope.subject,

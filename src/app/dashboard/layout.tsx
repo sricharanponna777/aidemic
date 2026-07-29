@@ -14,6 +14,7 @@ import {
   CalendarDays,
   ChevronRight,
   ClipboardList,
+  Gauge,
   GraduationCap,
   Headphones,
   Compass,
@@ -59,6 +60,7 @@ const STUDENT_NAV_GROUPS = [
     items: [
       { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
       { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
+      { href: "/dashboard/confidence", label: "Topic Confidence", icon: Gauge },
       { href: "/dashboard/planner", label: "Planner", icon: CalendarDays },
     ],
   },

@@ -1,0 +1,22 @@
+{
+  "welcome": {
+    "subject": "Welcome to {{appName}}, {{firstName}}",
+    "description": "Onboarding email sent after a new account is created. `highlights` accepts raw HTML (the caller supplies the role-specific rows); the rest is escaped.",
+    "layout": "_layout"
+  },
+  "weekly-digest": {
+    "subject": "Your weekly {{appName}} digest: {{periodLabel}}",
+    "description": "Weekly parent summary. `childrenHtml` accepts raw HTML, built per parent by the weekly-parent-digest Edge Function.",
+    "layout": "_layout"
+  },
+  "password-reset": {
+    "subject": "Reset your {{appName}} password",
+    "description": "Time-limited password reset link.",
+    "layout": "_layout"
+  },
+  "notification": {
+    "subject": "{{title}}",
+    "description": "Generic notification. `body` accepts raw HTML; the rest is escaped.",
+    "layout": "_layout"
+  }
+}

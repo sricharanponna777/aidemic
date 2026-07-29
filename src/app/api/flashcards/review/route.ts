@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-server';
 import { tryCreateAdminClient } from '@/lib/supabase-admin';
 import { recordMasteryEvents } from '@/lib/mastery/record';
 import { outcomeFromReviewQuality } from '@/lib/mastery';
+import { hasCloze } from '@/lib/cloze';
 import { updateSpacedRepetition, type CardSRState } from '@/lib/spacedRepetition';
 
 /**
@@ -25,6 +26,7 @@ type ReviewPayload = { cardId?: unknown; quality?: unknown };
 type CardRow = CardSRState & {
   id: string;
   deck_id: string;
+  front: string | null;
   subtopic_id: string | null;
   flashcard_decks: { user_id: string } | null;
 };
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
     const { data: cardData, error: cardError } = await supabase
       .from('flashcards')
       .select(
-        'id, deck_id, subtopic_id, ease_factor, interval_days, repetition_count, consecutive_correct, last_studied_at, next_review_date, times_studied, times_correct, flashcard_decks!inner(user_id)'
+        'id, deck_id, front, subtopic_id, ease_factor, interval_days, repetition_count, consecutive_correct, last_studied_at, next_review_date, times_studied, times_correct, flashcard_decks!inner(user_id)'
       )
       .eq('id', cardId)
       .maybeSingle();
@@ -75,12 +77,17 @@ export async function POST(request: Request) {
       if (spineClient) {
         const userId = authData.user.id;
         const subtopicId = card.subtopic_id;
+        // A cloze card is the same card reviewed with its deletions masked, so it
+        // comes through this route too. Recording it as its own source keeps
+        // gap-filling separable from front/back recall in analytics; the two carry
+        // the same EVIDENCE_WEIGHTS, so the belief maths is unaffected either way.
+        const source = hasCloze(card.front ?? '') ? 'cloze' : 'flashcard';
         after(async () => {
           const result = await recordMasteryEvents(spineClient, userId, [
             {
               subtopicId,
               outcome: outcomeFromReviewQuality(quality),
-              source: 'flashcard',
+              source,
               sourceId: cardId,
             },
           ]);

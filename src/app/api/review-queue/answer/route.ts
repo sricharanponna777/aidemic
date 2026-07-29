@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { createAdminClient } from '@/lib/supabase-admin';
 import { recordMasteryEvents } from '@/lib/mastery/record';
+import type { MasterySource } from '@/lib/mastery';
 
 /**
  * Mark one micro-question and record it as Learning Spine evidence.
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: item, error: readError } = await admin
       .from('review_queue_items')
-      .select('id, user_id, subtopic_id, question, answered_at')
+      .select('id, user_id, subtopic_id, question, answered_at, source')
       .eq('id', itemId)
       .maybeSingle();
 
@@ -66,12 +67,17 @@ export async function POST(request: Request) {
     if (claimError) return NextResponse.json({ error: 'Could not save your answer.' }, { status: 500 });
     if (!claimed) return NextResponse.json({ error: 'This question was already answered.' }, { status: 409 });
 
+    // Read off the row rather than assumed: /next records which surface asked,
+    // and a comprehension check inside a tutor conversation is a weaker signal
+    // than a Daily Review question (EVIDENCE_WEIGHTS: 0.6 against 1.2).
+    const source: MasterySource = item.source === 'tutor' ? 'tutor' : 'exam_practice';
+
     after(async () => {
       const result = await recordMasteryEvents(admin, authData.user.id, [
         {
           subtopicId: item.subtopic_id,
           outcome,
-          source: 'exam_practice',
+          source,
           sourceId: itemId,
         },
       ]);

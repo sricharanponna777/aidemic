@@ -10,6 +10,7 @@ import { PageHeader, EmptyState } from '@/components/ui/feedback';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 import { buildRevisionPlan, daysUntilExam, type PlannerSubject } from '@/lib/revisionPlanner';
+import { readDueSubtopics } from '@/lib/mastery/read';
 import { useToast } from '@/components/ToastProvider';
 
 type SubjectRow = StudentSubjectRow & { exam_date: string | null; target_grade: string | null };
@@ -20,6 +21,7 @@ type PlanRow = {
   planned_date: string;
   estimated_minutes: number | null;
   status: string | null;
+  subtopic_id: string | null;
 };
 
 type SubjectInfo = {
@@ -28,7 +30,13 @@ type SubjectInfo = {
   examDate: string | null;
   targetGrade: string | null;
   weakTopics: string[];
+  /** Set only for subjects the Learning Spine has measured. */
+  weakTopicRetrievability?: number[];
+  weakTopicSubtopicIds?: (string | null)[];
 };
+
+/** Weak topics per subject to carry into one plan. */
+const MAX_WEAK_TOPICS = 6;
 
 const PLAN_TERM_NAME = 'AIDemic Revision Plan';
 
@@ -50,7 +58,7 @@ export default function PlannerPage() {
     setIsLoading(true);
     const supabase = createClient();
 
-    const [{ data: subjectRows }, { data: attemptRows }, { data: termRows }] = await Promise.all([
+    const [{ data: subjectRows }, { data: attemptRows }, { data: termRows }, dueSubtopics] = await Promise.all([
       supabase
         .from('student_subjects')
         .select(`id, exam_date, target_grade, ${STUDENT_SUBJECT_SELECT}`)
@@ -63,6 +71,9 @@ export default function PlannerPage() {
         .order('created_at', { ascending: false })
         .limit(60),
       supabase.from('academic_terms').select('id').eq('user_id', userId).eq('name', PLAN_TERM_NAME).maybeSingle(),
+      // Already ordered overdue-first then weakest-first, which is the order the
+      // planner wants to cycle sessions through.
+      readDueSubtopics(supabase, userId),
     ]);
 
     // Weak topics grouped by raw subject key.
@@ -77,14 +88,40 @@ export default function PlannerPage() {
       weakBySubject.set(a.subject, set);
     }
 
+    // Spine-measured subtopics, keyed by the same lowercase subject name
+    // mapStudentSubjectRow produces, so the two paths are interchangeable below.
+    const spineBySubject = new Map<string, typeof dueSubtopics>();
+    for (const row of dueSubtopics) {
+      spineBySubject.set(row.scope.subject, [...(spineBySubject.get(row.scope.subject) ?? []), row]);
+    }
+
     const infos: SubjectInfo[] = ((subjectRows ?? []) as unknown as SubjectRow[]).map((row) => {
       const mapped = mapStudentSubjectRow(row);
-      return {
+      const spine = (spineBySubject.get(mapped.subject) ?? []).slice(0, MAX_WEAK_TOPICS);
+
+      // The spine gives real curriculum subtopics with a measured retrievability;
+      // weakness_tags gives LLM-authored strings and no measurement. Prefer the
+      // former per subject, and keep the latter for subjects it has not reached
+      // yet -- a student mid-migration should not lose their timetable.
+      const base = {
         id: row.id,
         label: getSubjectLabel(mapped.subject),
         examDate: row.exam_date,
         targetGrade: row.target_grade,
-        weakTopics: [...(weakBySubject.get(mapped.subject) ?? new Set())].slice(0, 6),
+      };
+
+      if (spine.length > 0) {
+        return {
+          ...base,
+          weakTopics: spine.map((item) => item.subtopicName),
+          weakTopicRetrievability: spine.map((item) => item.retrievability),
+          weakTopicSubtopicIds: spine.map((item) => item.subtopicId),
+        };
+      }
+
+      return {
+        ...base,
+        weakTopics: [...(weakBySubject.get(mapped.subject) ?? new Set())].slice(0, MAX_WEAK_TOPICS),
       };
     });
     setSubjects(infos);
@@ -93,7 +130,7 @@ export default function PlannerPage() {
     if (termId) {
       const { data: planRows } = await supabase
         .from('study_plan_items')
-        .select('id, title, planned_date, estimated_minutes, status')
+        .select('id, title, planned_date, estimated_minutes, status, subtopic_id')
         .eq('term_id', termId)
         .gte('planned_date', new Date().toISOString().slice(0, 10))
         .order('planned_date', { ascending: true });
@@ -130,6 +167,8 @@ export default function PlannerPage() {
       label: s.label,
       examDate: s.examDate,
       weakTopics: s.weakTopics,
+      weakTopicRetrievability: s.weakTopicRetrievability,
+      weakTopicSubtopicIds: s.weakTopicSubtopicIds,
     }));
     const plan = buildRevisionPlan(plannerSubjects);
 
@@ -184,6 +223,7 @@ export default function PlannerPage() {
         planned_date: item.plannedDate,
         estimated_minutes: item.estimatedMinutes,
         status: 'planned',
+        subtopic_id: item.subtopicId ?? null,
       }))
     );
 
@@ -333,7 +373,20 @@ export default function PlannerPage() {
                       <p className={`text-body ${item.status === 'done' ? 'text-content-subtle line-through' : 'text-content'}`}>
                         {item.title}
                       </p>
-                      <p className="text-caption text-content-subtle">{item.estimated_minutes ?? 30} min</p>
+                      <p className="text-caption text-content-subtle">
+                        {item.estimated_minutes ?? 30} min
+                        {item.subtopic_id ? (
+                          <>
+                            {' · '}
+                            <Link
+                              href={`/dashboard/daily-review?subtopic=${item.subtopic_id}`}
+                              className="font-semibold text-accent hover:underline"
+                            >
+                              Practise now
+                            </Link>
+                          </>
+                        ) : null}
+                      </p>
                     </div>
                     <button
                       type="button"

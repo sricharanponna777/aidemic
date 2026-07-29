@@ -17,6 +17,8 @@ import { buttonStyles } from "@/components/ui/button";
 import { useToast } from "@/components/ToastProvider";
 import { Flashcard, FlashcardDeck, StudySession } from "@/types";
 import { weightedPredictedGrade } from "@/lib/ai/gradeAverages";
+import { describeMasteryCoverage, emptyMasteryCoverage, masteryCoverage, type MasteryCoverage } from "@/lib/ai/gradeFromMastery";
+import { readSpecificationSubtopicCounts, readStudentMastery } from "@/lib/mastery/read";
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/subjectConfig";
 import { gcseTierLabelForGrade, gradeBadgeTone } from "@/lib/gradeTone";
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from "@/lib/ai/studentSubjects";
@@ -56,6 +58,8 @@ type SubjectPredictedGrade = {
   examType: "gcse" | "a-level" | null;
   specTier: string | null;
   predictedGrade: string;
+  /** How much of the specification the grade actually rests on. */
+  coverage: MasteryCoverage;
   totalMarksAwarded: number | null;
   totalAvailableMarks: number | null;
   totalPercentage: number | null;
@@ -274,7 +278,7 @@ export default function Dashboard() {
         const deckRows = (decks || []) as DashboardDeckRow[];
         const deckIds = deckRows.map((deck) => deck.id);
 
-        const [cardsResponse, sessionsResponse, attemptsResponse, subjectsResponse, studyGoals] = await Promise.all([
+        const [cardsResponse, sessionsResponse, attemptsResponse, subjectsResponse, studyGoals, masteryRows] = await Promise.all([
           deckIds.length > 0
             ? supabase
                 .from("flashcards")
@@ -294,10 +298,13 @@ export default function Dashboard() {
             .limit(50),
           supabase
             .from("student_subjects")
-            .select(STUDENT_SUBJECT_SELECT)
+            .select(`specification_id, ${STUDENT_SUBJECT_SELECT}`)
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: true }),
           fetchStudyGoals(supabase, session.user.id),
+          // Coverage is a count, so it needs every measured row rather than the
+          // default 200 the practice queue is sized for.
+          readStudentMastery(supabase, session.user.id, { limit: 2000 }),
         ]);
 
         if (cardsResponse.error) throw cardsResponse.error;
@@ -311,9 +318,20 @@ export default function Dashboard() {
         }
 
         const attempts = (attemptsResponse.data ?? []) as DashboardAttemptRow[];
-        const savedSubjects = ((subjectsResponse.data ?? []) as unknown as StudentSubjectRow[]).map(
-          mapStudentSubjectRow
-        ) as DashboardSubjectRow[];
+        const subjectRows = (subjectsResponse.data ?? []) as unknown as (StudentSubjectRow & {
+          specification_id: string | null;
+        })[];
+        const savedSubjects = subjectRows.map(mapStudentSubjectRow) as DashboardSubjectRow[];
+
+        // Coverage needs a denominator per specification, and mastery rows carry
+        // only the subject name, so keep the link between the two here.
+        const specificationBySubject = new Map<string, string>();
+        subjectRows.forEach((row, index) => {
+          if (row.specification_id) specificationBySubject.set(savedSubjects[index].subject, row.specification_id);
+        });
+        const subtopicCounts = await readSpecificationSubtopicCounts(supabase, [
+          ...specificationBySubject.values(),
+        ]);
         const latestAttempt = attempts[0];
         const primaryExamType = (attempts[0]?.exam_type === "a-level" ? "a-level" : attempts.length > 0 ? "gcse" : null) as "gcse" | "a-level" | null;
         // Recency-weighted so the headline weakness reflects what is costing
@@ -386,12 +404,20 @@ export default function Dashboard() {
             const examType = (subject.exam_type === "a-level" ? "a-level" : subject.exam_type === "gcse" ? "gcse" : null) as "gcse" | "a-level" | null;
             const group = subjectGroups.get(`${subject.subject}|${examType ?? "unknown"}`) ?? [];
             const prediction = weightedPredictedGrade(group, examType, subject.spec_tier, subject.exam_board);
+            const specificationId = specificationBySubject.get(subject.subject);
+            const coverage = specificationId
+              ? masteryCoverage(
+                  masteryRows.filter((row) => row.scope.subject === subject.subject),
+                  subtopicCounts.get(specificationId) ?? 0
+                )
+              : emptyMasteryCoverage();
             return {
               subject: subject.subject,
               examBoard: subject.exam_board ?? null,
               examType,
               specTier: subject.spec_tier ?? null,
               predictedGrade: prediction.grade,
+              coverage,
               totalMarksAwarded: prediction.totalMarksAwarded,
               totalAvailableMarks: prediction.totalAvailableMarks,
               totalPercentage: prediction.percentage,
@@ -618,6 +644,13 @@ export default function Dashboard() {
                     <p className="mt-0.5 text-xs font-semibold text-content-muted sm:hidden">
                       Total score: {formatTotalScoreLabel(item)}
                     </p>
+                    {/* How much of the course the grade rests on. The grade
+                        itself stays mark-based; this says how far to trust it. */}
+                    {describeMasteryCoverage(item.coverage) ? (
+                      <p className="mt-0.5 text-xs text-content-subtle">
+                        {describeMasteryCoverage(item.coverage)}
+                      </p>
+                    ) : null}
                   </div>
                   <p className="hidden text-sm text-content-muted sm:block">
                     {formatQualificationLabel({

@@ -6,6 +6,9 @@ import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
 import { calculateRetentionRate, calculateStudyStreak } from '@/lib/spacedRepetition';
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
+import { describeMasteryCoverage, masteryCoverage } from '@/lib/ai/gradeFromMastery';
+import { readSpecificationSubtopicCounts, readStudentMastery } from '@/lib/mastery/read';
+import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 import { rankWeaknesses, trendLabel, type RankedWeakness } from '@/lib/weaknesses';
@@ -27,6 +30,8 @@ type SubjectGrade = {
   examType: string | null;
   grade: string;
   attempts: number;
+  /** How much of the specification the grade rests on, when the spine knows. */
+  coverageLabel: string | null;
 };
 
 type ChildMetrics = {
@@ -58,18 +63,39 @@ export default function ParentOverviewPage() {
     let cancelled = false;
     const load = async () => {
       setMetricsLoading(true);
-      const [attemptsResponse, sessionsResponse, cardsResponse, attemptStatusResponse] = await Promise.all([
-        supabase
-          .from('exam_practice_attempts')
-          .select('subject, created_at, exam_type, weakness_tags, weakness_analysis, predicted_grade, total_marks_awarded, total_available_marks')
-          .eq('user_id', selectedStudentId)
-          .order('created_at', { ascending: false })
-          .limit(50),
-        supabase.from('study_sessions').select('started_at').eq('user_id', selectedStudentId),
-        supabase.from('flashcard_decks').select('id').eq('user_id', selectedStudentId),
-        supabase.from('assignment_attempts').select('status').eq('student_id', selectedStudentId),
-      ]);
+      const [attemptsResponse, sessionsResponse, cardsResponse, attemptStatusResponse, subjectsResponse, masteryRows] =
+        await Promise.all([
+          supabase
+            .from('exam_practice_attempts')
+            .select('subject, created_at, exam_type, weakness_tags, weakness_analysis, predicted_grade, total_marks_awarded, total_available_marks')
+            .eq('user_id', selectedStudentId)
+            .order('created_at', { ascending: false })
+            .limit(50),
+          supabase.from('study_sessions').select('started_at').eq('user_id', selectedStudentId),
+          supabase.from('flashcard_decks').select('id').eq('user_id', selectedStudentId),
+          supabase.from('assignment_attempts').select('status').eq('student_id', selectedStudentId),
+          supabase
+            .from('student_subjects')
+            .select(`specification_id, ${STUDENT_SUBJECT_SELECT}`)
+            .eq('user_id', selectedStudentId),
+          // Reads through the existing is_parent_of_student SELECT policies on
+          // the spine tables -- no new policy, and still read-only.
+          readStudentMastery(supabase, selectedStudentId, { limit: 2000 }),
+        ]);
 
+      if (cancelled) return;
+
+      const subjectRows = (subjectsResponse.data ?? []) as unknown as (StudentSubjectRow & {
+        specification_id: string | null;
+      })[];
+      const specificationBySubject = new Map<string, string>();
+      for (const row of subjectRows) {
+        const { subject } = mapStudentSubjectRow(row);
+        if (row.specification_id) specificationBySubject.set(subject, row.specification_id);
+      }
+      const subtopicCounts = await readSpecificationSubtopicCounts(supabase, [
+        ...specificationBySubject.values(),
+      ]);
       if (cancelled) return;
 
       const attempts = (attemptsResponse.data ?? []) as AttemptRow[];
@@ -88,7 +114,20 @@ export default function ParentOverviewPage() {
         .map(([key, group]) => {
           const [subject, examType] = key.split('|');
           const prediction = weightedPredictedGrade(group, examType === 'unknown' ? null : examType);
-          return { subject, examType: examType === 'unknown' ? null : examType, grade: prediction.grade, attempts: group.length };
+          const specificationId = specificationBySubject.get(subject);
+          const coverage = specificationId
+            ? masteryCoverage(
+                masteryRows.filter((row) => row.scope.subject === subject),
+                subtopicCounts.get(specificationId) ?? 0
+              )
+            : null;
+          return {
+            subject,
+            examType: examType === 'unknown' ? null : examType,
+            grade: prediction.grade,
+            attempts: group.length,
+            coverageLabel: coverage ? describeMasteryCoverage(coverage) : null,
+          };
         })
         .filter((item) => item.grade !== 'N/A')
         .sort((a, b) => a.subject.localeCompare(b.subject));
@@ -171,6 +210,9 @@ export default function ParentOverviewPage() {
                   <div>
                     <p className="text-sm font-semibold text-content dark:text-white">{getSubjectLabel(item.subject)}</p>
                     <p className="text-xs text-content-subtle">{item.attempts} attempts analysed</p>
+                    {item.coverageLabel ? (
+                      <p className="text-xs text-content-subtle">{item.coverageLabel}</p>
+                    ) : null}
                   </div>
                   <span
                     className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({

@@ -1,0 +1,37 @@
+-- ============================================================================
+-- One-shot guard for the post-signup welcome email.
+--
+-- There is no handle_new_user / on_auth_user_created trigger in this project:
+-- signup writes user_profiles from the browser (src/app/login/page.tsx), so the
+-- welcome email has to be kicked off by an app request too. A browser request
+-- can be replayed by a refresh mid-signup, double-fired by a double submit, or
+-- retried by hand, so POST /api/email/welcome claims this column before it
+-- sends anything:
+--
+--   update user_profiles set welcome_email_sent_at = now()
+--    where id = $1 and welcome_email_sent_at is null
+--   returning email, first_name, full_name, username, role;
+--
+-- Zero rows back means another call already claimed it, and this one sends
+-- nothing. The UPDATE doubles as the read, so the send path is one round trip.
+--
+-- NOT reset when the send fails, on purpose. Nothing retries this, so a reset
+-- cannot recover a lost email -- it can only widen the window for a duplicate,
+-- and email-server can legitimately accept and queue a message while still
+-- answering 5xx. A missing welcome email is cosmetic; a duplicate is spam. The
+-- route also checks EMAIL_SERVER_URL / EMAIL_SERVER_API_KEY / APP_URL /
+-- SUPPORT_EMAIL *before* claiming, so an unconfigured environment leaves the
+-- column null and stays re-sendable once those variables land.
+--
+-- Left NULL on every existing row: pre-existing users are not retro-mailed,
+-- because the only caller is the signup flow.
+--
+-- Note: the user_profiles RLS UPDATE policy is `auth.uid() = id`, so an account
+-- owner can null this column and re-trigger their own welcome email. Accepted --
+-- the column defends against our own duplicate sends, not against the owner.
+-- Hardening it would mean extending the user_profiles_freeze_role trigger
+-- (migration 20260724000000) to also freeze this column outside service_role.
+-- ============================================================================
+
+ALTER TABLE user_profiles
+  ADD COLUMN IF NOT EXISTS welcome_email_sent_at TIMESTAMPTZ;

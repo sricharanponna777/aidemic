@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { createAdminClient } from '@/lib/supabase-admin';
-import { readDueSubtopics, readStudentMastery } from '@/lib/mastery/read';
+import {
+  comparePracticePriority,
+  readDueSubtopics,
+  readStudentMastery,
+  readTopicSubtopics,
+} from '@/lib/mastery/read';
+import { studentStudiesTopic } from '@/lib/curriculum/enrolment';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import {
   extractJsonWithCoercer,
@@ -20,6 +26,13 @@ import type { SupportedSubject } from '@/lib/ai/validation';
  * against what was actually asked. That is the whole point: the client is given
  * the answer key to render the reveal panel, so only the server can honestly
  * say whether the student got it right.
+ *
+ * Three ways to choose the target, in descending specificity:
+ *
+ *   subtopicId  Daily Review naming one item of a queue it already built.
+ *   topicId     Study Chat checking understanding of the topic under discussion;
+ *               `source: 'tutor'` prices the resulting evidence accordingly.
+ *   neither     Whatever is most overdue.
  *
  * NOTE: the prompt below duplicates a slice of generate-questions/route.ts.
  * That route is ~1,200 lines of branching across plots, diagrams, English
@@ -76,18 +89,56 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
     }
 
-    const payload = (await request.json().catch(() => ({}))) as { subtopicId?: unknown };
+    const payload = (await request.json().catch(() => ({}))) as {
+      subtopicId?: unknown;
+      topicId?: unknown;
+      source?: unknown;
+    };
     const requestedSubtopicId = typeof payload.subtopicId === 'string' ? payload.subtopicId : '';
+    const requestedTopicId = typeof payload.topicId === 'string' ? payload.topicId : '';
+    const source = payload.source === 'tutor' ? 'tutor' : 'exam_practice';
 
-    // Both branches read through the caller's client, so RLS confines them to
-    // this student's own mastery rows. A requested subtopic they have no
-    // mastery row for simply does not resolve -- which is why letting the
-    // client name one (so a queue can cover several) stays safe.
-    const [target] = requestedSubtopicId
-      ? (await readStudentMastery(supabase, authData.user.id)).filter(
-          (row) => row.subtopicId === requestedSubtopicId
-        )
-      : await readDueSubtopics(supabase, authData.user.id, { limit: 1 });
+    const userId = authData.user.id;
+    let target;
+
+    if (requestedSubtopicId) {
+      // Reads through the caller's client, so RLS confines this to the student's
+      // own mastery rows. A subtopic they have no row for simply does not
+      // resolve -- which is why letting the client name one (so a queue can
+      // cover several) stays safe.
+      [target] = (await readStudentMastery(supabase, userId)).filter(
+        (row) => row.subtopicId === requestedSubtopicId
+      );
+    } else if (requestedTopicId) {
+      // Curriculum tables are public reference data, so a topic id proves
+      // nothing on its own; this is what stops a crafted request seeding mastery
+      // rows for a course the student does not take.
+      if (!(await studentStudiesTopic(supabase, userId, requestedTopicId))) {
+        return NextResponse.json({ error: 'That topic is not in your subjects.' }, { status: 403 });
+      }
+
+      // Read the whole topic, not just what the spine has measured: a student
+      // asking the tutor about something has usually never been measured on it,
+      // so requiring an existing mastery row would refuse exactly the questions
+      // worth asking.
+      const [all, measured] = await Promise.all([
+        readTopicSubtopics(supabase, requestedTopicId),
+        readStudentMastery(supabase, userId),
+      ]);
+      const known = new Map(
+        measured.filter((row) => row.topicId === requestedTopicId).map((row) => [row.subtopicId, row])
+      );
+
+      // Cover the topic rather than drilling one corner of it. Answering builds
+      // a mastery row, so ranking purely by weakness would re-serve whatever was
+      // just asked -- one answer is not enough evidence to demote it. Walking
+      // the never-asked subtopics in specification order first is what makes
+      // "ask me another" move.
+      const untouched = all.filter((row) => !known.has(row.subtopicId));
+      target = untouched[0] ?? [...known.values()].sort(comparePracticePriority)[0];
+    } else {
+      [target] = await readDueSubtopics(supabase, userId, { limit: 1 });
+    }
 
     if (!target) return NextResponse.json({ error: 'Nothing is due for review.' }, { status: 404 });
 
@@ -165,7 +216,7 @@ export async function POST(request: Request) {
     // cannot write here -- which is what stops the answer key being editable.
     const { data: item, error: insertError } = await createAdminClient()
       .from('review_queue_items')
-      .insert({ user_id: authData.user.id, subtopic_id: target.subtopicId, question: stored })
+      .insert({ user_id: userId, subtopic_id: target.subtopicId, question: stored, source })
       .select('id')
       .single();
 

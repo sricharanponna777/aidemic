@@ -17,8 +17,20 @@ export interface PlannerSubject {
   label: string;
   /** ISO date (YYYY-MM-DD) of the exam, or null if unknown. */
   examDate: string | null;
-  /** Distinct weak-topic labels for this subject (from weakness_tags). */
+  /** Weak-topic labels, weakest first. Curriculum subtopic names when the
+   *  Learning Spine has evidence, otherwise free-text weakness_tags. */
   weakTopics: string[];
+  /**
+   * Spine only: 0..1 retrievability for each entry in `weakTopics`, same order.
+   *
+   * Present, it lets the planner weight by HOW weak a topic is rather than
+   * merely how many there are — three barely-forgotten topics should not
+   * outrank one a student cannot do at all. Absent (the weakness_tag path,
+   * which carries no measurement) the count is all there is to go on.
+   */
+  weakTopicRetrievability?: number[];
+  /** Spine only: subtopics.id for each entry in `weakTopics`, same order. */
+  weakTopicSubtopicIds?: (string | null)[];
 }
 
 export interface PlanItem {
@@ -28,6 +40,8 @@ export interface PlanItem {
   plannedDate: string;
   title: string;
   estimatedMinutes: number;
+  /** The curriculum node this session targets, when it came from the spine. */
+  subtopicId?: string | null;
 }
 
 const DAY_MS = 86400000;
@@ -52,16 +66,37 @@ export function daysUntilExam(examDate: string | null, from: Date = new Date()):
 }
 
 /**
- * A subject's share of revision effort. More weak topics and a nearer exam both
- * raise the weight. Subjects past their exam, or with no exam date, get 0 — the
- * planner only schedules toward upcoming exams.
+ * How much work a subject's weak topics represent.
+ *
+ * With measured retrievability each topic contributes what has actually been
+ * forgotten (1 − r), so a subject with three nearly-secure topics weighs less
+ * than one with a single topic at zero. Without it — the weakness_tag path,
+ * which is a list of LLM-authored strings and no measurement — every topic
+ * counts as one, which is the behaviour that predates the spine.
+ */
+function weaknessLoad(subject: PlannerSubject): number {
+  const measured = subject.weakTopicRetrievability;
+  if (!measured || measured.length === 0) return subject.weakTopics.length;
+
+  return subject.weakTopics.reduce((sum, _topic, index) => {
+    const retrievability = measured[index];
+    // A topic with no reading alongside it falls back to counting as one, so a
+    // partially-measured list never weighs less than an unmeasured one.
+    if (!Number.isFinite(retrievability)) return sum + 1;
+    return sum + Math.min(1, Math.max(0, 1 - retrievability));
+  }, 0);
+}
+
+/**
+ * A subject's share of revision effort. More (or weaker) weak topics and a
+ * nearer exam both raise the weight. Subjects past their exam, or with no exam
+ * date, get 0 — the planner only schedules toward upcoming exams.
  */
 export function subjectWeight(subject: PlannerSubject, from: Date = new Date()): number {
   const days = daysUntilExam(subject.examDate, from);
   if (days === null || days < 0) return 0;
   const urgency = 1 / Math.sqrt(days + 1); // sooner exams weigh more, softly
-  const weaknessLoad = 1 + subject.weakTopics.length; // at least baseline effort
-  return urgency * weaknessLoad;
+  return urgency * (1 + weaknessLoad(subject)); // at least baseline effort
 }
 
 /**
@@ -101,15 +136,15 @@ export function buildRevisionPlan(
     for (let i = 0; i < subjectSessions; i++) {
       const dayOffset = Math.min(window - 1, Math.round(i * spacing));
       const plannedDate = toDateOnly(new Date(from.getTime() + dayOffset * DAY_MS));
-      const topic = subject.weakTopics.length > 0
-        ? subject.weakTopics[i % subject.weakTopics.length]
-        : null;
+      const topicIndex = subject.weakTopics.length > 0 ? i % subject.weakTopics.length : -1;
+      const topic = topicIndex >= 0 ? subject.weakTopics[topicIndex] : null;
       items.push({
         subjectId: subject.id,
         subjectLabel: subject.label,
         plannedDate,
         title: topic ? `${subject.label}: ${topic}` : `${subject.label}: general revision`,
         estimatedMinutes: minutesPerSession,
+        subtopicId: topicIndex >= 0 ? subject.weakTopicSubtopicIds?.[topicIndex] ?? null : null,
       });
     }
   }

@@ -15,6 +15,7 @@ export interface UserProfile {
   theme?: 'light' | 'dark';
   notifications_enabled?: boolean;
   role?: 'student' | 'teacher' | 'parent';
+  welcome_email_sent_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -45,6 +45,37 @@ describe('subjectWeight', () => {
     const many = subjectWeight(subject({ weakTopics: ['A', 'B', 'C', 'D'] }), FROM);
     expect(many).toBeGreaterThan(few);
   });
+
+  it('weighs a badly-forgotten topic above several nearly-secure ones', () => {
+    const forgotten = subjectWeight(
+      subject({ weakTopics: ['A'], weakTopicRetrievability: [0] }),
+      FROM
+    );
+    const nearlySecure = subjectWeight(
+      subject({ weakTopics: ['A', 'B', 'C'], weakTopicRetrievability: [0.9, 0.9, 0.9] }),
+      FROM
+    );
+    expect(forgotten).toBeGreaterThan(nearlySecure);
+  });
+
+  it('ignores retrievability when none is supplied', () => {
+    const counted = subjectWeight(subject({ weakTopics: ['A', 'B'] }), FROM);
+    const empty = subjectWeight(subject({ weakTopics: ['A', 'B'], weakTopicRetrievability: [] }), FROM);
+    expect(empty).toBe(counted);
+  });
+
+  it('counts a topic with no reading as a full unit', () => {
+    const partial = subjectWeight(
+      subject({ weakTopics: ['A', 'B'], weakTopicRetrievability: [0] }),
+      FROM
+    );
+    const both = subjectWeight(
+      subject({ weakTopics: ['A', 'B'], weakTopicRetrievability: [0, 1] }),
+      FROM
+    );
+    // 'B' unmeasured counts 1; 'B' measured as fully retrievable counts 0.
+    expect(partial).toBeGreaterThan(both);
+  });
 });
 
 describe('buildRevisionPlan', () => {
@@ -77,6 +108,27 @@ describe('buildRevisionPlan', () => {
   it('falls back to a general session when a subject has no weak topics', () => {
     const plan = buildRevisionPlan([subject({ weakTopics: [] })], { from: FROM });
     expect(plan.every((p) => p.title.includes('general revision'))).toBe(true);
+  });
+
+  it('carries the subtopic id of the topic each session targets', () => {
+    const plan = buildRevisionPlan(
+      [
+        subject({
+          weakTopics: ['Enzymes', 'Osmosis'],
+          weakTopicSubtopicIds: ['sub-enzymes', 'sub-osmosis'],
+        }),
+      ],
+      { from: FROM, sessionsPerWeek: 14 }
+    );
+    for (const item of plan) {
+      const expected = item.title.includes('Enzymes') ? 'sub-enzymes' : 'sub-osmosis';
+      expect(item.subtopicId).toBe(expected);
+    }
+  });
+
+  it('leaves subtopicId null on the weakness-tag path', () => {
+    const plan = buildRevisionPlan([subject()], { from: FROM });
+    expect(plan.every((p) => p.subtopicId === null)).toBe(true);
   });
 
   it('gives a heavier subject more sessions than a lighter one', () => {

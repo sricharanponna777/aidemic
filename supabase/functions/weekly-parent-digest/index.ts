@@ -2,13 +2,50 @@
 // pg_cron job (see migration 20260720100000) every Monday at 08:00 UTC via
 // pg_net -- not meant to be called directly by the app or by end users.
 //
+// Delivery goes through the standalone email-server (../../email-server), which
+// must be reachable over public HTTPS from Supabase's edge network -- there is
+// no VPC peering. One POST /api/email/bulk per 100 parents, so retries,
+// connection pooling and the plain-text alternative are all its problem.
+//
 // Deploy: supabase functions deploy weekly-parent-digest --no-verify-jwt
-// Secrets (set once): supabase secrets set RESEND_API_KEY=... RESEND_FROM_EMAIL=... CRON_SECRET=...
+// Secrets (set once): supabase secrets set EMAIL_SERVER_URL=... EMAIL_SERVER_API_KEY=... \
+//   APP_NAME=AIDemic APP_URL=... SUPPORT_EMAIL=... CRON_SECRET=...
 // (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are provided automatically by the platform.)
+//
+// The `weekly-digest` template must exist in email-server BEFORE this function
+// is deployed, or every message comes back 404.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** POST /api/email/bulk hard-caps `messages` at 100. */
+const CHUNK_SIZE = 100;
+/** 100 messages at BULK_CONCURRENCY=5 with 2 retries is ~20 sequential rounds;
+ *  at 1-2s per send that is 20-40s, and a retried batch could double it. Drop
+ *  CHUNK_SIZE to 25 if this ever trips. */
+const CHUNK_TIMEOUT_MS = 120_000;
+/** Bad key, undeployed template, malformed data, oversized body -- all of them
+ *  fail every remaining chunk the same way, so the loop stops instead. */
+const FATAL_STATUSES = [400, 401, 403, 404, 413];
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type BulkResponse = {
+  ok: boolean;
+  total: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  results: Array<{
+    index: number;
+    status: 'sent' | 'failed' | 'skipped';
+    to: string[];
+    messageId?: string;
+    previewUrl?: string;
+    error?: { code: string; message: string; details?: unknown };
+  }>;
+};
 
 const normalizeInsightLabel = (value: string) =>
   value
@@ -52,35 +89,93 @@ function buildStreak(sessionDates: number[]): number {
   return streak;
 }
 
-function renderEmailHtml(children: ChildDigest[]): string {
-  const sections = children
-    .map((child) => {
-      const grades = child.latestPredictedGrades.length
-        ? child.latestPredictedGrades
-            .map((g) => `<span style="display:inline-block;margin:2px 6px 2px 0;padding:4px 10px;border-radius:8px;background:#eef2ff;color:#4338ca;font-weight:700;font-size:13px;">${escapeHtml(g.subject)}: ${escapeHtml(g.grade)}</span>`)
-            .join('')
-        : '<span style="color:#64748b;font-size:13px;">No exam practice yet.</span>';
+// --------------------------------------------------------------------------
+// Fills the `childrenHtml` raw slot of email-server's `weekly-digest` template.
+// Conventions are email-server's: every style inline, layout via
+// role="presentation" tables (mail clients support neither flex nor grid), and
+// the .sm-*/.dm-* classes come from the <style> block in
+// email-server/src/templates/_layout.html.
+//
+// Use NUMERIC character references (&#183;) only. email-server's htmlToText
+// decodes just eight named entities plus &nbsp; -- any other named entity would
+// leak literally into the auto-generated plain-text part.
+// --------------------------------------------------------------------------
 
-      return `
-        <div style="margin-bottom:24px;padding:20px;border:1px solid #e2e8f0;border-radius:12px;">
-          <h2 style="margin:0 0 12px;font-size:18px;color:#0f172a;">${escapeHtml(child.name)}</h2>
-          <p style="margin:0 0 10px;font-size:14px;color:#334155;">
-            This week: <strong>${child.weeklyPracticeAttempts}</strong> practice attempts,
-            <strong>${child.weeklyAssignmentsCompleted}</strong> assignments completed,
-            <strong>${child.currentStreakDays}</strong> day study streak.
-          </p>
-          ${child.topWeaknessThisWeek ? `<p style="margin:0 0 10px;font-size:14px;color:#92400e;">Recurring weak area this week: <strong>${escapeHtml(child.topWeaknessThisWeek)}</strong></p>` : ''}
-          <div>${grades}</div>
-        </div>`;
-    })
-    .join('');
+const MAX_GRADE_PILLS = 6;
 
+function renderStat(value: number, label: string): string {
+  return `<td class="sm-stack" width="33%" align="center" valign="top" style="padding:0 4px;">
+            <div style="font-size:26px; line-height:1.1; font-weight:700; color:#4f46e5;">${value}</div>
+            <div style="margin-top:4px; font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#6b7280;">${label}</div>
+          </td>`;
+}
+
+function renderGradePills(grades: { subject: string; grade: string }[]): string {
+  if (grades.length === 0) {
+    return '<p style="margin:0; font-size:13px; color:#6b7280;">No exam practice recorded yet.</p>';
+  }
+
+  const shown = grades.slice(0, MAX_GRADE_PILLS);
+  const pills = shown
+    .map(
+      (g) =>
+        `<span style="display:inline-block; margin:0 6px 6px 0; padding:4px 10px; border-radius:8px; background-color:#eef2ff; font-size:13px; font-weight:600; color:#4338ca;">${escapeHtml(g.subject)} &#183; ${escapeHtml(g.grade)}</span>`
+    )
+    // Joined on a space, not '': the pills are inline-block spans, so without
+    // it htmlToText runs them together as "Mathematics · APhysics · B+" in the
+    // plain-text part. In HTML it is an unnoticeable few pixels of extra gap.
+    .join(' ');
+  const overflow = grades.length - shown.length;
+  const more =
+    overflow > 0
+      ? ` <span style="display:inline-block; margin:0 0 6px; padding:4px 0; font-size:13px; color:#6b7280;">+${overflow} more</span>`
+      : '';
+
+  return `<p style="margin:0 0 8px; font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#6b7280;">Latest predicted grades</p>
+          <div style="margin:0 0 -6px;">${pills}${more}</div>`;
+}
+
+function renderChildCard(child: ChildDigest): string {
+  const weakness = child.topWeaknessThisWeek
+    ? `<p style="margin:0 0 14px; padding:12px 14px; background-color:#fef9ec; border-left:3px solid #f0b429; border-radius:0 6px 6px 0; font-size:13px; line-height:1.5; color:#5c4813;"><strong style="font-weight:650;">Focus area this week:</strong> ${escapeHtml(child.topWeaknessThisWeek)}</p>`
+    : '';
+
+  // The stat values sit in <div>s rather than <span>s so htmlToText emits
+  // "12\nPractice" instead of running every number into one line.
   return `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;">
-      <h1 style="font-size:20px;color:#0f172a;">Your weekly AIDemic digest</h1>
-      ${sections}
-      <p style="font-size:12px;color:#94a3b8;margin-top:24px;">You are receiving this because your account is linked to a student on AIDemic.</p>
-    </div>`;
+<table role="presentation" class="dm-card" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px; border:1px solid #e4e4ea; border-radius:10px; background-color:#ffffff;">
+  <tr>
+    <td class="dm-body" style="padding:18px 20px;">
+      <h2 style="margin:0 0 14px; font-size:16px; line-height:1.3; font-weight:650; letter-spacing:-0.01em; color:#111827;">${escapeHtml(child.name)}</h2>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px; background-color:#f7f7fb; border-radius:8px;">
+        <tr>
+          <td style="padding:14px 8px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                ${renderStat(child.weeklyPracticeAttempts, 'Practice')}
+                ${renderStat(child.weeklyAssignmentsCompleted, 'Assignments')}
+                ${renderStat(child.currentStreakDays, 'Day streak')}
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+      ${weakness}
+      ${renderGradePills(child.latestPredictedGrades)}
+    </td>
+  </tr>
+</table>`;
+}
+
+/** Deduped and ordered: `childrenByParent` pushes once per link, so two active
+ *  links to the same student would render that child twice, and link order is
+ *  not deterministic. */
+function renderChildrenHtml(children: ChildDigest[]): string {
+  const unique = new Map(children.map((child) => [child.name, child]));
+  return [...unique.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(renderChildCard)
+    .join('');
 }
 
 Deno.serve(async (req) => {
@@ -89,10 +184,31 @@ Deno.serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const resendApiKey = Deno.env.get('RESEND_API_KEY');
-  const fromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'AIDemic <onboarding@resend.dev>';
-  if (!resendApiKey) {
-    return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), { status: 500 });
+  const emailServerUrl = (Deno.env.get('EMAIL_SERVER_URL') ?? '').trim().replace(/\/+$/, '');
+  const emailServerApiKey = (Deno.env.get('EMAIL_SERVER_API_KEY') ?? '').trim();
+  const appUrl = (Deno.env.get('APP_URL') ?? '').trim().replace(/\/+$/, '');
+  const supportEmail = (Deno.env.get('SUPPORT_EMAIL') ?? '').trim();
+  const appName = (Deno.env.get('APP_NAME') || 'AIDemic').trim();
+
+  // Checked for non-emptiness up front rather than left to the first send: an
+  // empty string is a *defined* template value, so email-server would happily
+  // render `mailto:` with no address and a CTA pointing at a path on no host.
+  // Failing here is the only way that stays visible.
+  const missingConfig = [
+    ['EMAIL_SERVER_URL', emailServerUrl],
+    ['EMAIL_SERVER_API_KEY', emailServerApiKey],
+    ['APP_URL', appUrl],
+    ['SUPPORT_EMAIL', supportEmail],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (missingConfig.length > 0) {
+    console.error(`[weekly-digest] missing config: ${missingConfig.join(', ')}`);
+    return new Response(JSON.stringify({ error: `Missing config: ${missingConfig.join(', ')}` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -195,29 +311,131 @@ Deno.serve(async (req) => {
     childrenByParent.set(link.parent_id as string, list);
   }
 
-  let sent = 0;
-  const failures: string[] = [];
+  // email-server validates every message in a chunk before it sends any of
+  // them, so a single unparseable address would 400 all 100. Filter first.
+  const messages: Array<{ to: string; template: string; data: Record<string, string> }> = [];
+  let invalidRecipients = 0;
+
+  const dayMonth = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const periodLabel = `${dayMonth.format(new Date(Date.now() - WEEK_MS))} – ${dayMonth.format(new Date())}`;
+
   for (const [parentId, children] of childrenByParent.entries()) {
-    const parentEmail = parentEmailById.get(parentId);
-    if (!parentEmail) continue;
+    const parentEmail = (parentEmailById.get(parentId) ?? '').trim();
+    if (!EMAIL_PATTERN.test(parentEmail)) {
+      invalidRecipients += 1;
+      continue;
+    }
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: parentEmail,
-        subject: 'Your weekly AIDemic digest',
-        html: renderEmailHtml(children),
-      }),
+    messages.push({
+      to: parentEmail,
+      template: 'weekly-digest',
+      // `from` is omitted on purpose: email-server falls back to MAIL_FROM, so
+      // the sender identity lives in one place instead of two.
+      data: {
+        appName,
+        supportEmail,
+        periodLabel,
+        dashboardUrl: `${appUrl}/dashboard/parent`,
+        childrenHtml: renderChildrenHtml(children),
+      },
     });
+  }
 
-    if (response.ok) {
-      sent += 1;
-    } else {
-      failures.push(`${parentEmail}: ${await response.text()}`);
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  let aborted: string | null = null;
+  let previewUrl: string | undefined;
+  const failures: string[] = [];
+
+  for (let offset = 0; offset < messages.length; offset += CHUNK_SIZE) {
+    const chunk = messages.slice(offset, offset + CHUNK_SIZE);
+
+    let response: Response;
+    try {
+      response = await fetch(`${emailServerUrl}/api/email/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': emailServerApiKey },
+        body: JSON.stringify({ messages: chunk, continueOnError: true }),
+        // A hung email-server would otherwise burn this function's whole
+        // wall-clock budget and take every later chunk down with it, silently.
+        signal: AbortSignal.timeout(CHUNK_TIMEOUT_MS),
+      });
+    } catch (error) {
+      failed += chunk.length;
+      const detail = error instanceof Error ? error.message : String(error);
+      failures.push(`chunk@${offset}: transport: ${detail}`);
+      console.error(`[weekly-digest] chunk@${offset} transport failure: ${detail}`);
+      continue;
+    }
+
+    const bodyText = await response.text();
+    let body: BulkResponse | null;
+    try {
+      body = JSON.parse(bodyText) as BulkResponse;
+    } catch {
+      body = null;
+    }
+
+    // 200 (all sent), 207 (partial) and 502 (none sent) all carry `results`.
+    // Anything else is a rejection of the request as a whole.
+    if (body && Array.isArray(body.results)) {
+      sent += body.sent;
+      failed += body.failed;
+      skipped += body.skipped;
+      for (const result of body.results) {
+        if (result.status === 'sent') {
+          previewUrl ??= result.previewUrl;
+          continue;
+        }
+        failures.push(
+          `${result.to.join(',')}: ${result.status}: ${result.error?.code ?? 'unknown'}: ${result.error?.message ?? ''}`.slice(0, 300)
+        );
+      }
+      continue;
+    }
+
+    failed += chunk.length;
+    failures.push(`chunk@${offset}: HTTP ${response.status}: ${bodyText.slice(0, 300)}`);
+    console.error(`[weekly-digest] chunk@${offset} rejected: HTTP ${response.status} ${bodyText.slice(0, 500)}`);
+
+    // A bad API key, an undeployed template, malformed data or an oversized body
+    // all fail every remaining chunk identically. Stop rather than hammer a
+    // server that has already said no.
+    if (FATAL_STATUSES.includes(response.status)) {
+      aborted = `HTTP ${response.status} from email-server; ${messages.length - offset - chunk.length} messages not attempted`;
+      break;
     }
   }
 
-  return new Response(JSON.stringify({ sent, failures }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  const summary = {
+    parents: childrenByParent.size,
+    attempted: messages.length,
+    sent,
+    failed,
+    skipped,
+    invalidRecipients,
+    ...(aborted ? { aborted } : {}),
+  };
+
+  // pg_net discards the response body, so console is the only channel through
+  // which a failed Monday run is visible (`supabase functions logs
+  // weekly-parent-digest`). The returned JSON is for manual invocation.
+  if (failed > 0 || aborted || invalidRecipients > 0) {
+    console.error('[weekly-digest]', JSON.stringify({ ...summary, failures: failures.slice(0, 20) }));
+  } else {
+    console.log('[weekly-digest]', JSON.stringify(summary));
+  }
+  if (previewUrl) console.log(`[weekly-digest] test-transport preview: ${previewUrl}`);
+
+  // A real status code, unlike the previous unconditional 200 that made total
+  // failure look identical to success. pg_net ignores it, but it persists in
+  // net._http_response.status_code, which makes that table a usable health
+  // check. Nothing retries on non-2xx, so there is no retry-storm risk.
+  const status = messages.length === 0 ? 200 : sent === 0 ? 500 : failed > 0 || aborted ? 207 : 200;
+
+  return new Response(JSON.stringify({ ...summary, failures: failures.slice(0, 20) }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 });

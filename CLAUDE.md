@@ -72,17 +72,37 @@ OPENAI_API_KEY          # or equivalent for OpenRouter/local LLM
 
 See `.env.local.example` for the full list including OpenRouter and local LLM options.
 
+Optional, for transactional email (see below): `EMAIL_SERVER_URL`, `EMAIL_SERVER_API_KEY`, `APP_NAME`, `APP_URL`, `SUPPORT_EMAIL`. If any is unset, welcome emails are skipped with a console warning and signup still works.
+
+### Transactional email (email-server)
+
+[email-server/](email-server/) is a standalone Express 5 + Nodemailer service that turns SMTP into a JSON API. It has its own `package.json`, `bun.lock` and `.env`, and is excluded from the root [tsconfig.json](tsconfig.json) — run its own `bun run typecheck` rather than the root one. Two consumers:
+
+- The Next app, via [src/lib/email.ts](src/lib/email.ts) → `POST /api/email/send-template`. Server-only (no `NEXT_PUBLIC_` prefix); returns `null`/skips rather than throwing when unconfigured, so a missing email can never break a user flow.
+- The weekly digest Edge Function, over **public HTTPS** with `x-api-key` → `POST /api/email/bulk`.
+
+Templates live in `email-server/src/templates/` — one `.html` body each plus `manifest.json`, all sharing `_layout.html`. Three things to know before editing them:
+
+- **Adding a placeholder makes it a hard requirement for every caller** — a missing variable is a 400, not a blank. `GET /api/email/templates` lists the derived requirement set; [src/lib/email.test.ts](src/lib/email.test.ts) pins `welcome`'s.
+- The engine has no loops or conditionals, so repeated/variant content arrives through a **raw slot** the caller fills: `notification.body`, `welcome.highlights`, `weekly-digest.childrenHtml`. Never interpolate user input into one.
+- With `SMTP_HOST` unset, email-server provisions an Ethereal test inbox: nothing is delivered and every response carries a `previewUrl`. `POST /api/email/preview` renders without sending at all.
+
 ## Database
 
 The migrations in `supabase/migrations/` are the **single source of truth** for the schema — apply changes through the Supabase SQL editor or Supabase MCP tools. [queries.sql](queries.sql) is a **legacy reference for the original student-learning tables only**; it predates the teacher/class/school, parent-link, podcast, and profile role/name columns and is **not runnable against a live database** (its destructive `DROP TABLE` block has been removed for that reason). To stand up a fresh database, apply the migrations in order.
 
-### Weekly parent digest (Resend + Edge Function + pg_cron)
+### Weekly parent digest (email-server + Edge Function + pg_cron)
 
-[supabase/functions/weekly-parent-digest/index.ts](supabase/functions/weekly-parent-digest/index.ts) emails each parent a weekly summary of their linked children (streak, assignments completed, weak topics, latest predicted grades). It is triggered by `trigger_weekly_parent_digest()`, a `pg_cron` job scheduled in migration `20260720100000` for Mondays at 08:00 UTC via `pg_net`. One-time setup after applying that migration:
+[supabase/functions/weekly-parent-digest/index.ts](supabase/functions/weekly-parent-digest/index.ts) emails each parent a weekly summary of their linked children (streak, assignments completed, weak topics, latest predicted grades). It is triggered by `trigger_weekly_parent_digest()`, a `pg_cron` job scheduled in migration `20260720100000` for Mondays at 08:00 UTC via `pg_net`. Delivery goes through email-server's `weekly-digest` template — one `POST /api/email/bulk` per 100 parents. One-time setup after applying that migration:
 
 ```bash
 supabase functions deploy weekly-parent-digest --no-verify-jwt
-supabase secrets set RESEND_API_KEY=re_xxx RESEND_FROM_EMAIL="AIDemic <digest@yourdomain.com>" CRON_SECRET=some-random-string
+supabase secrets set \
+  EMAIL_SERVER_URL=https://mail.yourdomain.com \
+  EMAIL_SERVER_API_KEY=one-of-email-servers-API_KEYS \
+  APP_NAME=AIDemic APP_URL=https://app.yourdomain.com \
+  SUPPORT_EMAIL=support@yourdomain.com \
+  CRON_SECRET=some-random-string
 ```
 
 Then, in the Supabase SQL editor:
@@ -94,7 +114,12 @@ insert into app_config (key, value) values
 on conflict (key) do update set value = excluded.value;
 ```
 
-`RESEND_FROM_EMAIL` must be a domain verified in Resend; until then it falls back to Resend's shared `onboarding@resend.dev` sender.
+Two deployment constraints:
+
+- **email-server must be reachable over public HTTPS from Supabase's edge network** — there is no VPC peering, so `localhost` and private addresses cannot work. Behind a reverse proxy, set email-server's `TRUST_PROXY=1` or every caller collapses into one shared rate-limit bucket.
+- **Deploy email-server before this function.** Templates load at module boot, so a `weekly-digest` template that is not live yet returns 404 for every message.
+
+`pg_net` discards the response body, so `supabase functions logs weekly-parent-digest` (a single `[weekly-digest] {...}` JSON line per run) is the only place failures surface. The function returns 500 when nothing sent and 207 on a partial failure, which lands in `net._http_response.status_code`.
 
 ### Parent-link notification (Resend + Edge Function + pg_net trigger)
 
@@ -102,10 +127,11 @@ on conflict (key) do update set value = excluded.value;
 
 ```bash
 supabase functions deploy parent-link-notification --no-verify-jwt
-supabase secrets set PARENT_LINK_NOTIFICATION_SECRET=some-random-string
+supabase secrets set PARENT_LINK_NOTIFICATION_SECRET=some-random-string \
+  RESEND_API_KEY=re_xxx RESEND_FROM_EMAIL="AIDemic <digest@yourdomain.com>"
 ```
 
-`RESEND_API_KEY` / `RESEND_FROM_EMAIL` are reused from the weekly digest setup above — no need to set them again. Then, in the Supabase SQL editor:
+This is the **only remaining Resend consumer** — the weekly digest now goes through email-server, so `RESEND_API_KEY` / `RESEND_FROM_EMAIL` are set here rather than reused from that section. `RESEND_FROM_EMAIL` must be a domain verified in Resend; until then it falls back to Resend's shared `onboarding@resend.dev` sender. Then, in the Supabase SQL editor:
 
 ```sql
 insert into app_config (key, value) values

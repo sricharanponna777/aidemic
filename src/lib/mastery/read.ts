@@ -186,6 +186,74 @@ export async function readDueSubtopics(
   return candidates.sort(comparePracticePriority).slice(0, options.limit ?? candidates.length);
 }
 
+const TOPIC_SUBTOPIC_SELECT = `
+  id, name,
+  topics!inner (
+    id, name,
+    specifications!inner (
+      name, tier,
+      subjects!inner (
+        name,
+        exam_boards!inner ( name, qualifications!inner ( name ) )
+      )
+    )
+  )
+`;
+
+/**
+ * Every subtopic of a topic, in specification order, with a zero-evidence state.
+ *
+ * The complement of readStudentMastery: that one answers "what has this student
+ * shown me", this one "what is in this topic at all". Callers need it wherever a
+ * subtopic must be practised before any evidence exists for it — a topic a
+ * student has never touched is exactly where a comprehension check is most
+ * informative, and the mastery table has nothing to offer there by definition.
+ *
+ * The returned states are `initialMasteryState()`, so every band is 'unknown'.
+ * That is the honest reading: no evidence is not weakness.
+ */
+export async function readTopicSubtopics(
+  db: SupabaseClient,
+  topicId: string
+): Promise<SubtopicMastery[]> {
+  if (!topicId) return [];
+  try {
+    const { data, error } = await db
+      .from('subtopics')
+      .select(TOPIC_SUBTOPIC_SELECT)
+      .eq('topic_id', topicId)
+      .order('order_index');
+
+    if (error) {
+      console.error('[spine] readTopicSubtopics failed', error.message);
+      return [];
+    }
+
+    const at = new Date();
+    return ((data ?? []) as unknown as NonNullable<MasteryJoinRow['subtopics']>[])
+      .map((subtopic) =>
+        toSubtopicMastery(
+          {
+            subtopic_id: subtopic.id,
+            strength: 0,
+            stability: 0,
+            confidence: 0,
+            evidence_count: 0,
+            last_seen_at: null,
+            due_at: null,
+            self_rating: null,
+            subtopics: subtopic,
+          },
+          at
+        )
+      )
+      .filter((row): row is SubtopicMastery => row !== null);
+  } catch (err) {
+    console.error('[spine] readTopicSubtopics failed', err);
+    return [];
+  }
+}
+
 export interface ClassMasteryCell {
   userId: string;
   subtopicId: string;
@@ -199,6 +267,39 @@ export interface ClassMastery {
   subtopics: { subtopicId: string; subtopicName: string }[];
   /** Keyed `${userId}:${subtopicId}`. A missing key means no evidence at all. */
   cells: Map<string, ClassMasteryCell>;
+}
+
+/**
+ * How many subtopics each specification contains.
+ *
+ * The denominator for coverage: a count of measured subtopics means nothing
+ * without the size of the course it is measured against. Issued as one HEAD
+ * request per specification rather than a single joined SELECT — a student has
+ * a handful of subjects, and counting server-side avoids pulling a thousand
+ * subtopic rows over the wire to call `.length` on them.
+ */
+export async function readSpecificationSubtopicCounts(
+  db: SupabaseClient,
+  specificationIds: string[]
+): Promise<Map<string, number>> {
+  const unique = [...new Set(specificationIds.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+
+  try {
+    const counts = await Promise.all(
+      unique.map(async (specificationId) => {
+        const { count } = await db
+          .from('subtopics')
+          .select('id, topics!inner(specification_id)', { count: 'exact', head: true })
+          .eq('topics.specification_id', specificationId);
+        return [specificationId, count ?? 0] as const;
+      })
+    );
+    return new Map(counts);
+  } catch (err) {
+    console.error('[spine] readSpecificationSubtopicCounts failed', err);
+    return new Map();
+  }
 }
 
 /** Topics of a class's specification, in specification order. */

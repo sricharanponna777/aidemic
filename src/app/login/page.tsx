@@ -80,6 +80,14 @@ function LoginContent() {
         } catch (syncErr) {
           console.error('Failed to sync new signup session:', syncErr);
         }
+
+        // Fire-and-forget, strictly after the awaited /api/auth cookie sync
+        // above -- the route authenticates via supabase.auth.getUser() off the
+        // SSR cookies, so firing it earlier would just 401. `keepalive` lets it
+        // outlive the navigation below; a dropped request costs one welcome
+        // email and never a duplicate, because the route claims a one-shot flag.
+        void fetch('/api/email/welcome', { method: 'POST', keepalive: true }).catch(() => {});
+
         router.push(onboardingPath);
         return;
       } else {

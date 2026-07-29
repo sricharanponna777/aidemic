@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Layers, Loader2, MessageCircle, RotateCcw, Send, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Layers, Loader2, MessageCircle, RotateCcw, Send, Sparkles, Target, XCircle } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
@@ -59,8 +59,182 @@ function ssWrite(key: string, value: unknown) {
   } catch {}
 }
 
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'] as const;
+
+type CheckQuestion = {
+  itemId: string;
+  subtopicName: string;
+  question: string;
+  options: string[];
+};
+
+type CheckResult = { correct: boolean; correctOption: string; explanation: string };
+
+/**
+ * One server-marked question on the topic under discussion.
+ *
+ * A chat has no ground truth — the tutor is agreeable by construction, so
+ * grading mastery from the transcript would be inventing a signal rather than
+ * measuring one. Asking a question the server stores and marks itself turns the
+ * conversation into real evidence, and reuses the machinery Daily Review already
+ * built for exactly that problem (see review_queue_items). The evidence lands as
+ * `tutor`, which EVIDENCE_WEIGHTS prices below marked exam practice.
+ */
+function UnderstandingCheck({ topicId }: { topicId: string | null }) {
+  const [question, setQuestion] = useState<CheckQuestion | null>(null);
+  const [result, setResult] = useState<CheckResult | null>(null);
+  const [selected, setSelected] = useState<string>('');
+  const [isBusy, setIsBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  if (!topicId) return null;
+
+  const start = async () => {
+    setIsBusy(true);
+    setErrorMessage('');
+    setQuestion(null);
+    setResult(null);
+    setSelected('');
+
+    try {
+      const response = await fetch('/api/review-queue/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId, source: 'tutor' }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        setErrorMessage(body.error || 'Could not build a question.');
+        return;
+      }
+      setQuestion({
+        itemId: body.itemId,
+        subtopicName: body.subtopicName ?? '',
+        question: body.question?.question ?? '',
+        options: body.question?.options ?? [],
+      });
+    } catch {
+      setErrorMessage('Network error while building your question.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const answer = async (letter: string) => {
+    if (!question || result) return;
+    setSelected(letter);
+    setIsBusy(true);
+
+    try {
+      const response = await fetch('/api/review-queue/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: question.itemId, selectedOption: letter }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        setSelected('');
+        setErrorMessage(body.error || 'Could not mark your answer.');
+        return;
+      }
+      setResult(body as CheckResult);
+    } catch {
+      setSelected('');
+      setErrorMessage('Network error while marking your answer.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-subtle pt-4">
+      {!question ? (
+        <>
+          <button
+            type="button"
+            onClick={() => void start()}
+            disabled={isBusy}
+            className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'w-full justify-center' })}
+          >
+            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
+            {isBusy ? 'Writing a question…' : 'Check my understanding'}
+          </button>
+          {errorMessage ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errorMessage}</p> : null}
+        </>
+      ) : (
+        <div className="space-y-3">
+          {question.subtopicName ? (
+            <p className="text-caption font-semibold uppercase tracking-wide text-content-subtle">
+              {question.subtopicName}
+            </p>
+          ) : null}
+          <MarkdownContent content={question.question} className="text-sm text-content" />
+
+          <div className="space-y-2">
+            {question.options.map((option, index) => {
+              const letter = OPTION_LETTERS[index];
+              const isChosen = selected === letter;
+              const isKey = result?.correctOption === letter;
+              const tone = !result
+                ? isChosen
+                  ? 'border-accent bg-accent-muted'
+                  : 'border-subtle bg-surface hover:border-strong'
+                : isKey
+                  ? 'border-emerald-500 bg-emerald-100 dark:bg-emerald-500/15'
+                  : isChosen
+                    ? 'border-red-500 bg-red-100 dark:bg-red-500/15'
+                    : 'border-subtle bg-surface opacity-70';
+
+              return (
+                <button
+                  key={letter}
+                  type="button"
+                  disabled={isBusy || !!result}
+                  onClick={() => void answer(letter)}
+                  className={`flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left text-sm text-content transition disabled:cursor-default ${tone}`}
+                >
+                  <span className="font-semibold">{letter}</span>
+                  <span className="min-w-0 flex-1">{option}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {result ? (
+            <div className="space-y-2">
+              <p
+                className={`inline-flex items-center gap-1.5 text-sm font-semibold ${
+                  result.correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {result.correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                {result.correct ? 'Correct' : 'Not quite'}
+              </p>
+              {result.explanation ? (
+                <MarkdownContent content={result.explanation} className="text-sm text-content-muted" />
+              ) : null}
+              <button
+                type="button"
+                onClick={() => void start()}
+                disabled={isBusy}
+                className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'w-full justify-center' })}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Ask me another
+              </button>
+            </div>
+          ) : null}
+
+          {errorMessage ? <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StudyChat({
   concept,
+  topicId,
   subject,
   examBoard,
   examType,
@@ -68,6 +242,8 @@ function StudyChat({
   setMessages,
 }: {
   concept: string;
+  /** The curriculum topic these notes came from, when it resolved to one. */
+  topicId: string | null;
   subject: string;
   examBoard: string;
   examType: string;
@@ -198,6 +374,8 @@ function StudyChat({
           {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </button>
       </form>
+
+      <UnderstandingCheck topicId={topicId} />
     </aside>
   );
 }
@@ -236,6 +414,10 @@ export default function NotesPage() {
   const { topics: topicOptions, isLoading: topicsLoading } = useTopicOptions(selectedSubject, specOption, poemOne, poemTwo);
   const topicSuggestions = topicOptions.map((option) => option.name);
   const selectedTopicOption = topicOptions.find((option) => option.name === topic.trim()) ?? null;
+  // Resolved against the notes on screen, not the form field: the two diverge as
+  // soon as a student edits the topic without regenerating, and Study Chat must
+  // check understanding of what it is actually discussing.
+  const activeTopicOption = topicOptions.find((option) => option.name === activeTopic) ?? null;
   const { subtopics: subtopicSuggestions } = useSubtopicOptions(selectedTopicOption?.id ?? null);
   const { objectives: learningObjectiveOptions } = useLearningObjectives(selectedSubject, 'notes');
   const paperOptions = getPaperOptions(selectedSubject);
@@ -551,6 +733,7 @@ export default function NotesPage() {
             {activeSubject ? (
               <StudyChat
                 concept={activeTopic}
+                topicId={activeTopicOption?.id ?? null}
                 subject={activeSubject.subject}
                 examBoard={activeSubject.exam_board}
                 examType={activeSubject.exam_type}
