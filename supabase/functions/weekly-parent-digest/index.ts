@@ -65,6 +65,10 @@ type ChildDigest = {
   topWeaknessThisWeek: string | null;
   currentStreakDays: number;
   latestPredictedGrades: { subject: string; grade: string }[];
+  lifetimePracticeHours: number;
+  lifetimeDaysStudied: number;
+  longestStreakDays: number;
+  averageGrade: string | null;
 };
 
 function buildStreak(sessionDates: number[]): number {
@@ -87,6 +91,29 @@ function buildStreak(sessionDates: number[]): number {
     if (dayTs < expectedDay.getTime()) break;
   }
   return streak;
+}
+
+function buildLongestStreak(sessionDates: number[]): number {
+  const uniqueDays = new Set<number>();
+  for (const ts of sessionDates) {
+    const day = new Date(ts);
+    day.setHours(0, 0, 0, 0);
+    uniqueDays.add(day.getTime());
+  }
+  const sortedDays = Array.from(uniqueDays).sort((a, b) => a - b);
+  if (sortedDays.length === 0) return 0;
+
+  let maxStreak = 1;
+  let currentStreak = 1;
+  for (let i = 1; i < sortedDays.length; i++) {
+    if (sortedDays[i] - sortedDays[i - 1] === 86400000) {
+      currentStreak += 1;
+      maxStreak = Math.max(maxStreak, currentStreak);
+    } else {
+      currentStreak = 1;
+    }
+  }
+  return maxStreak;
 }
 
 // --------------------------------------------------------------------------
@@ -147,6 +174,8 @@ function renderChildCard(child: ChildDigest): string {
   <tr>
     <td class="dm-body" style="padding:18px 20px;">
       <h2 style="margin:0 0 14px; font-size:16px; line-height:1.3; font-weight:650; letter-spacing:-0.01em; color:#111827;">${escapeHtml(child.name)}</h2>
+
+      <p style="margin:0 0 8px; font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#6b7280;">This week</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px; background-color:#f7f7fb; border-radius:8px;">
         <tr>
           <td style="padding:14px 8px;">
@@ -160,6 +189,22 @@ function renderChildCard(child: ChildDigest): string {
           </td>
         </tr>
       </table>
+
+      <p style="margin:0 0 8px; font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#6b7280;">Lifetime</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px; background-color:#f7f7fb; border-radius:8px;">
+        <tr>
+          <td style="padding:14px 8px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                ${renderStat(child.lifetimePracticeHours, 'Hours studied')}
+                ${renderStat(child.lifetimeDaysStudied, 'Days studied')}
+                ${renderStat(child.longestStreakDays, 'Best streak')}
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
       ${weakness}
       ${renderGradePills(child.latestPredictedGrades)}
     </td>
@@ -253,7 +298,7 @@ Deno.serve(async (req) => {
         .eq('user_id', studentId)
         .order('created_at', { ascending: false })
         .limit(100),
-      supabase.from('study_sessions').select('started_at').eq('user_id', studentId),
+      supabase.from('study_sessions').select('started_at, duration_minutes').eq('user_id', studentId),
       supabase.from('assignment_attempts').select('status, completed_at').eq('student_id', studentId),
     ]);
 
@@ -284,10 +329,40 @@ Deno.serve(async (req) => {
     }
     const topWeaknessThisWeek = [...tagCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
-    const sessionDates = ((sessionsResp.data ?? []) as Array<{ started_at: string | null }>)
+    const sessions = (sessionsResp.data ?? []) as Array<{ started_at: string | null; duration_minutes: number | null }>;
+    const sessionDates = sessions
       .map((s) => (s.started_at ? new Date(s.started_at).getTime() : NaN))
       .filter((t) => Number.isFinite(t));
     const currentStreakDays = buildStreak(sessionDates);
+
+    const lifetimePracticeMinutes = sessions.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0);
+    const lifetimePracticeHours = Math.round(lifetimePracticeMinutes / 60);
+
+    const uniqueDays = new Set<number>();
+    for (const s of sessions) {
+      if (s.started_at) {
+        const day = new Date(s.started_at);
+        day.setHours(0, 0, 0, 0);
+        uniqueDays.add(day.getTime());
+      }
+    }
+    const lifetimeDaysStudied = uniqueDays.size;
+
+    const longestStreakDays = buildLongestStreak(sessionDates);
+
+    const gradeValues = Array.from(latestGradeBySubject.values())
+      .filter((g) => /^[A-Fa-f][\+*]?$|^\d+/.test(g))
+      .map((g) => {
+        const match = g.match(/^([A-Fa-f])([\+*])?/);
+        if (match) {
+          const base = g.charCodeAt(0) - 65;
+          const modifier = match[2] === '+' ? 0.5 : match[2] === '*' ? -0.5 : 0;
+          return base + modifier;
+        }
+        return NaN;
+      })
+      .filter((v) => !isNaN(v));
+    const averageGrade = gradeValues.length > 0 ? String.fromCharCode(65 + Math.round(gradeValues.reduce((a, b) => a + b) / gradeValues.length)) : null;
 
     const weeklyAssignmentsCompleted = ((assignmentsResp.data ?? []) as Array<{ status: string; completed_at: string | null }>).filter(
       (a) => a.status === 'completed' && a.completed_at && a.completed_at >= weekAgo
@@ -300,6 +375,10 @@ Deno.serve(async (req) => {
       topWeaknessThisWeek,
       currentStreakDays,
       latestPredictedGrades: [...latestGradeBySubject.entries()].map(([subject, grade]) => ({ subject, grade })),
+      lifetimePracticeHours,
+      lifetimeDaysStudied,
+      longestStreakDays,
+      averageGrade,
     });
   }
 

@@ -83,7 +83,7 @@ export default function Home() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href={loginHref} className={buttonStyles({ variant: "primary", size: "lg", className: "bg-surface text-slate-950 shadow-xl shadow-indigo-950/30 hover:bg-slate-100" })}>
+              <Link href={loginHref} className={buttonStyles({ variant: "secondary", size: "lg", className: "border-white/30 bg-white/15 text-white hover:bg-white/25" })}>
                 Log in
               </Link>
               <Link href={signUpHref} className={buttonStyles({ variant: "secondary", size: "lg", className: "border-white/30 bg-surface/12 text-white hover:bg-surface/18" })}>
