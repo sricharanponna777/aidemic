@@ -9,7 +9,7 @@ interface RenderedEmail {
 }
 
 const TEMPLATES_DIR = path.join(process.cwd(), 'src', 'emails', 'templates');
-const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/send';
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 let cachedManifest: Record<string, Record<string, string>> | null = null;
 
@@ -260,4 +260,22 @@ function parseFromAddress(from: string): { name?: string; email: string } {
     return { name: parsed[1].trim(), email: parsed[2].trim() };
   }
   return { email: from };
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#183;/g, '·')
+    .replace(/\n\s*\n/g, '\n\n')
+    .trim();
 }
