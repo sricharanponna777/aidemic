@@ -72,36 +72,35 @@ OPENAI_API_KEY          # or equivalent for OpenRouter/local LLM
 
 See `.env.local.example` for the full list including OpenRouter and local LLM options.
 
-Optional, for transactional email (see below): `EMAIL_SERVER_URL`, `EMAIL_SERVER_API_KEY`, `APP_NAME`, `APP_URL`, `SUPPORT_EMAIL`. If any is unset, welcome emails are skipped with a console warning and signup still works.
+Optional, for transactional email (see below): `BREVO_API_KEY`, `BREVO_SMTP_FROM`, `APP_NAME`, `APP_URL`, `SUPPORT_EMAIL`. If any is unset, emails are skipped with a console warning and signup still works.
 
-### Transactional email (email-server)
+### Transactional email (Brevo SMTP)
 
-[email-server/](email-server/) is a standalone Express 5 + Nodemailer service that turns SMTP into a JSON API. It has its own `package.json`, `bun.lock` and `.env`, and is excluded from the root [tsconfig.json](tsconfig.json) — run its own `bun run typecheck` rather than the root one. Two consumers:
+Emails are sent via Nodemailer + Brevo SMTP. Two consumers:
 
-- The Next app, via [src/lib/email.ts](src/lib/email.ts) → `POST /api/email/send-template`. Server-only (no `NEXT_PUBLIC_` prefix); returns `null`/skips rather than throwing when unconfigured, so a missing email can never break a user flow.
-- The weekly digest Edge Function, over **public HTTPS** with `x-api-key` → `POST /api/email/bulk`.
+- The Next app, via [src/lib/email.ts](src/lib/email.ts) and [src/lib/email-mailer.ts](src/lib/email-mailer.ts). Server-only (no `NEXT_PUBLIC_` prefix); returns ok: false and skips rather than throwing when unconfigured, so a missing email can never break a user flow.
+- The weekly digest Edge Function, over **public HTTPS** to [src/app/api/email/bulk/route.ts](src/app/api/email/bulk/route.ts).
 
-Templates live in `email-server/src/templates/` — one `.html` body each plus `manifest.json`, all sharing `_layout.html`. Three things to know before editing them:
+Templates live in [src/emails/templates/](src/emails/templates/) — one `.html` body each plus `manifest.json`, all sharing `_layout.html`. Three things to know before editing:
 
-- **Adding a placeholder makes it a hard requirement for every caller** — a missing variable is a 400, not a blank. `GET /api/email/templates` lists the derived requirement set; [src/lib/email.test.ts](src/lib/email.test.ts) pins `welcome`'s.
-- The engine has no loops or conditionals, so repeated/variant content arrives through a **raw slot** the caller fills: `notification.body`, `welcome.highlights`, `weekly-digest.childrenHtml`. Never interpolate user input into one.
-- With `SMTP_HOST` unset, email-server provisions an Ethereal test inbox: nothing is delivered and every response carries a `previewUrl`. `POST /api/email/preview` renders without sending at all.
+- **Adding a placeholder makes it a hard requirement for every caller** — a missing variable throws an error. [src/lib/email.test.ts](src/lib/email.test.ts) pins `welcome`'s required set.
+- The template engine has no loops or conditionals, so repeated/variant content arrives through a **raw slot** the caller fills: `notification.body`, `welcome.highlights`, `weekly-digest.childrenHtml`. Never interpolate user input into one.
+- Template variables use `{{name}}` for escaped output and `{{{name}}}` for raw HTML (never user input).
 
 ## Database
 
 The migrations in `supabase/migrations/` are the **single source of truth** for the schema — apply changes through the Supabase SQL editor or Supabase MCP tools. [queries.sql](queries.sql) is a **legacy reference for the original student-learning tables only**; it predates the teacher/class/school, parent-link, podcast, and profile role/name columns and is **not runnable against a live database** (its destructive `DROP TABLE` block has been removed for that reason). To stand up a fresh database, apply the migrations in order.
 
-### Weekly parent digest (email-server + Edge Function + pg_cron)
+### Weekly parent digest (Edge Function + pg_cron)
 
-[supabase/functions/weekly-parent-digest/index.ts](supabase/functions/weekly-parent-digest/index.ts) emails each parent a weekly summary of their linked children (streak, assignments completed, weak topics, latest predicted grades). It is triggered by `trigger_weekly_parent_digest()`, a `pg_cron` job scheduled in migration `20260720100000` for Mondays at 08:00 UTC via `pg_net`. Delivery goes through email-server's `weekly-digest` template — one `POST /api/email/bulk` per 100 parents. One-time setup after applying that migration:
+[supabase/functions/weekly-parent-digest/index.ts](supabase/functions/weekly-parent-digest/index.ts) emails each parent a weekly summary of their linked children (streak, assignments completed, weak topics, latest predicted grades). It is triggered by `trigger_weekly_parent_digest()`, a `pg_cron` job scheduled in migration `20260720100000` for Mondays at 08:00 UTC via `pg_net`. Delivery goes through the app's [src/app/api/email/bulk/route.ts](src/app/api/email/bulk/route.ts) endpoint — one `POST /api/email/bulk` per 100 parents. One-time setup after applying that migration:
 
 ```bash
 supabase functions deploy weekly-parent-digest --no-verify-jwt
 supabase secrets set \
-  EMAIL_SERVER_URL=https://mail.yourdomain.com \
-  EMAIL_SERVER_API_KEY=one-of-email-servers-API_KEYS \
-  APP_NAME=AIDemic APP_URL=https://app.yourdomain.com \
-  SUPPORT_EMAIL=support@yourdomain.com \
+  APP_URL=https://yourdomain.com \
+  BULK_EMAIL_SECRET=some-random-string \
+  APP_NAME=AIDemic SUPPORT_EMAIL=support@yourdomain.com \
   CRON_SECRET=some-random-string
 ```
 
@@ -114,10 +113,9 @@ insert into app_config (key, value) values
 on conflict (key) do update set value = excluded.value;
 ```
 
-Two deployment constraints:
+One deployment constraint:
 
-- **email-server must be reachable over public HTTPS from Supabase's edge network** — there is no VPC peering, so `localhost` and private addresses cannot work. Behind a reverse proxy, set email-server's `TRUST_PROXY=1` or every caller collapses into one shared rate-limit bucket.
-- **Deploy email-server before this function.** Templates load at module boot, so a `weekly-digest` template that is not live yet returns 404 for every message.
+- **The main app must be reachable over public HTTPS from Supabase's edge network** — there is no VPC peering, so `localhost` and private addresses cannot work.
 
 `pg_net` discards the response body, so `supabase functions logs weekly-parent-digest` (a single `[weekly-digest] {...}` JSON line per run) is the only place failures surface. The function returns 500 when nothing sent and 207 on a partial failure, which lands in `net._http_response.status_code`.
 

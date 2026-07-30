@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { tryCreateAdminClient } from '@/lib/supabase-admin';
 import { buildWelcomeData, getEmailServerConfig, missingEmailEnv, sendTemplateEmail } from '@/lib/email';
+import { isMailerConfigured } from '@/lib/email-mailer';
 
 /**
  * Sends the post-signup welcome email, at most once per account.
@@ -23,9 +24,9 @@ export async function POST() {
     // Checked BEFORE the claim on purpose: an unconfigured environment must
     // leave welcome_email_sent_at null so the email still goes out once the
     // variables are set, rather than being permanently burned.
-    if (!getEmailServerConfig()) {
+    if (!isMailerConfigured() || !getEmailServerConfig()) {
       console.warn(`[email] welcome skipped: unset ${missingEmailEnv().join(', ')}`);
-      return NextResponse.json({ ok: true, skipped: 'email-server-not-configured' });
+      return NextResponse.json({ ok: true, skipped: 'email-not-configured' });
     }
 
     const admin = tryCreateAdminClient();

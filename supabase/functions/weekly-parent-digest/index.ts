@@ -2,18 +2,18 @@
 // pg_cron job (see migration 20260720100000) every Monday at 08:00 UTC via
 // pg_net -- not meant to be called directly by the app or by end users.
 //
-// Delivery goes through the standalone email-server (../../email-server), which
-// must be reachable over public HTTPS from Supabase's edge network -- there is
-// no VPC peering. One POST /api/email/bulk per 100 parents, so retries,
-// connection pooling and the plain-text alternative are all its problem.
+// Delivery goes through the main app's /api/email/bulk endpoint, which must be
+// reachable over public HTTPS from Supabase's edge network -- there is no VPC
+// peering. One POST /api/email/bulk per 100 parents, so retries, connection
+// pooling and the plain-text alternative are all the app's problem.
 //
 // Deploy: supabase functions deploy weekly-parent-digest --no-verify-jwt
-// Secrets (set once): supabase secrets set EMAIL_SERVER_URL=... EMAIL_SERVER_API_KEY=... \
-//   APP_NAME=AIDemic APP_URL=... SUPPORT_EMAIL=... CRON_SECRET=...
+// Secrets (set once): supabase secrets set APP_URL=... BULK_EMAIL_SECRET=... \
+//   APP_NAME=AIDemic SUPPORT_EMAIL=... CRON_SECRET=...
 // (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are provided automatically by the platform.)
 //
-// The `weekly-digest` template must exist in email-server BEFORE this function
-// is deployed, or every message comes back 404.
+// The `weekly-digest` template must exist in the main app's src/emails/templates/
+// BEFORE this function is deployed, or every message comes back 404.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -184,20 +184,18 @@ Deno.serve(async (req) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const emailServerUrl = (Deno.env.get('EMAIL_SERVER_URL') ?? '').trim().replace(/\/+$/, '');
-  const emailServerApiKey = (Deno.env.get('EMAIL_SERVER_API_KEY') ?? '').trim();
   const appUrl = (Deno.env.get('APP_URL') ?? '').trim().replace(/\/+$/, '');
+  const bulkEmailSecret = (Deno.env.get('BULK_EMAIL_SECRET') ?? '').trim();
   const supportEmail = (Deno.env.get('SUPPORT_EMAIL') ?? '').trim();
   const appName = (Deno.env.get('APP_NAME') || 'AIDemic').trim();
 
   // Checked for non-emptiness up front rather than left to the first send: an
-  // empty string is a *defined* template value, so email-server would happily
+  // empty string is a *defined* template value, so the API would happily
   // render `mailto:` with no address and a CTA pointing at a path on no host.
   // Failing here is the only way that stays visible.
   const missingConfig = [
-    ['EMAIL_SERVER_URL', emailServerUrl],
-    ['EMAIL_SERVER_API_KEY', emailServerApiKey],
     ['APP_URL', appUrl],
+    ['BULK_EMAIL_SECRET', bulkEmailSecret],
     ['SUPPORT_EMAIL', supportEmail],
   ]
     .filter(([, value]) => !value)
@@ -210,6 +208,9 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+
+  // BULK_EMAIL_SECRET is optional: if unset, the endpoint is open (dev mode)
+  const emailApiUrl = `${appUrl}/api/email/bulk`;
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -353,12 +354,17 @@ Deno.serve(async (req) => {
 
     let response: Response;
     try {
-      response = await fetch(`${emailServerUrl}/api/email/bulk`, {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (bulkEmailSecret) {
+        headers['x-api-key'] = bulkEmailSecret;
+      }
+
+      response = await fetch(emailApiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': emailServerApiKey },
-        body: JSON.stringify({ messages: chunk, continueOnError: true }),
-        // A hung email-server would otherwise burn this function's whole
-        // wall-clock budget and take every later chunk down with it, silently.
+        headers,
+        body: JSON.stringify({ messages: chunk }),
+        // A hung API would otherwise burn this function's whole wall-clock
+        // budget and take every later chunk down with it, silently.
         signal: AbortSignal.timeout(CHUNK_TIMEOUT_MS),
       });
     } catch (error) {

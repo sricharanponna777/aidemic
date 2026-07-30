@@ -10,12 +10,11 @@
          client honours. This block exists solely for the two things inline CSS
          cannot express at all.
 
-         Keep it free of double-brace sequences: templates.ts substitutes this
-         file, so an unrecognised placeholder anywhere in it becomes a required
-         variable for every template that uses this layout, and a hard 400.
-
-         Class contract: .sm-px .sm-h1 .sm-stack .dm-page .dm-card .dm-body are
-         also emitted by the digest cards built in
+         Keep it free of double-brace sequences: the template engine substitutes
+         this file, so an unrecognised placeholder anywhere in it becomes a
+         required variable for every template that uses this layout, and a hard
+         error. Class contract: .sm-px .sm-h1 .sm-stack .dm-page .dm-card
+         .dm-body are also emitted by the digest cards built in
          supabase/functions/weekly-parent-digest/index.ts. Renaming one here
          means editing that file too. */
 

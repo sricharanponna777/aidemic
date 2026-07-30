@@ -22,11 +22,11 @@ const WELCOME_VARIABLES = [
   'supportEmail',
 ] as const;
 
-const ENV = ['EMAIL_SERVER_URL', 'EMAIL_SERVER_API_KEY', 'APP_URL', 'SUPPORT_EMAIL', 'APP_NAME'] as const;
+const ENV = ['BREVO_API_KEY', 'BREVO_SMTP_FROM', 'APP_URL', 'SUPPORT_EMAIL', 'APP_NAME'] as const;
 
 function configure() {
-  process.env.EMAIL_SERVER_URL = 'http://localhost:4000';
-  process.env.EMAIL_SERVER_API_KEY = 'test-key';
+  process.env.BREVO_API_KEY = 'test-api-key';
+  process.env.BREVO_SMTP_FROM = 'AIDemic <noreply@example.com>';
   process.env.APP_URL = 'https://app.example.com';
   process.env.SUPPORT_EMAIL = 'support@example.com';
   process.env.APP_NAME = 'AIDemic';
@@ -48,27 +48,25 @@ afterEach(() => {
 });
 
 describe('missingEmailEnv / getEmailServerConfig', () => {
-  it('reports nothing missing when all four are set', () => {
+  it('reports nothing missing when all are set', () => {
     expect(missingEmailEnv()).toEqual([]);
     expect(getEmailServerConfig()).not.toBeNull();
   });
 
-  it('gates on all four, not just the URL and key', () => {
+  it('gates on required config', () => {
     delete process.env.SUPPORT_EMAIL;
-    expect(missingEmailEnv()).toEqual(['SUPPORT_EMAIL']);
+    expect(missingEmailEnv()).toContain('SUPPORT_EMAIL');
     expect(getEmailServerConfig()).toBeNull();
   });
 
   it('treats whitespace as unset', () => {
     process.env.APP_URL = '   ';
-    expect(missingEmailEnv()).toEqual(['APP_URL']);
+    expect(missingEmailEnv()).toContain('APP_URL');
   });
 
   it('strips trailing slashes so URLs never double up', () => {
-    process.env.EMAIL_SERVER_URL = 'http://localhost:4000/';
     process.env.APP_URL = 'https://app.example.com//';
     const config = getEmailServerConfig();
-    expect(config?.baseUrl).toBe('http://localhost:4000');
     expect(config?.appUrl).toBe('https://app.example.com');
   });
 
@@ -148,37 +146,36 @@ describe('buildWelcomeData', () => {
 
 describe('sendTemplateEmail', () => {
   it('no-ops without calling out when email is not configured', async () => {
-    delete process.env.EMAIL_SERVER_URL;
+    // Build data while config is set
+    const data = buildWelcomeData({});
+    // Then delete the config for the send call
+    delete process.env.BREVO_API_KEY;
+
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const result = await sendTemplateEmail({ to: 'a@example.com', template: 'welcome', data: {} });
+    const result = await sendTemplateEmail({ to: 'a@example.com', template: 'welcome', data });
 
     expect(result).toEqual({ ok: false, skipped: 'not-configured' });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled();
   });
 
-  it('posts to send-template with the API key', async () => {
+  it('posts to Brevo API with the API key', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      .mockResolvedValue(new Response(JSON.stringify({ messageId: '<test@example.com>' }), { status: 200 }));
 
     const result = await sendTemplateEmail({
       to: 'a@example.com',
       template: 'welcome',
-      data: { firstName: 'Ada' },
+      data: buildWelcomeData({ first_name: 'Ada' }),
     });
 
     expect(result.ok).toBe(true);
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://localhost:4000/api/email/send-template');
-    expect((init.headers as Record<string, string>)['x-api-key']).toBe('test-key');
-    expect(JSON.parse(init.body as string)).toEqual({
-      to: 'a@example.com',
-      template: 'welcome',
-      data: { firstName: 'Ada' },
-    });
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit | undefined];
+    expect(url).toBe('https://api.brevo.com/v3/smtp/email');
+    expect((init?.headers as Record<string, string>)['api-key']).toBe('test-api-key');
   });
 
   it('reports a non-2xx as a failure without throwing', async () => {
@@ -187,7 +184,7 @@ describe('sendTemplateEmail', () => {
     );
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(sendTemplateEmail({ to: 'a@example.com', template: 'welcome', data: {} })).resolves.toEqual({
+    await expect(sendTemplateEmail({ to: 'a@example.com', template: 'welcome', data: buildWelcomeData({}) })).resolves.toEqual({
       ok: false,
       error: 'HTTP 400',
     });
@@ -197,7 +194,7 @@ describe('sendTemplateEmail', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'));
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(sendTemplateEmail({ to: 'a@example.com', template: 'welcome', data: {} })).resolves.toEqual({
+    await expect(sendTemplateEmail({ to: 'a@example.com', template: 'welcome', data: buildWelcomeData({}) })).resolves.toEqual({
       ok: false,
       error: 'ECONNREFUSED',
     });

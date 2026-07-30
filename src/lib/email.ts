@@ -1,22 +1,12 @@
-// Client for the standalone email-server (./email-server, POST /api/email/*).
-//
-// Server-only, by the same convention as src/lib/supabase-admin.ts: none of
-// these variables carry a NEXT_PUBLIC_ prefix, so importing this from a client
-// component reads undefined and silently no-ops. Import from route handlers
-// only.
+// Email client for sending template-based emails via Brevo API.
+// Server-only: no NEXT_PUBLIC_ prefix, so importing from a client component
+// reads undefined and silently no-ops. Import from route handlers only.
 
-const SEND_TIMEOUT_MS = 10_000;
-
-/** All four gate a send, not just the URL and key: _layout.html hard-requires
- *  supportEmail and every template CTA needs an absolute URL, so sending
- *  without them is a guaranteed 400. Better to skip loudly than 400 quietly. */
-const REQUIRED_ENV = ['EMAIL_SERVER_URL', 'EMAIL_SERVER_API_KEY', 'APP_URL', 'SUPPORT_EMAIL'] as const;
+import { sendEmail as sendViaMailer, getMissingMailerEnv } from './email-mailer';
 
 type TemplateData = Record<string, string | number | boolean>;
 
-type EmailServerConfig = {
-  baseUrl: string;
-  apiKey: string;
+type EmailConfig = {
   appName: string;
   appUrl: string;
   supportEmail: string;
@@ -28,19 +18,24 @@ const read = (name: string) => (process.env[name] || '').trim();
 
 /** Which required variables are unset. Empty means email is configured. */
 export function missingEmailEnv(): string[] {
-  return REQUIRED_ENV.filter((name) => !read(name));
+  const missing = getMissingMailerEnv();
+  const appUrl = read('APP_URL');
+  const supportEmail = read('SUPPORT_EMAIL');
+
+  if (!appUrl) missing.push('APP_URL');
+  if (!supportEmail) missing.push('SUPPORT_EMAIL');
+
+  return missing;
 }
 
 /**
- * `null` when email is not configured -- local dev with no email-server, or a
- * deploy that has not had the variables added yet. Callers treat that as
- * "skip", never "fail": a missing welcome email must not break signup.
+ * `null` when email is not configured -- local dev without Brevo, or a deploy
+ * that has not had the variables added yet. Callers treat that as "skip",
+ * never "fail": a missing welcome email must not break signup.
  */
-export function getEmailServerConfig(): EmailServerConfig | null {
+export function getEmailServerConfig(): EmailConfig | null {
   if (missingEmailEnv().length > 0) return null;
   return {
-    baseUrl: read('EMAIL_SERVER_URL').replace(/\/+$/, ''),
-    apiKey: read('EMAIL_SERVER_API_KEY'),
     appName: read('APP_NAME') || 'AIDemic',
     appUrl: read('APP_URL').replace(/\/+$/, ''),
     supportEmail: read('SUPPORT_EMAIL'),
@@ -73,37 +68,22 @@ export async function sendTemplateEmail(input: {
     return { ok: false, skipped: 'not-configured' };
   }
 
-  try {
-    const response = await fetch(`${config.baseUrl}/api/email/send-template`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': config.apiKey },
-      body: JSON.stringify({
-        to: input.to,
-        template: input.template,
-        data: input.data,
-        ...(input.subject ? { subject: input.subject } : {}),
-      }),
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-      cache: 'no-store',
-    });
+  // Enrich data with config values (appName, supportEmail, year)
+  const enrichedData = {
+    ...input.data,
+    appName: config.appName,
+    supportEmail: config.supportEmail,
+    year: new Date().getFullYear(),
+  };
 
-    if (!response.ok) {
-      // A 400 body carries { template, missing, required } -- exactly what you
-      // need to see when a template gains a placeholder and a caller does not.
-      const detail = (await response.text().catch(() => '')).slice(0, 500);
-      console.error(`[email] "${input.template}" failed: HTTP ${response.status} ${detail}`);
-      return { ok: false, error: `HTTP ${response.status}` };
-    }
+  const result = await sendViaMailer({
+    to: input.to,
+    template: input.template,
+    data: enrichedData,
+    subject: input.subject,
+  });
 
-    const body = (await response.json().catch(() => null)) as { previewUrl?: string } | null;
-    // Present only on the Ethereal test transport (SMTP_HOST unset). The local
-    // verification loop hangs off this line.
-    if (body?.previewUrl) console.log(`[email] "${input.template}" preview: ${body.previewUrl}`);
-    return { ok: true };
-  } catch (error) {
-    console.error(`[email] "${input.template}" failed:`, error);
-    return { ok: false, error: error instanceof Error ? error.message : 'unknown' };
-  }
+  return { ok: result.ok, error: result.error };
 }
 
 // ---------------------------------------------------------------------------
