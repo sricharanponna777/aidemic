@@ -138,6 +138,7 @@ export async function sendEmail(input: {
         to: [{ email: input.to }],
         subject,
         htmlContent: rendered.html,
+        textContent: htmlToPlainText(rendered.html),
       }),
     });
 
@@ -213,6 +214,7 @@ export async function sendBulkEmail(input: {
           to: [{ email: msg.to }],
           subject: rendered.subject,
           htmlContent: rendered.html,
+          textContent: htmlToPlainText(rendered.html),
         }),
       });
 
@@ -260,4 +262,22 @@ function parseFromAddress(from: string): { name?: string; email: string } {
     return { name: parsed[1].trim(), email: parsed[2].trim() };
   }
   return { email: from };
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#183;/g, '·')
+    .replace(/\n\s*\n/g, '\n\n')
+    .trim();
 }
