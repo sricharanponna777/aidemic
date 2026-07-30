@@ -47,7 +47,7 @@ function escapeHtml(value: string): string {
 }
 
 function interpolate(template: string, data: TemplateData, escapeVars = true): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+  return template.replace(/(?<!\{)\{\{(\w+)\}\}(?!\})/g, (match, key) => {
     const value = data[key];
     if (value === undefined) {
       throw new Error(`Missing template variable: ${key}`);
