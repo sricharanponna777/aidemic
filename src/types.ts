@@ -24,9 +24,9 @@ export interface ParentLink {
   id: string;
   student_id: string;
   parent_id: string | null;
-  invite_code: string;
+  invite_code: string | null;
   status: 'pending' | 'active' | 'revoked';
-  link_source: 'student' | 'teacher';
+  link_source: 'student' | 'teacher' | 'parent';
   created_by: string | null;
   revocation_requested_at: string | null;
   created_at?: string;

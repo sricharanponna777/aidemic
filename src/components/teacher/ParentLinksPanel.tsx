@@ -76,6 +76,7 @@ export function ParentLinksPanel({ studentId }: { studentId: string }) {
   };
 
   const handleCopy = async (link: LinkRow) => {
+    if (!link.invite_code) return;
     await navigator.clipboard.writeText(link.invite_code);
     setCopiedId(link.id);
     window.setTimeout(() => setCopiedId((current) => (current === link.id ? null : current)), 2000);

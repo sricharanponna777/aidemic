@@ -1,8 +1,10 @@
-// Notifies a student by email as soon as a parent redeems an invite code and
-// links to their account. Invoked by the `parent_link_activated_notify`
-// trigger (see migration 20260722000000) via pg_net, immediately after
-// redeem_parent_invite_code() flips a parent_links row to 'active' -- not
-// meant to be called directly by the app or by end users.
+// Notifies the appropriate party when a parent_links row becomes 'active'.
+// Invoked by the `parent_link_activated_notify` trigger (see migration 20260722000000)
+// via pg_net, immediately after any operation flips a parent_links row to 'active'.
+// Behavior depends on link_source:
+// - 'teacher': emails the student (unchanged from original)
+// - 'parent': emails the parent (new as of migration 20260801010000)
+// Not meant to be called directly by the app or by end users.
 //
 // Deploy: supabase functions deploy parent-link-notification --no-verify-jwt
 // Secrets (set once): supabase secrets set PARENT_LINK_NOTIFICATION_SECRET=...
@@ -20,7 +22,28 @@ type Profile = { id: string; email: string; full_name?: string | null; first_nam
 const displayName = (profile?: Profile) =>
   profile?.full_name || profile?.first_name || profile?.username || profile?.email || 'Someone';
 
-function renderEmailHtml({ studentName, parentName }: { studentName: string; parentName: string }): string {
+function renderEmailHtml(
+  { studentName, parentName }: { studentName: string; parentName: string },
+  linkSource: string = 'teacher'
+): string {
+  // For parent-initiated links, the parent accepted the student's approval.
+  if (linkSource === 'parent') {
+    return `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;">
+        <h1 style="font-size:20px;color:#0f172a;">Your request to link with ${escapeHtml(studentName)} was accepted</h1>
+        <p style="font-size:14px;color:#334155;">Hi ${escapeHtml(parentName)},</p>
+        <p style="font-size:14px;color:#334155;">
+          <strong>${escapeHtml(studentName)}</strong> accepted your request to link to their account.
+          You can now view their predicted grades, study streak, recurring weak topics, and assignment progress from your parent dashboard.
+        </p>
+        <p style="font-size:14px;color:#334155;">
+          If you have any questions, you can reach out to ${escapeHtml(studentName)} or visit your parent dashboard anytime.
+        </p>
+        <p style="font-size:12px;color:#94a3b8;margin-top:24px;">You are receiving this because a student accepted your parent account link request on AIDemic.</p>
+      </div>`;
+  }
+
+  // For teacher-initiated links, the parent redeemed a teacher-generated code.
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;">
       <h1 style="font-size:20px;color:#0f172a;">A parent linked to your AIDemic account</h1>
@@ -50,7 +73,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), { status: 500 });
   }
 
-  const { student_id: studentId, parent_id: parentId } = await req.json().catch(() => ({}));
+  const { student_id: studentId, parent_id: parentId, link_source: linkSource } = await req.json().catch(() => ({}));
   if (!studentId || !parentId) {
     return new Response(JSON.stringify({ error: 'student_id and parent_id are required' }), { status: 400 });
   }
@@ -62,8 +85,13 @@ Deno.serve(async (req) => {
     supabase.from('user_profiles').select('id, email, full_name, first_name, username').eq('id', parentId).maybeSingle(),
   ]);
 
-  if (!studentProfile?.email) {
-    return new Response(JSON.stringify({ error: 'Student profile/email not found' }), { status: 404 });
+  // For parent-initiated links, email the parent; for all others (teacher or absent/legacy), email the student.
+  const isParentInitiated = linkSource === 'parent';
+  const recipientProfile = isParentInitiated ? parentProfile : studentProfile;
+  const otherProfile = isParentInitiated ? studentProfile : parentProfile;
+
+  if (!recipientProfile?.email) {
+    return new Response(JSON.stringify({ error: 'Recipient profile/email not found' }), { status: 404 });
   }
 
   const response = await fetch('https://api.resend.com/emails', {
@@ -71,12 +99,17 @@ Deno.serve(async (req) => {
     headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: fromEmail,
-      to: studentProfile.email,
-      subject: 'A parent linked to your AIDemic account',
-      html: renderEmailHtml({
-        studentName: displayName(studentProfile as Profile),
-        parentName: displayName(parentProfile as Profile | undefined),
-      }),
+      to: recipientProfile.email,
+      subject: isParentInitiated
+        ? `Your request to link with ${displayName(otherProfile as Profile | undefined)} was accepted`
+        : 'A parent linked to your AIDemic account',
+      html: renderEmailHtml(
+        {
+          studentName: displayName(studentProfile as Profile),
+          parentName: displayName(parentProfile as Profile | undefined),
+        },
+        linkSource || 'teacher'
+      ),
     }),
   });
 

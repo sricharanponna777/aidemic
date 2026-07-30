@@ -11,7 +11,7 @@ type ParentChildContextValue = {
   selectedStudentId: string | null;
   setSelectedStudentId: (id: string) => void;
   loading: boolean;
-  linkChild: (inviteCode: string) => Promise<{ error?: string }>;
+  linkChild: (identifier: string) => Promise<{ error?: string; studentName?: string }>;
 };
 
 const STORAGE_KEY = 'aidemic-parent-child';
@@ -94,27 +94,33 @@ export function ParentChildProvider({ children }: { children: React.ReactNode })
   }, [session, loadStudents]);
 
   const linkChild = useCallback(
-    async (inviteCode: string): Promise<{ error?: string }> => {
+    async (identifier: string): Promise<{ error?: string; studentName?: string }> => {
       if (!session) return { error: 'Not signed in.' };
 
-      const { error } = await supabase.rpc('redeem_parent_invite_code', { p_invite_code: inviteCode.trim() });
+      const { data, error } = await supabase.rpc('request_parent_link', { p_identifier: identifier.trim() });
 
       if (error) {
         return {
-          error: error.message.includes('Invalid invite code')
-            ? 'That invite code is not valid.'
-            : error.message.includes('own account')
-              ? 'You cannot link to your own account.'
-              : 'Could not link that account.',
+          error: error.message.includes('No student found')
+            ? 'No student found with that email or username.'
+            : error.message.includes('Multiple accounts match')
+              ? 'Multiple accounts match that email — ask your child for their username instead.'
+              : error.message.includes('already linked')
+                ? 'You are already linked to this student.'
+                : error.message.includes('already pending')
+                  ? 'A request is already pending for this student.'
+                  : error.message.includes('own account')
+                    ? 'You cannot link to your own account.'
+                    : 'Could not send the request. Please try again.',
         };
       }
 
-      const rows = await loadStudents(session.user.id);
-      setStudents(rows);
-      setSelectedStudentIdState((current) => current ?? rows[0]?.studentId ?? null);
-      return {};
+      // Don't refresh students here — the request is pending, not linked yet.
+      // Return the student's display name so the UI can show a confirmation message.
+      const studentName = (data as Array<{ student_display_name: string }>)?.[0]?.student_display_name;
+      return { studentName };
     },
-    [session, supabase, loadStudents]
+    [session, supabase]
   );
 
   return (

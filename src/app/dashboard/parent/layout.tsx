@@ -14,9 +14,10 @@ function ParentShell({ children }: { children: React.ReactNode }) {
   const { students, selectedStudentId, setSelectedStudentId, loading } = useLinkedChildren();
 
   const [showLinkForm, setShowLinkForm] = useState(false);
-  const [inviteCode, setInviteCode] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState('');
+  const [requestSent, setRequestSent] = useState<string | null>(null);
   const { linkChild } = useLinkedChildren();
 
   useEffect(() => {
@@ -27,20 +28,21 @@ function ParentShell({ children }: { children: React.ReactNode }) {
   }, [isLoading, profile, router]);
 
   const handleLink = async () => {
-    if (!inviteCode.trim()) {
-      setLinkError('Enter an invite code.');
+    if (!identifier.trim()) {
+      setLinkError("Enter your child's email or username.");
       return;
     }
     setIsLinking(true);
     setLinkError('');
-    const { error } = await linkChild(inviteCode);
+    setRequestSent(null);
+    const { error, studentName } = await linkChild(identifier);
     setIsLinking(false);
     if (error) {
       setLinkError(error);
       return;
     }
-    setInviteCode('');
-    setShowLinkForm(false);
+    setIdentifier('');
+    setRequestSent(studentName || 'Your child');
   };
 
   if (isLoading || loading) {
@@ -68,21 +70,52 @@ function ParentShell({ children }: { children: React.ReactNode }) {
 
       {showLinkForm ? (
         <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-          <label className="text-sm font-semibold text-content-muted text-content">Link a child</label>
-          <div className="mt-2 flex gap-2">
-            <input
-              type="text"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-              placeholder="Enter invite code"
-              className="flex-1 rounded-lg border border-subtle px-3 py-2 text-sm font-mono uppercase tracking-widest outline-none focus:border-accent bg-surface text-content"
-            />
-            <button type="button" onClick={handleLink} disabled={isLinking} className={buttonStyles({ variant: 'primary' })}>
-              <LogIn className="h-4 w-4" />
-              {isLinking ? 'Linking...' : 'Link'}
-            </button>
-          </div>
-          {linkError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{linkError}</p> : null}
+          {requestSent ? (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-content">Request sent to {requestSent}</p>
+              <p className="text-sm text-content-muted">
+                They&apos;ll need to approve it from their dashboard before you can see their progress.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequestSent(null);
+                    setIdentifier('');
+                    setShowLinkForm(false);
+                  }}
+                  className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                >
+                  Done
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestSent(null)}
+                  className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                >
+                  Add another child
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <label className="text-sm font-semibold text-content">Link a child</label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Child's email or username"
+                  className="flex-1 rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
+                />
+                <button type="button" onClick={handleLink} disabled={isLinking} className={buttonStyles({ variant: 'primary' })}>
+                  <LogIn className="h-4 w-4" />
+                  {isLinking ? 'Sending...' : 'Send request'}
+                </button>
+              </div>
+              {linkError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{linkError}</p> : null}
+            </>
+          )}
         </div>
       ) : null}
 
@@ -91,7 +124,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
           <Users className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-content-muted" />
           <p className="font-semibold text-content-muted dark:text-slate-200">No linked children yet</p>
           <p className="mt-1 text-sm text-content-subtle">
-            Ask your child to open Invite Parent in their AIDemic dashboard and share their invite code, then add it above.
+            Add a child using their email or username above. They&apos;ll need to accept the request from their dashboard.
           </p>
         </div>
       ) : (

@@ -121,7 +121,7 @@ One deployment constraint:
 
 ### Parent-link notification (Resend + Edge Function + pg_net trigger)
 
-[supabase/functions/parent-link-notification/index.ts](supabase/functions/parent-link-notification/index.ts) emails a student as soon as a parent redeems their invite code. It is triggered by `notify_parent_link_activated()`, an `AFTER UPDATE` trigger on `parent_links` added in migration `20260722000000`, fired the instant `redeem_parent_invite_code()` flips a link's status to `'active'` (via `pg_net`, no cron involved). One-time setup after applying that migration:
+[supabase/functions/parent-link-notification/index.ts](supabase/functions/parent-link-notification/index.ts) emails the relevant party when a parent_links row becomes `'active'`. It is triggered by `notify_parent_link_activated()`, an `AFTER UPDATE` trigger on `parent_links` added in migration `20260722000000`, fired the instant any operation flips a link's status to `'active'` (via `pg_net`, no cron involved). The recipient depends on `link_source`: for `'teacher'`-initiated links, emails the student (unchanged behavior); for `'parent'`-initiated links (as of migration `20260801010000`), emails the parent instead. One-time setup after applying that migration:
 
 ```bash
 supabase functions deploy parent-link-notification --no-verify-jwt
@@ -135,6 +135,24 @@ This is the **only remaining Resend consumer** — the weekly digest now goes th
 insert into app_config (key, value) values
   ('parent_link_notification_function_url', 'https://<project-ref>.functions.supabase.co/parent-link-notification'),
   ('parent_link_notification_secret', 'some-random-string') -- must match PARENT_LINK_NOTIFICATION_SECRET above
+on conflict (key) do update set value = excluded.value;
+```
+
+### Parent-link request notification (Resend + Edge Function + pg_net trigger)
+
+[supabase/functions/parent-link-requested/index.ts](supabase/functions/parent-link-requested/index.ts) emails a student as soon as a parent submits a link request. It is triggered by `notify_parent_link_requested()`, an `AFTER INSERT` trigger on `parent_links` added in migration `20260801010000`, fired the instant `request_parent_link()` inserts a pending row with `link_source='parent'` (via `pg_net`, no cron involved). One-time setup after applying that migration:
+
+```bash
+supabase functions deploy parent-link-requested --no-verify-jwt
+supabase secrets set PARENT_LINK_REQUESTED_SECRET=some-random-string
+```
+
+Reuses `RESEND_API_KEY` / `RESEND_FROM_EMAIL` already configured for `parent-link-notification` above. Then, in the Supabase SQL editor:
+
+```sql
+insert into app_config (key, value) values
+  ('parent_link_requested_function_url', 'https://<project-ref>.functions.supabase.co/parent-link-requested'),
+  ('parent_link_requested_secret', 'some-random-string') -- must match PARENT_LINK_REQUESTED_SECRET above
 on conflict (key) do update set value = excluded.value;
 ```
 

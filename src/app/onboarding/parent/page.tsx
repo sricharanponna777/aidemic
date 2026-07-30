@@ -12,9 +12,10 @@ export default function ParentOnboardingPage() {
   const supabase = createClient();
   const { session, isLoading } = useAuth();
 
-  const [inviteCode, setInviteCode] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [isLinking, setIsLinking] = useState(false);
   const [error, setError] = useState('');
+  const [requestSent, setRequestSent] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -22,30 +23,38 @@ export default function ParentOnboardingPage() {
   };
 
   const handleLink = async () => {
-    if (!inviteCode.trim()) {
-      setError('Enter the invite code your child shared with you.');
+    if (!identifier.trim()) {
+      setError("Enter your child's email or username.");
       return;
     }
     setIsLinking(true);
     setError('');
 
-    const { error: linkError } = await supabase.rpc('redeem_parent_invite_code', {
-      p_invite_code: inviteCode.trim(),
+    const { data, error: linkError } = await supabase.rpc('request_parent_link', {
+      p_identifier: identifier.trim(),
     });
 
     setIsLinking(false);
     if (linkError) {
       setError(
-        linkError.message.includes('Invalid invite code')
-          ? 'That invite code is not valid.'
-          : linkError.message.includes('own account')
-            ? 'You cannot link to your own account.'
-            : 'Could not link that account. Please try again.'
+        linkError.message.includes('No student found')
+          ? 'No student found with that email or username.'
+          : linkError.message.includes('Multiple accounts match')
+            ? 'Multiple accounts match that email — ask your child for their username instead.'
+            : linkError.message.includes('already linked')
+              ? 'You are already linked to this student.'
+              : linkError.message.includes('already pending')
+                ? 'A request is already pending for this student.'
+                : linkError.message.includes('own account')
+                  ? 'You cannot link to your own account.'
+                  : 'Could not send the request. Please try again.'
       );
       return;
     }
 
-    router.push('/dashboard/parent');
+    const studentName = (data as Array<{ student_display_name: string }>)?.[0]?.student_display_name;
+    setRequestSent(studentName || 'Your child');
+    setIdentifier('');
   };
 
   if (isLoading) {
@@ -84,44 +93,74 @@ export default function ParentOnboardingPage() {
             </button>
           </div>
 
-          <div className="mt-8 space-y-2">
-            <label htmlFor="inviteCode" className="flex items-center gap-2 text-sm font-semibold text-content-muted text-content">
-              <Users className="h-4 w-4 text-accent" />
-              Family invite code
-            </label>
-            <p className="text-sm text-content-muted">
-              Ask your child to open Invite Parent in their AIDemic dashboard and share their invite code with you.
-            </p>
-            <input
-              id="inviteCode"
-              type="text"
-              value={inviteCode}
-              onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
-              placeholder="Enter invite code"
-              className="w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm font-mono uppercase tracking-widest text-content outline-none focus:border-accent"
-            />
-          </div>
+          {requestSent ? (
+            <div className="mt-8 space-y-4">
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/30 dark:bg-green-950/10">
+                <p className="text-sm font-semibold text-green-900 dark:text-green-100">Request sent to {requestSent}</p>
+                <p className="mt-2 text-sm text-green-800 dark:text-green-200">
+                  They&apos;ll need to approve it from their dashboard before you can see their progress.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => router.push('/dashboard/parent')}
+                  className={buttonStyles({ variant: 'primary', size: 'lg', className: 'flex-1' })}
+                >
+                  <LogIn className="h-4 w-4" />
+                  Go to dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRequestSent(null)}
+                  className={buttonStyles({ variant: 'secondary', size: 'lg' })}
+                >
+                  Add another child
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mt-8 space-y-2">
+                <label htmlFor="identifier" className="flex items-center gap-2 text-sm font-semibold text-content">
+                  <Users className="h-4 w-4 text-accent" />
+                  Child&apos;s email or username
+                </label>
+                <p className="text-sm text-content-muted">
+                  Enter your child&apos;s email address or username to send them a parent link request.
+                </p>
+                <input
+                  id="identifier"
+                  type="text"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                  placeholder="Email or username"
+                  className="w-full rounded-lg border border-subtle bg-surface px-3 py-2 text-sm text-content outline-none focus:border-accent"
+                />
+              </div>
 
-          {error ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+              {error ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
 
-          <div className="mt-8 flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={handleLink}
-              disabled={isLinking}
-              className={buttonStyles({ variant: 'primary', size: 'lg', className: 'flex-1' })}
-            >
-              <LogIn className="h-4 w-4" />
-              {isLinking ? 'Linking...' : 'Link account'}
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/parent')}
-              className={buttonStyles({ variant: 'secondary', size: 'lg' })}
-            >
-              Skip for now
-            </button>
-          </div>
+              <div className="mt-8 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={handleLink}
+                  disabled={isLinking}
+                  className={buttonStyles({ variant: 'primary', size: 'lg', className: 'flex-1' })}
+                >
+                  <LogIn className="h-4 w-4" />
+                  {isLinking ? 'Sending...' : 'Send request'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push('/dashboard/parent')}
+                  className={buttonStyles({ variant: 'secondary', size: 'lg' })}
+                >
+                  Skip for now
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </div>
     </main>

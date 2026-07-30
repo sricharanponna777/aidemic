@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Copy, Plus, Trash2, Users } from 'lucide-react';
+import { Check, Copy, Trash2, Users, X } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
@@ -10,12 +10,6 @@ import { PageLoader } from '@/components/PageLoader';
 import { useToast } from '@/components/ToastProvider';
 import type { ParentLink } from '@/types';
 
-const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars (0/O, 1/I/L)
-
-function generateInviteCode(length = 6) {
-  const bytes = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(bytes, (b) => INVITE_CODE_CHARS[b % INVITE_CODE_CHARS.length]).join('');
-}
 
 type LinkRow = ParentLink & { parent_profile: { email: string; full_name?: string | null } | null };
 
@@ -26,8 +20,8 @@ export default function FamilyPage() {
 
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [linksLoading, setLinksLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [handlingRequestId, setHandlingRequestId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const fetchLinks = async (studentId: string) => {
@@ -82,22 +76,34 @@ export default function FamilyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, session, profile, router]);
 
-  const handleGenerate = async () => {
+  const handleAccept = async (linkId: string) => {
     if (!session) return;
-    setIsGenerating(true);
-    const { error } = await supabase.from('parent_links').insert({
-      student_id: session.user.id,
-      invite_code: generateInviteCode(),
-    });
+    setHandlingRequestId(linkId);
+    const { error } = await supabase.rpc('accept_parent_link_request', { p_link_id: linkId });
+    setHandlingRequestId(null);
 
     if (error) {
-      showToast('error', 'Could not create an invite code. Please try again.');
-      setIsGenerating(false);
+      showToast('error', 'Could not accept request. Please try again.');
       return;
     }
 
+    showToast('success', 'Request accepted.');
     setLinks(await fetchLinks(session.user.id));
-    setIsGenerating(false);
+  };
+
+  const handleDecline = async (linkId: string) => {
+    if (!session) return;
+    setHandlingRequestId(linkId);
+    const { error } = await supabase.rpc('decline_parent_link_request', { p_link_id: linkId });
+    setHandlingRequestId(null);
+
+    if (error) {
+      showToast('error', 'Could not decline request. Please try again.');
+      return;
+    }
+
+    showToast('success', 'Request declined.');
+    setLinks(await fetchLinks(session.user.id));
   };
 
   const handleRevoke = async (linkId: string) => {
@@ -122,6 +128,7 @@ export default function FamilyPage() {
   };
 
   const handleCopy = async (link: LinkRow) => {
+    if (!link.invite_code) return;
     await navigator.clipboard.writeText(link.invite_code);
     setCopiedId(link.id);
     window.setTimeout(() => setCopiedId((current) => (current === link.id ? null : current)), 2000);
@@ -137,62 +144,100 @@ export default function FamilyPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">Invite Parent</h1>
+        <h1 className="text-2xl font-bold text-content dark:text-white">Family</h1>
         <p className="mt-1 text-sm text-content-muted">
-          Share an invite code with a parent or guardian so they can view your progress. They can never edit your data.
+          Parents can send a link request using your email or username. Review and respond to requests below. They can never edit your data.
         </p>
       </div>
 
+      {/* Requests from parents (parent-initiated) */}
       <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-semibold text-content-muted text-content">Invite a parent</label>
-          <button type="button" onClick={handleGenerate} disabled={isGenerating} className={buttonStyles({ variant: 'primary', size: 'sm' })}>
-            <Plus className="h-3.5 w-3.5" />
-            {isGenerating ? 'Generating...' : 'New invite code'}
-          </button>
-        </div>
-
-        {pendingLinks.length === 0 ? (
-          <p className="mt-3 text-sm text-content-subtle">No pending invite codes.</p>
+        <h2 className="mb-3 text-lg font-bold text-content dark:text-white">Requests from your parents</h2>
+        {pendingLinks.filter((link) => link.link_source === 'parent').length === 0 ? (
+          <p className="text-sm text-content-muted">No pending requests.</p>
         ) : (
-          <div className="mt-3 space-y-2">
-            {pendingLinks.map((link) => (
-              <div
-                key={link.id}
-                className="flex items-center justify-between rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 dark:bg-surface/3"
-              >
-                <div className="flex flex-col">
-                  <span className="font-mono text-sm font-semibold uppercase tracking-widest text-content">
-                    {link.invite_code}
-                  </span>
-                  {link.link_source === 'teacher' ? (
-                    <span className="text-xs text-content-subtle">Created by your teacher</span>
-                  ) : null}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(link)}
-                    className={buttonStyles({ variant: 'secondary', size: 'sm' })}
-                  >
-                    {copiedId === link.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copiedId === link.id ? 'Copied' : 'Copy'}
-                  </button>
-                  {link.link_source === 'student' ? (
+          <div className="space-y-2">
+            {pendingLinks
+              .filter((link) => link.link_source === 'parent')
+              .map((link) => (
+                <div
+                  key={link.id}
+                  className="flex items-center justify-between rounded-lg border border-subtle bg-surface-sunken px-4 py-3 dark:bg-surface/3"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-content">
+                      {link.parent_profile?.full_name || link.parent_profile?.email || 'A parent'}
+                    </p>
+                    <p className="text-xs text-content-subtle">{link.parent_profile?.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => handleRevoke(link.id)}
+                      onClick={() => handleAccept(link.id)}
+                      disabled={handlingRequestId === link.id}
+                      className={buttonStyles({ variant: 'primary', size: 'sm' })}
+                    >
+                      {handlingRequestId === link.id ? 'Accepting...' : 'Accept'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDecline(link.id)}
+                      disabled={handlingRequestId === link.id}
                       className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
-                  ) : null}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </div>
+
+      {/* Pending invite codes (teacher-initiated or legacy) */}
+      {pendingLinks.filter((link) => link.link_source !== 'parent').length > 0 ? (
+        <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
+          <label className="text-sm font-semibold text-content">Invite codes to share</label>
+          <div className="mt-3 space-y-2">
+            {pendingLinks
+              .filter((link) => link.link_source !== 'parent')
+              .map((link) => (
+                <div
+                  key={link.id}
+                  className="flex items-center justify-between rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 dark:bg-surface/3"
+                >
+                  <div className="flex flex-col">
+                    <span className="font-mono text-sm font-semibold uppercase tracking-widest text-content">
+                      {link.invite_code}
+                    </span>
+                    {link.link_source === 'teacher' ? (
+                      <span className="text-xs text-content-subtle">Created by your teacher</span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(link)}
+                      className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                    >
+                      {copiedId === link.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copiedId === link.id ? 'Copied' : 'Copy'}
+                    </button>
+                    {link.link_source === 'student' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRevoke(link.id)}
+                        className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <h2 className="mb-3 text-lg font-bold text-content dark:text-white">Linked parents</h2>
