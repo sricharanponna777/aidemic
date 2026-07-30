@@ -1,5 +1,6 @@
 import { POST } from './route';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 const saved: Record<string, string | undefined> = {};
 
@@ -35,7 +36,7 @@ describe('POST /api/email/bulk', () => {
       body: JSON.stringify({ messages: [] }),
     });
 
-    const response = await POST(request as any);
+    const response = await POST(request as unknown as NextRequest);
     expect(response.status).toBe(401);
   });
 
@@ -67,7 +68,7 @@ describe('POST /api/email/bulk', () => {
       }),
     });
 
-    const response = await POST(request as any);
+    const response = await POST(request as unknown as NextRequest);
     expect(response.status).toBeLessThan(400);
   });
 
@@ -101,7 +102,7 @@ describe('POST /api/email/bulk', () => {
       }),
     });
 
-    const response = await POST(request as any);
+    const response = await POST(request as unknown as NextRequest);
     const data = await response.json();
 
     expect(data).toHaveProperty('ok');
