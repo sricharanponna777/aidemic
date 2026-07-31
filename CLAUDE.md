@@ -27,7 +27,11 @@ Middleware in [src/proxy.ts](src/proxy.ts) guards `/dashboard/*` routes using `s
 
 ### Roles
 
-`user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student: a student generates an invite code on [src/app/dashboard/family/page.tsx](src/app/dashboard/family/page.tsx), a parent redeems it via the `redeem_parent_invite_code()` RPC (onboarding or [src/app/dashboard/parent/page.tsx](src/app/dashboard/parent/page.tsx)). The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper (migration `20260720100000`) drive every cross-role SELECT policy — parents never get a write policy on any table.
+`user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student. Linking is **parent-initiated** (migration `20260801000000`): a parent enters the student's email or username via `request_parent_link()` — from onboarding or [src/app/dashboard/parent/layout.tsx](src/app/dashboard/parent/layout.tsx) — which inserts a `pending` row with `link_source='parent'`; the student then accepts or declines it on [src/app/dashboard/family/page.tsx](src/app/dashboard/family/page.tsx) via `accept_parent_link_request()` / `decline_parent_link_request()`.
+
+A second, teacher-initiated variant remains: a teacher generates an invite code (`link_source='teacher'`) that the parent redeems with `redeem_parent_invite_code()`. The difference is who can undo it — a student can revoke `'student'` and `'parent'` links directly (migration `20260801020000`), but a `'teacher'` link only supports `request_parent_link_revocation()`, which needs teacher approval.
+
+The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper (migration `20260720100000`) drive every cross-role SELECT policy — parents never get a write policy on any table.
 
 ### Supabase Clients
 
@@ -67,16 +71,16 @@ Copy `.env.local.example` to `.env.local`. Required variables:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY  # server-only; bypasses RLS; needed for assignment marking
-OPENAI_API_KEY          # or equivalent for OpenRouter/local LLM
+AI_API_KEY                 # OpenAI/OpenRouter/local LLM. Legacy OPENAI_API_KEY still works
 ```
 
 See `.env.local.example` for the full list including OpenRouter and local LLM options.
 
 Optional, for transactional email (see below): `BREVO_API_KEY`, `BREVO_SMTP_FROM`, `APP_NAME`, `APP_URL`, `SUPPORT_EMAIL`. If any is unset, emails are skipped with a console warning and signup still works.
 
-### Transactional email (Brevo SMTP)
+### Transactional email (Brevo API)
 
-Emails are sent via Nodemailer + Brevo SMTP. Two consumers:
+Emails are sent through the Brevo HTTP API (`https://api.brevo.com/v3/smtp/email`) with `fetch` — there is no SMTP client or Nodemailer dependency. Two consumers:
 
 - The Next app, via [src/lib/email.ts](src/lib/email.ts) and [src/lib/email-mailer.ts](src/lib/email-mailer.ts). Server-only (no `NEXT_PUBLIC_` prefix); returns ok: false and skips rather than throwing when unconfigured, so a missing email can never break a user flow.
 - The weekly digest Edge Function, over **public HTTPS** to [src/app/api/email/bulk/route.ts](src/app/api/email/bulk/route.ts).

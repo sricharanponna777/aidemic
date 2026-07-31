@@ -26,7 +26,7 @@ function renderEmailHtml(
   { studentName, parentName }: { studentName: string; parentName: string },
   linkSource: string = 'teacher'
 ): string {
-  // For parent-initiated links, the parent accepted the student's approval.
+  // For parent-initiated links, the student accepted the parent's request.
   if (linkSource === 'parent') {
     return `
       <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;">

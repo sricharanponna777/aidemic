@@ -113,6 +113,7 @@ export default function FamilyPage() {
       showToast('error', 'Could not revoke access. Please try again.');
       return;
     }
+    showToast('success', 'Access revoked.');
     setLinks(await fetchLinks(session.user.id));
   };
 
@@ -135,7 +136,7 @@ export default function FamilyPage() {
   };
 
   if (isLoading || linksLoading) {
-    return <PageLoader text="Loading your invite settings..." />;
+    return <PageLoader text="Loading your family settings..." />;
   }
 
   const activeLinks = links.filter((link) => link.status === 'active');
@@ -263,7 +264,7 @@ export default function FamilyPage() {
                     ) : null}
                   </div>
                 </div>
-                {link.link_source === 'student' ? (
+                {link.link_source !== 'teacher' ? (
                   <button
                     type="button"
                     onClick={() => handleRevoke(link.id)}

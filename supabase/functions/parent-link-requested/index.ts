@@ -20,7 +20,7 @@ const displayName = (profile?: Profile) =>
   profile?.full_name || profile?.first_name || profile?.username || profile?.email || 'Someone';
 
 function renderEmailHtml({ studentName, parentName }: { studentName: string; parentName: string }): string {
-  const dashboardUrl = `${Deno.env.get('APP_URL') || 'https://aidemic.ai'}/dashboard/family`;
+  const dashboardUrl = `${Deno.env.get('APP_URL') || 'https://aidemic.co.uk'}/dashboard/family`;
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;">
       <h1 style="font-size:20px;color:#0f172a;">Parent account link request</h1>

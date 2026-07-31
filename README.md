@@ -23,7 +23,7 @@ The package manager is **Bun**.
 Classes and rosters, assignments with AI-assisted marking and manual override, per-class and per-student reports, AI insights, a question bank, and school administration (with school verification).
 
 ### For parents
-A read-only projection of a linked child: progress, subjects, activity, assignments, and a weekly email digest. Parents never get a write policy on any table.
+A read-only projection of a linked child: progress, subjects, activity, assignments, and a weekly email digest. Linking is parent-initiated and takes the child's consent — the parent sends a request, the child accepts it. Parents never get a write policy on any table.
 
 ### Throughout
 - Dark/light theme driven by a semantic **design-token** system (see [Design system](#design-system)).
@@ -40,7 +40,7 @@ A read-only projection of a linked child: progress, subjects, activity, assignme
 | Auth & DB | Supabase (Postgres + Auth), Row-Level Security on every table |
 | AI | OpenAI-compatible API (OpenAI, OpenRouter, or a local server) |
 | TTS | OpenAI-compatible speech endpoint (podcasts) |
-| Email | Resend (Edge Functions + `pg_cron`/`pg_net`) |
+| Email | Brevo API (app templates); Resend (Edge Function notifications via `pg_cron`/`pg_net`) |
 | Rich text | Tiptap 3 |
 | Math | KaTeX |
 | Icons | Lucide React |
@@ -104,6 +104,14 @@ bun run test       # Vitest
 | `TTS_VOICE` / `TTS_VOICE_SECONDARY` | No | Voices for the two podcast speakers |
 | `TTS_API_KEY` | No | TTS API key |
 | `AI_RATE_LIMIT_FAIL_CLOSED` | No | If `true`, reject AI calls when the rate-limit RPC errors (default fails open) |
+| `BREVO_API_KEY` | No | Brevo API key. Unset disables transactional email (sends are skipped, never fatal) |
+| `BREVO_SMTP_FROM` | No | Sender, as `Name <address@domain>` |
+| `APP_NAME` | No | Branding in every email template. Defaults to `AIDemic` |
+| `APP_URL` | No† | Absolute base URL for email CTAs. Server-only, so no `NEXT_PUBLIC_` prefix |
+| `SUPPORT_EMAIL` | No† | Contact address in the shared email layout |
+| `BULK_EMAIL_SECRET` | No | Shared secret for `/api/email/bulk`. Unset leaves the endpoint open (dev only) |
+
+† Required *for email specifically* — with either unset, email is treated as unconfigured and skipped. The rest of the app is unaffected.
 
 Legacy `OPENAI_BASE_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` names are still accepted as fallbacks.
 
@@ -138,7 +146,7 @@ Next.js 16 App Router with TypeScript, Supabase, and an OpenAI-compatible API ab
 Middleware in [`src/proxy.ts`](src/proxy.ts) guards `/dashboard/*` using `supabase.auth.getUser()`. Unauthenticated requests go to `/login`; role gating for `/dashboard/teacher/*`, `/dashboard/admin/*`, and `/dashboard/parent/*` is enforced here as defense-in-depth. **RLS is the real backstop.**
 
 ### Roles
-`user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student: a student generates an invite code on the Family page, a parent redeems it via the `redeem_parent_invite_code()` RPC. The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper drive every cross-role SELECT policy.
+`user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student, and the link is **parent-initiated**: a parent enters the student's email address or username (`request_parent_link()`), the student accepts or declines it on the Family page (`accept_parent_link_request()` / `decline_parent_link_request()`), and nothing is shared until they accept. Teachers can also create a link for a student on their roster with an invite code the parent redeems (`redeem_parent_invite_code()`); only a teacher can remove that variant. The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper drive every cross-role SELECT policy.
 
 ### Supabase clients
 - [`src/lib/supabase-client.ts`](src/lib/supabase-client.ts) — browser client (Client Components/hooks)
@@ -169,18 +177,31 @@ Apply the migrations in [`supabase/migrations/`](supabase/migrations) in order. 
 - **Parent:** `parent_links`
 - **Infra:** `ai_request_counters` (rate limiting), `app_config`
 
-### Weekly parent digest (Resend + Edge Function + pg_cron)
-[`supabase/functions/weekly-parent-digest`](supabase/functions/weekly-parent-digest) emails each parent a weekly summary of their linked children. Triggered by `trigger_weekly_parent_digest()` via a `pg_cron` job (Mondays 08:00 UTC) using `pg_net`. One-time setup:
+### Transactional email
+
+Two independent senders, on purpose:
+
+- **The Next app → Brevo API** ([`src/lib/email.ts`](src/lib/email.ts), [`src/lib/email-mailer.ts`](src/lib/email-mailer.ts)). Templates live in [`src/emails/templates/`](src/emails/templates) — one `.html` body each plus `manifest.json`, all sharing `_layout.html`. `{{name}}` escapes, `{{{name}}}` does not (never put user input in a raw slot). A missing variable throws rather than sending a half-rendered email. Server-only: if the config is unset, sends are skipped with a warning, so a missing email can never break signup.
+- **Edge Functions → Resend**, for the two `pg_net`-triggered parent-link notifications below.
+
+### Weekly parent digest (Edge Function + pg_cron → the app's bulk endpoint)
+[`supabase/functions/weekly-parent-digest`](supabase/functions/weekly-parent-digest) emails each parent a weekly summary of their linked children. Triggered by `trigger_weekly_parent_digest()` via a `pg_cron` job (Mondays 08:00 UTC) using `pg_net`. It does not send mail itself — it posts batches of 100 to the app's [`/api/email/bulk`](src/app/api/email/bulk/route.ts), so **the app must be reachable over public HTTPS from Supabase's edge network** (no VPC peering; `localhost` cannot work). One-time setup:
 
 ```bash
 supabase functions deploy weekly-parent-digest --no-verify-jwt
-supabase secrets set RESEND_API_KEY=re_xxx RESEND_FROM_EMAIL="AIDemic <digest@yourdomain.com>" CRON_SECRET=some-random-string
+supabase secrets set APP_URL=https://yourdomain.com BULK_EMAIL_SECRET=some-random-string \
+  APP_NAME=AIDemic SUPPORT_EMAIL=support@yourdomain.com CRON_SECRET=some-random-string
 ```
 
-Then in the SQL editor, set `weekly_digest_function_url` and `weekly_digest_cron_secret` in `app_config`. See [CLAUDE.md](CLAUDE.md) for the exact SQL.
+Then in the SQL editor, set `weekly_digest_function_url` and `weekly_digest_cron_secret` in `app_config`. See [CLAUDE.md](CLAUDE.md) for the exact SQL. `pg_net` discards the response body, so `supabase functions logs weekly-parent-digest` is the only place failures surface.
 
-### Parent-link notification (Resend + Edge Function + pg_net trigger)
-[`supabase/functions/parent-link-notification`](supabase/functions/parent-link-notification) emails a student when a parent redeems their invite code, via an `AFTER UPDATE` trigger on `parent_links`. Setup and `app_config` keys are documented in [CLAUDE.md](CLAUDE.md).
+### Parent-link notifications (Resend + Edge Functions + pg_net triggers)
+Two functions, both fired by triggers on `parent_links` — no cron involved:
+
+- [`parent-link-requested`](supabase/functions/parent-link-requested) — emails the **student** on `AFTER INSERT` of a pending parent-initiated request, so they know to accept or decline.
+- [`parent-link-notification`](supabase/functions/parent-link-notification) — emails on `AFTER UPDATE` when a link becomes `active`. Recipient follows `link_source`: the **parent** whose request was accepted, or the **student** whose teacher-issued code was redeemed.
+
+These are the only Resend consumers. Setup, secrets, and `app_config` keys are documented in [CLAUDE.md](CLAUDE.md).
 
 ## Project structure
 
@@ -204,7 +225,7 @@ src/
   types.ts
 supabase/
   migrations/          # single source of truth for the schema
-  functions/           # Resend edge functions
+  functions/           # weekly digest + parent-link notification edge functions
 ```
 
 ## Testing

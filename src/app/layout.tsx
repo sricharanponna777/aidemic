@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://aidemic.app"),
+  metadataBase: new URL("https://aidemic.co.uk"),
   title: {
     default: "AIDemic — AI Revision Coach",
     template: "%s · AIDemic",

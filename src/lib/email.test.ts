@@ -7,11 +7,10 @@ import {
   sendTemplateEmail,
 } from './email';
 
-// The exact variable list welcome.html requires. Derived by email-server from
-// the subject, the body and _layout.html, and confirmed with
-// `GET /api/email/templates`. Hardcoded rather than computed so that editing the
-// template without updating buildWelcomeData fails here instead of as a runtime
-// 400 on a real signup.
+// The exact variable list welcome.html requires -- the union of the placeholders
+// in the manifest subject, the body and _layout.html. Hardcoded rather than
+// computed so that editing the template without updating buildWelcomeData fails
+// here instead of as a render error on a real signup.
 const WELCOME_VARIABLES = [
   'actionLabel',
   'actionUrl',

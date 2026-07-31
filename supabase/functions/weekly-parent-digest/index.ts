@@ -254,7 +254,9 @@ Deno.serve(async (req) => {
     });
   }
 
-  // BULK_EMAIL_SECRET is optional: if unset, the endpoint is open (dev mode)
+  // Required above, not optional: /api/email/bulk treats an unset secret as
+  // "open endpoint", so a digest run that sent without one would be silently
+  // relying on the app's bulk mailer being unauthenticated in production.
   const emailApiUrl = `${appUrl}/api/email/bulk`;
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);

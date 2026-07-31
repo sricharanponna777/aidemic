@@ -46,24 +46,28 @@ function escapeHtml(value: string): string {
   });
 }
 
+/**
+ * Substitutes `{{{raw}}}` and `{{escaped}}` in a single left-to-right pass.
+ *
+ * One pass is the whole point: running the escaped pass and the raw pass in
+ * sequence lets a substituted *value* be re-scanned by the next one, so a
+ * display name of `{{{highlights}}}` would expand into that slot's unescaped
+ * HTML. Because the alternation is matched in one traversal, replacements are
+ * never revisited.
+ *
+ * `escapeVars: false` renders both forms verbatim -- for plain-text targets
+ * like the Subject header, where HTML entities would show up literally.
+ */
 function interpolate(template: string, data: TemplateData, escapeVars = true): string {
-  return template.replace(/(?<!\{)\{\{(\w+)\}\}(?!\})/g, (match, key) => {
+  return template.replace(/\{\{\{(\w+)\}\}\}|\{\{(\w+)\}\}/g, (match, rawKey, escapedKey) => {
+    const key = rawKey ?? escapedKey;
     const value = data[key];
     if (value === undefined) {
       throw new Error(`Missing template variable: ${key}`);
     }
     const str = String(value);
-    return escapeVars ? escapeHtml(str) : str;
-  });
-}
-
-function interpolateRaw(template: string, data: TemplateData): string {
-  return template.replace(/\{\{\{(\w+)\}\}\}/g, (match, key) => {
-    const value = data[key];
-    if (value === undefined) {
-      throw new Error(`Missing template variable: ${key}`);
-    }
-    return String(value);
+    // The triple-brace form is raw by contract; only the double-brace form escapes.
+    return rawKey !== undefined || !escapeVars ? str : escapeHtml(str);
   });
 }
 
@@ -89,24 +93,15 @@ export async function renderTemplate(templateName: string, data: TemplateData): 
   const layout = fs.readFileSync(layoutPath, 'utf-8');
   const content = fs.readFileSync(templatePath, 'utf-8');
 
-  // Interpolate template content first (supports both {{}} and {{{}}} syntax)
-  const interpolatedContent = interpolateRaw(
-    interpolate(content, enrichedData),
-    enrichedData
-  );
+  // Interpolate the body, then drop the result into the layout's raw
+  // {{{content}}} slot. The layout pass must run over already-rendered content,
+  // so it is passed as the slot value rather than re-scanned.
+  const interpolatedContent = interpolate(content, enrichedData);
+  const html = interpolate(layout, { ...enrichedData, content: interpolatedContent });
 
-  // Create the final HTML with layout
-  const finalData = {
-    ...enrichedData,
-    content: interpolatedContent,
-  };
-
-  // Interpolate layout (but preserve content as-is)
-  let html = interpolate(layout, finalData);
-  html = interpolateRaw(html, { content: interpolatedContent });
-
-  // Interpolate subject
-  const subject = interpolate(templateConfig.subject, enrichedData);
+  // The Subject is a plain-text mail header, not markup: escaping it here is
+  // what puts a literal `O&#39;Brien` in the recipient's inbox.
+  const subject = interpolate(templateConfig.subject, enrichedData, false);
 
   return { subject, html };
 }
@@ -260,22 +255,4 @@ function parseFromAddress(from: string): { name?: string; email: string } {
     return { name: parsed[1].trim(), email: parsed[2].trim() };
   }
   return { email: from };
-}
-
-function htmlToPlainText(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<\/tr>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#183;/g, '·')
-    .replace(/\n\s*\n/g, '\n\n')
-    .trim();
 }

@@ -64,7 +64,7 @@ function ParentShell({ children }: { children: React.ReactNode }) {
           className={buttonStyles({ variant: 'secondary', size: 'sm' })}
         >
           <Plus className="h-3.5 w-3.5" />
-          Add another child
+          {students.length === 0 ? 'Add a child' : 'Add another child'}
         </button>
       </div>
 
@@ -124,7 +124,8 @@ function ParentShell({ children }: { children: React.ReactNode }) {
           <Users className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-content-muted" />
           <p className="font-semibold text-content-muted dark:text-slate-200">No linked children yet</p>
           <p className="mt-1 text-sm text-content-subtle">
-            Add a child using their email or username above. They&apos;ll need to accept the request from their dashboard.
+            Use <span className="font-semibold">Add a child</span> above to send a request with their email address or
+            username. They&apos;ll need to accept it from their dashboard before their progress appears here.
           </p>
         </div>
       ) : (

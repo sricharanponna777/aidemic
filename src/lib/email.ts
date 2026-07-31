@@ -43,7 +43,7 @@ export function getEmailServerConfig(): EmailConfig | null {
 }
 
 /**
- * email-server interpolates the *subject* unescaped -- it is a plain-text
+ * The renderer interpolates the *subject* unescaped -- it is a plain-text
  * header, not markup -- and `first_name` is written client-side at signup with
  * no server validation, so it is attacker-controlled text landing in a mail
  * header. Strip anything that could fold in another header, and cap the length
@@ -89,7 +89,7 @@ export async function sendTemplateEmail(input: {
 // ---------------------------------------------------------------------------
 // Welcome email content.
 //
-// email-server's template engine has no conditionals and no loops, so the
+// The template engine has no conditionals and no loops, so the
 // role-specific part is built here and passed through welcome.html's raw
 // {{{ highlights }}} slot. STATIC COPY ONLY -- that slot is not escaped, so
 // nothing user-supplied may ever be interpolated into it.
@@ -148,8 +148,8 @@ const WELCOME_CONTENT: Record<
     actionPath: '/dashboard/parent',
     highlights: [
       [
-        'Link your child with an invite code',
-        'One code from your child connects the two accounts, and nothing is shared until they generate it.',
+        'Send your child a link request',
+        'Enter their email address or username, and nothing is shared until they accept the request.',
       ],
       [
         'See the week at a glance',
@@ -195,11 +195,11 @@ export type WelcomeProfile = {
   role?: string | null;
 };
 
-/** Exactly the seven variables welcome.html requires -- a missing one is a hard
- *  400, so src/lib/email.test.ts pins the key set. */
+/** Exactly the seven variables welcome.html requires -- a missing one throws
+ *  during render, so src/lib/email.test.ts pins the key set. */
 export function buildWelcomeData(profile: WelcomeProfile): TemplateData {
   const config = getEmailServerConfig();
-  if (!config) throw new Error('email-server is not configured.');
+  if (!config) throw new Error('Email is not configured.');
 
   const role: Role = profile.role === 'teacher' || profile.role === 'parent' ? profile.role : 'student';
   const content = WELCOME_CONTENT[role];
