@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, History } from 'lucide-react';
+import { ArrowLeft, ClipboardList, History } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
@@ -214,18 +215,13 @@ export default function TeacherStudentAnswersPage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        href={`/dashboard/teacher/classes/${classId}`}
-        className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to class
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">{assignmentTitle}</h1>
-        <p className="mt-1 text-sm text-content-muted">{studentName}&apos;s answers</p>
-      </div>
+      <PageHero
+        icon={ClipboardList}
+        title={assignmentTitle}
+        description={`${studentName}'s answers`}
+        backHref={`/dashboard/teacher/classes/${classId}`}
+        backLabel="Back to class"
+      />
 
       <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-500/30 dark:bg-indigo-500/10">
         <div className="flex flex-wrap items-start justify-between gap-3">

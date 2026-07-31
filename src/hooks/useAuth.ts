@@ -10,6 +10,10 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // `isLoading` only covers the session lookup — the profile fetch is kicked
+  // off without being awaited, so callers that branch on `profile.role` need
+  // to know it has actually landed rather than reading `null` as "student".
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient();
 
@@ -23,19 +27,24 @@ export function useAuth() {
     let currentUserId: string | null = null;
 
     const loadProfile = async (userId: string) => {
-      const { data: prof, error: profErr } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      setIsProfileLoading(true);
+      try {
+        const { data: prof, error: profErr } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (profErr && profErr.code !== 'PGRST116') {
-        console.error('Error fetching user profile:', profErr.message);
-        setProfile(null);
-        return;
+        if (profErr && profErr.code !== 'PGRST116') {
+          console.error('Error fetching user profile:', profErr.message);
+          setProfile(null);
+          return;
+        }
+
+        setProfile(prof);
+      } finally {
+        setIsProfileLoading(false);
       }
-
-      setProfile(prof);
     };
 
     const applySession = (nextSession: Session | null) => {
@@ -50,6 +59,7 @@ export function useAuth() {
           void loadProfile(nextUserId);
         } else {
           setProfile(null);
+          setIsProfileLoading(false);
         }
       }
     };
@@ -79,5 +89,5 @@ export function useAuth() {
     return () => subscription?.unsubscribe();
   }, [router, supabase]);
 
-  return { session, isLoading, profile };
+  return { session, isLoading, isProfileLoading, profile };
 }

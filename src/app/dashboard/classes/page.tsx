@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogIn, Users } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
@@ -114,10 +115,11 @@ export default function StudentClassesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">My Classes</h1>
-        <p className="mt-1 text-sm text-content-muted">Join a class with an invite code from your teacher.</p>
-      </div>
+      <PageHero
+        icon={Users}
+        title="My Classes"
+        description="Join a class with an invite code from your teacher."
+      />
 
       <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
         <label className="text-sm font-semibold text-content-muted text-content">Join a class</label>

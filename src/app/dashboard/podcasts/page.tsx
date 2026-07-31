@@ -14,7 +14,7 @@ import {
 } from '@/lib/ai/majorTopics';
 import { getSubjectLabel, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
-import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { PageHero } from '@/components/ui/feedback';
 import type { GeneratedPodcast } from '@/types';
 
 type DialogueTurn = { speaker: 'HOST' | 'GUEST'; text: string };
@@ -134,18 +134,13 @@ export default function PodcastsPage() {
   };
 
   return (
-    <main className="space-y-7" aria-labelledby="podcasts-title">
-      <RevisionCycleStepper current="learn" />
-
-      <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
-        <div className="flex items-center gap-3">
-          <Headphones className="h-7 w-7 text-accent" />
-          <h1 id="podcasts-title" className="text-3xl font-bold text-content dark:text-white">Podcasts</h1>
-        </div>
-        <p className="mt-2 text-sm text-content-muted">
-          Generate a short AI-narrated audio episode for any of your saved subjects.
-        </p>
-      </section>
+    <div className="space-y-6" aria-labelledby="podcasts-title">
+      <PageHero
+        icon={Headphones}
+        titleId="podcasts-title"
+        title="Podcasts"
+        description="Generate a short AI-narrated audio episode for any of your saved subjects."
+      />
 
       {!activePodcast ? (
         <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
@@ -267,6 +262,6 @@ export default function PodcastsPage() {
           </ul>
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }

@@ -6,11 +6,11 @@ import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, useTheme } from "@/hooks/useTheme";
 import { useSfxMuted } from "@/hooks/useSfxMuted";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Moon, Sun, Target, Volume2, VolumeX } from "lucide-react";
+import { BookOpen, LogOut, Moon, Settings as SettingsIcon, Sun, Target, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
 import { Alert, Label, fieldStyles } from "@/components/ui/field";
-import { PageHeader } from "@/components/ui/feedback";
+import { PageHero } from "@/components/ui/feedback";
 import {
   DAILY_CARD_TARGET_RANGE,
   DEFAULT_STUDY_GOALS,
@@ -153,11 +153,13 @@ export default function Settings() {
     setIsThemeSaving(false);
   };
 
-  const isStudent = loadedProfile?.role !== "teacher" && loadedProfile?.role !== "parent";
+  // Requires a loaded profile: the `!==` checks alone read a still-null profile
+  // as a student, flashing student-only cards at teachers and parents.
+  const isStudent = !!loadedProfile && loadedProfile.role !== "teacher" && loadedProfile.role !== "parent";
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-8">
-      <PageHeader title="Settings" description="Manage your account and preferences." />
+    <div className="space-y-6">
+      <PageHero icon={SettingsIcon} title="Settings" description="Manage your account and preferences." />
 
       <SettingsCard title="Profile" description="Update your name and username.">
         <form onSubmit={handleProfileSave}>
@@ -265,7 +267,7 @@ export default function Settings() {
         </SettingsCard>
       )}
 
-      {loadedProfile?.role !== "teacher" && (
+      {isStudent && (
         <section className="rounded-card border border-subtle bg-surface p-6 shadow-card">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">

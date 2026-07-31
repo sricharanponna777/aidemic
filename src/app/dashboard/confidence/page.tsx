@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, GraduationCap, ListChecks } from 'lucide-react';
+import { ChevronDown, ChevronRight, Gauge, GraduationCap, ListChecks } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ToastProvider';
 import { createClient } from '@/lib/supabase-client';
 import { buttonStyles } from '@/components/ui/button';
-import { EmptyState, PageHeader } from '@/components/ui/feedback';
+import { EmptyState, PageHero } from '@/components/ui/feedback';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 import { readStudentMastery, type SubtopicMastery } from '@/lib/mastery/read';
@@ -255,7 +255,8 @@ export default function ConfidencePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHero
+        icon={Gauge}
         title="Topic Confidence"
         description="Rate each part of your specification red, amber or green. Your reds go to the front of the review queue."
         actions={

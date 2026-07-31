@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, ClipboardList, Clock, Circle } from 'lucide-react';
+import { CheckCircle2, Clock, Circle } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
 import { gradeBadgeTone } from '@/lib/gradeTone';
@@ -40,7 +40,7 @@ export default function ParentAssignmentsPage() {
   const { selectedStudentId } = useLinkedChildren();
 
   const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!selectedStudentId) return;
@@ -110,18 +110,12 @@ export default function ParentAssignmentsPage() {
   if (!selectedStudentId) return null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <ClipboardList className="h-5 w-5 text-indigo-500" />
-          <h2 className="text-lg font-bold text-content dark:text-white">Assignments</h2>
-        </div>
-        {rows.length > 0 ? (
-          <span className="text-sm text-content-subtle">
-            {summary.completed}/{summary.total} completed
-          </span>
-        ) : null}
-      </div>
+    <div className="space-y-6">
+      {rows.length > 0 ? (
+        <p className="text-sm text-content-subtle">
+          {summary.completed}/{summary.total} completed
+        </p>
+      ) : null}
 
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">

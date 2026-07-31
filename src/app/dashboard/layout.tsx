@@ -8,116 +8,26 @@ import { createClient } from "@/lib/supabase-client";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  BarChart3,
-  BookOpen,
-  Brain,
-  CalendarDays,
   ChevronRight,
-  ClipboardList,
-  Gauge,
-  GraduationCap,
-  Headphones,
-  Compass,
-  Layers,
-  LayoutDashboard,
-  ListChecks,
   LogOut,
   Menu,
   Moon,
-  PenLine,
-  Settings,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Sun,
-  Target,
-  TrendingUp,
-  Users,
-  UserPlus,
   X,
   Zap,
   type LucideIcon,
 } from "lucide-react";
-
-const STUDENT_NAV_GROUPS = [
-  {
-    label: null,
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
-      { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
-    ],
-  },
-  {
-    label: "Learn",
-    items: [
-      { href: "/dashboard/notes", label: "Notes", icon: BookOpen },
-      { href: "/dashboard/podcasts", label: "Podcasts", icon: Headphones },
-      { href: "/dashboard/flashcards", label: "Flashcards", icon: Layers },
-    ],
-  },
-  {
-    label: "Review",
-    items: [
-      { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
-      { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
-      { href: "/dashboard/confidence", label: "Topic Confidence", icon: Gauge },
-      { href: "/dashboard/planner", label: "Planner", icon: CalendarDays },
-    ],
-  },
-  {
-    label: "Practice",
-    items: [
-      { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
-      { href: "/dashboard/blurt", label: "Blurting", icon: PenLine },
-    ],
-  },
-  {
-    label: "Improve",
-    items: [
-      { href: "/dashboard/exam-coach", label: "Exam Coach", icon: Compass },
-    ],
-  },
-  {
-    label: null,
-    items: [
-      { href: "/dashboard/classes", label: "My Classes", icon: Users },
-      { href: "/dashboard/family", label: "Invite Parent", icon: UserPlus },
-      { href: "/dashboard/settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
-
-type StudentNavItem = (typeof STUDENT_NAV_GROUPS)[number]["items"][number];
-
-const GROUP_ICONS: Record<string, LucideIcon> = {
-  Learn: BookOpen,
-  Review: ListChecks,
-  Practice: Target,
-};
-
-const TEACHER_NAV_ITEMS = [
-  { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/teacher/classes", label: "Classes", icon: Users },
-  { href: "/dashboard/teacher/assignments", label: "Assignments", icon: ClipboardList },
-  { href: "/dashboard/teacher/reports", label: "Reports", icon: BarChart3 },
-  { href: "/dashboard/teacher/ai-insights", label: "AI Insights", icon: Sparkles },
-  { href: "/dashboard/teacher/question-bank", label: "Question Bank", icon: Layers },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-];
-
-const PARENT_NAV_ITEMS = [
-  { href: "/dashboard/parent", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/parent/progress", label: "Progress", icon: TrendingUp },
-  { href: "/dashboard/parent/subjects", label: "Subjects", icon: BookOpen },
-  { href: "/dashboard/parent/activity", label: "Activity", icon: CalendarDays },
-  { href: "/dashboard/parent/assignments", label: "Assignments", icon: ClipboardList },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-];
-
-function isActiveRoute(item: { href: string; exact?: boolean }, pathname: string) {
-  if (item.exact) return pathname === item.href;
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
+import { SectionBreadcrumb } from "@/components/SectionBreadcrumb";
+import {
+  GROUP_ICONS,
+  PARENT_NAV_ITEMS,
+  STUDENT_NAV_GROUPS,
+  TEACHER_NAV_ITEMS,
+  isActiveRoute,
+  type NavItem,
+} from "@/lib/nav";
 
 function GroupFlyout({
   label,
@@ -128,7 +38,7 @@ function GroupFlyout({
 }: {
   label: string;
   icon: LucideIcon;
-  items: StudentNavItem[];
+  items: NavItem[];
   pathname: string;
   onNavigate?: () => void;
 }) {
@@ -211,7 +121,7 @@ function GroupFlyout({
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { session, profile, isLoading } = useAuth();
+  const { session, profile, isLoading, isProfileLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -222,19 +132,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [isSchoolAdmin, setIsSchoolAdmin] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [hasLinkedChild, setHasLinkedChild] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
     const load = async () => {
-      const [{ data: teacherRow }, { data: adminRow }] = await Promise.all([
+      const [{ data: teacherRow }, { data: adminRow }, { count: linkedChildren }] = await Promise.all([
         supabase.from("teachers").select("is_school_admin").eq("user_id", session.user.id).maybeSingle(),
         supabase.from("platform_admins").select("user_id").eq("user_id", session.user.id).maybeSingle(),
+        supabase
+          .from("parent_links")
+          .select("id", { count: "exact", head: true })
+          .eq("parent_id", session.user.id)
+          .eq("status", "active"),
       ]);
       if (cancelled) return;
       setIsSchoolAdmin(!!teacherRow?.is_school_admin);
       setIsPlatformAdmin(!!adminRow);
+      setHasLinkedChild((linkedChildren ?? 0) > 0);
     };
     void load();
     return () => {
@@ -242,7 +159,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [session, supabase]);
 
-  const baseNavGroups: { label: string | null; items: StudentNavItem[] }[] = isTeacher
+  // Until a child accepts the link the parent pages render nothing, so the
+  // per-child nav items would just change the URL and leave the screen as-is.
+  const parentNavItems = hasLinkedChild
+    ? PARENT_NAV_ITEMS
+    : PARENT_NAV_ITEMS.filter((item) => item.href === "/dashboard/parent" || item.href === "/dashboard/settings");
+
+  const baseNavGroups: { label: string | null; items: NavItem[] }[] = isTeacher
     ? [
         {
           label: null,
@@ -253,7 +176,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
       ]
     : isParent
-    ? [{ label: null, items: PARENT_NAV_ITEMS }]
+    ? [{ label: null, items: parentNavItems }]
     : STUDENT_NAV_GROUPS;
 
   const navGroups = isPlatformAdmin
@@ -267,7 +190,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const renderNavLinks = (onNavigate?: () => void, allowFlyouts = true) =>
     navGroups.map((group, groupIndex) => {
-      const isCollapsibleGroup = allowFlyouts && group.label !== null && group.items.length > 1;
+      const isCollapsibleGroup = allowFlyouts && group.label !== null;
 
       if (isCollapsibleGroup) {
         const GroupIcon = GROUP_ICONS[group.label as string] ?? group.items[0].icon;
@@ -320,7 +243,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       );
     });
 
-  if (isLoading) {
+  if (isLoading || (session && isProfileLoading)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas">
         <div className="flex items-center gap-1.5">
@@ -471,7 +394,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <div className="lg:pl-64">
         <main className="mx-auto max-w-6xl px-4 pt-16 pb-10 sm:px-6 lg:pt-8">
-          <div className="animate-page-enter">
+          <div className="animate-page-enter space-y-6">
+            {!isTeacher && !isParent && <SectionBreadcrumb />}
             {children}
           </div>
         </main>

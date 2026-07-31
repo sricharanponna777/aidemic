@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp, ClipboardList, Plus } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
@@ -201,21 +202,22 @@ export default function TeacherAssignmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-content dark:text-white">Assignments</h1>
-          <p className="mt-1 text-sm text-content-muted">Create, schedule, and review assignments across all your classes.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowForm((v) => !v)}
-          disabled={activeClasses.length === 0}
-          className={buttonStyles({ variant: 'primary' })}
-        >
-          <Plus className="h-4 w-4" />
-          Create assignment
-        </button>
-      </div>
+      <PageHero
+        icon={ClipboardList}
+        title="Assignments"
+        description="Create, schedule, and review assignments across all your classes."
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            disabled={activeClasses.length === 0}
+            className={buttonStyles({ variant: 'primary' })}
+          >
+            <Plus className="h-4 w-4" />
+            Create assignment
+          </button>
+        }
+      />
 
       {classes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">

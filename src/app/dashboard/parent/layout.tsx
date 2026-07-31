@@ -1,15 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { LogIn, Plus, Users } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { LayoutDashboard, LogIn, Plus, Users } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { PageLoader } from '@/components/PageLoader';
+import { PARENT_NAV_ITEMS, findNavItem } from '@/lib/nav';
 import { ParentChildProvider, useLinkedChildren } from './ParentChildContext';
+
+/** Copy for the hero on each parent route. Titles/icons come from the shared
+ *  nav config so the header always matches the sidebar entry. */
+const PAGE_DESCRIPTIONS: Record<string, string> = {
+  '/dashboard/parent': "A read-only view of your child's progress on AIDemic.",
+  '/dashboard/parent/progress': 'Retention, streaks and predicted grades over time.',
+  '/dashboard/parent/subjects': 'The qualifications your child is studying and how each is going.',
+  '/dashboard/parent/activity': 'What your child has been working on recently.',
+  '/dashboard/parent/assignments': 'Assignments set by their teachers, and how they scored.',
+};
 
 function ParentShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { profile, isLoading } = useAuth();
   const { students, selectedStudentId, setSelectedStudentId, loading } = useLinkedChildren();
 
@@ -49,24 +62,26 @@ function ParentShell({ children }: { children: React.ReactNode }) {
     return <PageLoader text="Loading your Parent Dashboard..." />;
   }
 
+  const navMatch = findNavItem(pathname, [{ label: null, items: PARENT_NAV_ITEMS }]);
+  const isParentHome = pathname === '/dashboard/parent';
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-content dark:text-white">Parent Dashboard</h1>
-          <p className="mt-1 text-sm text-content-muted">
-            A read-only view of your child&apos;s progress on AIDemic.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowLinkForm((v) => !v)}
-          className={buttonStyles({ variant: 'secondary', size: 'sm' })}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {students.length === 0 ? 'Add a child' : 'Add another child'}
-        </button>
-      </div>
+      <PageHero
+        icon={navMatch?.item.icon ?? LayoutDashboard}
+        title={isParentHome ? 'Parent Dashboard' : navMatch?.item.label ?? 'Parent Dashboard'}
+        description={PAGE_DESCRIPTIONS[pathname]}
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowLinkForm((v) => !v)}
+            className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {students.length === 0 ? 'Add a child' : 'Add another child'}
+          </button>
+        }
+      />
 
       {showLinkForm ? (
         <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">

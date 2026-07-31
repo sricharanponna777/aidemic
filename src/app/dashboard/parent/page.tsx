@@ -55,7 +55,9 @@ export default function ParentOverviewPage() {
   const { selectedStudentId } = useLinkedChildren();
 
   const [metrics, setMetrics] = useState<ChildMetrics>(emptyMetrics);
-  const [metricsLoading, setMetricsLoading] = useState(false);
+  // Starts true: initialising to false paints "0d streak / nothing completed"
+  // before the first fetch lands, telling parents their child has done nothing.
+  const [metricsLoading, setMetricsLoading] = useState(true);
 
   useEffect(() => {
     if (!selectedStudentId) return;
@@ -166,6 +168,8 @@ export default function ParentOverviewPage() {
   if (metricsLoading) {
     return <PageLoader text="Loading progress..." />;
   }
+
+  if (!selectedStudentId) return null;
 
   return (
     <>

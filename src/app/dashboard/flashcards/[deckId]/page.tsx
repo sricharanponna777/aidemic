@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Brain, Edit, Layers, Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Brain, Edit, Layers, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag, FlashcardTagMapping } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { countLeeches, isLeech } from '@/lib/leeches';
 
 const TAG_COLORS = ['#2563eb', '#0f766e', '#7c3aed', '#be123c', '#b45309', '#0284c7'];
@@ -251,34 +252,28 @@ export default function DeckPage() {
   if (!deck) return <p className="text-red-600">Deck not found.</p>;
 
   return (
-    <main className="space-y-7" aria-labelledby="deck-page-title">
-      <section className="rounded-card border border-subtle bg-linear-to-br from-surface to-surface-sunken p-6 shadow-raised">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className='flex flex-row items-center gap-3'>
-              <Layers className="h-7 w-7 text-accent" />
-              <h1 id="deck-page-title" className="text-3xl font-bold text-content">{deck.name}</h1>
-            </div>
-            {deck.description ? <p className="mt-2 text-sm text-content-muted">{deck.description}</p> : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'secondary' })}>
-              <ArrowLeft className="h-4 w-4" />
-              Flashcards
-            </Link>
-            <Link href={`/dashboard/study-sessions?deckId=${deckId}`} className={buttonStyles({ variant: 'primary' })}>
-              <Brain className="h-4 w-4" />
-              Flashcard Revision
-            </Link>
-          </div>
-        </div>
+    <div className="space-y-6" aria-labelledby="deck-page-title">
+      <PageHero
+        icon={Layers}
+        titleId="deck-page-title"
+        title={deck.name}
+        description={deck.description || undefined}
+        backHref="/dashboard/flashcards"
+        backLabel="Flashcards"
+        actions={
+          <Link href={`/dashboard/study-sessions?deckId=${deckId}`} className={buttonStyles({ variant: 'primary' })}>
+            <Brain className="h-4 w-4" />
+            Flashcard Revision
+          </Link>
+        }
+      >
         <div className="mt-4 flex flex-wrap gap-3 text-sm">
           <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{deck.card_count || cards.length} cards</span>
           <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{dueCards} due now</span>
           <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{tags.length} tags</span>
           {deck.ai_generated ? <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-900/45 dark:text-blue-200">AI deck</span> : null}
         </div>
-      </section>
+      </PageHero>
 
       <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-content">Tags</h2>
@@ -637,6 +632,6 @@ export default function DeckPage() {
           </div>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }

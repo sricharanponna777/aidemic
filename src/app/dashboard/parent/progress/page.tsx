@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
@@ -69,7 +68,7 @@ export default function ParentProgressPage() {
   const { selectedStudentId } = useLinkedChildren();
 
   const [attempts, setAttempts] = useState<AttemptRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!selectedStudentId) return;
@@ -121,12 +120,7 @@ export default function ParentProgressPage() {
   if (!selectedStudentId) return null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2.5">
-        <TrendingUp className="h-5 w-5 text-indigo-500" />
-        <h2 className="text-lg font-bold text-content dark:text-white">Progress over time</h2>
-      </div>
-
+    <div className="space-y-6">
       {trends.length === 0 ? (
         <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">
           No exam practice completed yet. Trends will appear here once your child starts practising.

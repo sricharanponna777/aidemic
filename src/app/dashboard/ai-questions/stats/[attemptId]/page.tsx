@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, BarChart3, CheckCircle2, Target, Trophy } from 'lucide-react';
+import { BarChart3, CheckCircle2, Target, Trophy } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
-import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
@@ -161,29 +160,19 @@ export default function AttemptDetailPage() {
   const hasQuestionDetail = detail.questions.length > 0 && detail.markedAnswers.length > 0;
 
   return (
-    <main className="space-y-7" aria-labelledby="attempt-detail-title">
-      <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Attempt Detail</p>
-            <div className="mt-2 flex items-center gap-3">
-              <BarChart3 className="h-7 w-7 text-accent" />
-              <h1 id="attempt-detail-title" className="text-3xl font-bold text-content dark:text-white">
-                {attempt?.topic || 'Practice Attempt'}
-              </h1>
-            </div>
-            {attempt ? (
-              <p className="mt-2 text-sm text-content-muted">
-                {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {formatTieredExamLabel(attempt.exam_type, specTier, attempt.predicted_grade)} - {formatDateTime(attempt.created_at)}
-              </p>
-            ) : null}
-          </div>
-          <Link href="/dashboard/ai-questions/stats" className={buttonStyles({ variant: 'secondary' })}>
-            <ArrowLeft className="h-4 w-4" />
-            All statistics
-          </Link>
-        </div>
-      </section>
+    <div className="space-y-6" aria-labelledby="attempt-detail-title">
+      <PageHero
+        icon={BarChart3}
+        titleId="attempt-detail-title"
+        title={attempt?.topic || 'Practice Attempt'}
+        backHref="/dashboard/ai-questions/stats"
+        backLabel="All statistics"
+        description={
+          attempt
+            ? `${getSubjectLabel(attempt.subject)} - ${attempt.exam_board.toUpperCase()} ${formatTieredExamLabel(attempt.exam_type, specTier, attempt.predicted_grade)} - ${formatDateTime(attempt.created_at)}`
+            : undefined
+        }
+      />
 
       {errorMessage ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-700/60 dark:bg-red-950/35 dark:text-red-200">
@@ -335,6 +324,6 @@ export default function AttemptDetailPage() {
           </section>
         </>
       ) : null}
-    </main>
+    </div>
   );
 }

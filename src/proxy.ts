@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { getOptionalSupabaseEnv } from './lib/supabase-env';
+import { STUDENT_ONLY_PREFIXES } from './lib/nav';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -44,17 +45,26 @@ export async function proxy(request: NextRequest) {
 
     // Defense-in-depth only: RLS is the real authorization backstop. These
     // checks just stop an unauthorized user from ever rendering the page.
-    if (pathname.startsWith('/dashboard/teacher')) {
-      const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user!.id).maybeSingle();
-      if (profile?.role !== 'teacher') {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-      }
-    }
+    const isTeacherRoute = pathname.startsWith('/dashboard/teacher');
+    const isParentRoute = pathname.startsWith('/dashboard/parent');
+    const isStudentRoute = STUDENT_ONLY_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    );
 
-    if (pathname.startsWith('/dashboard/parent')) {
+    if (isTeacherRoute || isParentRoute || isStudentRoute) {
       const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', user!.id).maybeSingle();
-      if (profile?.role !== 'parent') {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+      const role = profile?.role;
+      // A null role predates the role column, so treat it as a student.
+      const home = role === 'teacher' ? '/dashboard/teacher' : role === 'parent' ? '/dashboard/parent' : '/dashboard';
+
+      const allowed = isTeacherRoute
+        ? role === 'teacher'
+        : isParentRoute
+        ? role === 'parent'
+        : role !== 'teacher' && role !== 'parent';
+
+      if (!allowed) {
+        return NextResponse.redirect(new URL(home, request.url));
       }
     }
 

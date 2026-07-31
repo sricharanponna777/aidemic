@@ -31,7 +31,7 @@ export default function ParentActivityPage() {
 
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [attemptDates, setAttemptDates] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   // Captured once at mount so the memoised heatmap/week calculations stay pure.
   const [now] = useState(() => Date.now());
 

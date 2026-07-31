@@ -25,7 +25,7 @@ import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
 import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
-import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useTopicOptions } from '@/hooks/useTopicOptions';
@@ -733,21 +733,14 @@ export default function AIQuestionsPage() {
   }, [isMockExam, mockDeadline, report]);
 
   return (
-    <main className="space-y-7" aria-labelledby="ai-questions-title">
-      <RevisionCycleStepper current="practice" />
-
-      <section className="overflow-hidden rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <Rocket className="h-7 w-7 text-accent" />
-              <h1 id="ai-questions-title" className="text-3xl font-bold text-content dark:text-white">Smart Practice</h1>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm text-content-muted">
-              Generate exam-board questions, answer them, then get marks, a predicted grade, and targeted upgrade advice.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+    <div className="space-y-6" aria-labelledby="ai-questions-title">
+      <PageHero
+        icon={Rocket}
+        titleId="ai-questions-title"
+        title="Smart Practice"
+        description="Generate exam-board questions, answer them, then get marks, a predicted grade, and targeted upgrade advice."
+        actions={
+          <>
             <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'secondary' })}>
               <ArrowLeft className="h-4 w-4" />
               Flashcard Revision
@@ -757,9 +750,9 @@ export default function AIQuestionsPage() {
               Dashboard
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {status && (inPractice || !setupValidationMessage) ? (
         <div role="status" aria-live="polite" className={`rounded-xl border px-4 py-3 text-sm ${statusStyles[status.tone]}`}>{status.text}</div>
@@ -1415,6 +1408,6 @@ export default function AIQuestionsPage() {
           </div>
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }

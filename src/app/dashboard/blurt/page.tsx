@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Brain, CheckCircle2, CircleAlert, Lightbulb, RotateCcw, Timer } from 'lucide-react';
+import { Brain, CheckCircle2, CircleAlert, Lightbulb, PenLine, RotateCcw, Timer } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { buttonStyles } from '@/components/ui/button';
 import { Alert, Label, fieldStyles } from '@/components/ui/field';
-import { PageHeader, EmptyState } from '@/components/ui/feedback';
+import { PageHero, EmptyState } from '@/components/ui/feedback';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { scoreBadgeTone } from '@/lib/scoreTone';
 import Link from 'next/link';
@@ -119,7 +119,11 @@ export default function BlurtPage() {
   if (!subjectsLoading && subjects.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Blurting" description="Free-recall practice: write everything you know, then see what you missed." />
+        <PageHero
+          icon={PenLine}
+          title="Blurting"
+          description="Free-recall practice: write everything you know, then see what you missed."
+        />
         <EmptyState
           icon={Brain}
           title="Add a subject first"
@@ -136,7 +140,8 @@ export default function BlurtPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHero
+        icon={PenLine}
         title="Blurting"
         description="Brain-dump everything you know about a topic, then get an AI breakdown of what you nailed and what you missed."
       />

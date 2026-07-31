@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Copy, Trash2, Users, X } from 'lucide-react';
+import { Check, Copy, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
@@ -144,12 +145,11 @@ export default function FamilyPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">Family</h1>
-        <p className="mt-1 text-sm text-content-muted">
-          Parents can send a link request using your email or username. Review and respond to requests below. They can never edit your data.
-        </p>
-      </div>
+      <PageHero
+        icon={UserPlus}
+        title="Family"
+        description="Parents can send a link request using your email or username. Review and respond to requests below. They can never edit your data."
+      />
 
       {/* Requests from parents (parent-initiated) */}
       <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">

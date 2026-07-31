@@ -9,7 +9,7 @@ import { formatInterval, previewNextReview } from '@/lib/spacedRepetition';
 import { useAuth } from '@/hooks/useAuth';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
-import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { PageHero } from '@/components/ui/feedback';
 import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
 import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
 
@@ -402,21 +402,14 @@ export default function StudySessions() {
     : '';
 
   return (
-    <main className="space-y-6" aria-labelledby="study-sessions-title">
-      <RevisionCycleStepper current="review" />
-
-      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <div className="flex items-center gap-3">
-              <Brain className="h-7 w-7 text-accent" />
-              <h1 id="study-sessions-title" className="text-3xl font-bold text-content dark:text-white">Flashcard Revision</h1>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm text-content-muted">
-              Review your flashcards with spaced repetition.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+    <div className="space-y-6" aria-labelledby="study-sessions-title">
+      <PageHero
+        icon={Brain}
+        titleId="study-sessions-title"
+        title="Flashcard Revision"
+        description="Review your flashcards with spaced repetition."
+        actions={
+          <>
             <Link
               href="/dashboard/flashcards"
               className={buttonStyles({ variant: 'secondary' })}
@@ -428,7 +421,6 @@ export default function StudySessions() {
               href="/dashboard/ai-questions"
               className={buttonStyles({
                 variant: 'primary',
-                size: 'lg',
                 className: 'shadow-lg shadow-indigo-500/25 hover:-translate-y-px hover:shadow-indigo-500/35',
               })}
             >
@@ -436,9 +428,9 @@ export default function StudySessions() {
               Smart Practice
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       <section aria-label="Study overview" className="grid gap-4 md:grid-cols-2">
         <article className="rounded-2xl border border-subtle bg-surface p-5 shadow-card">
@@ -683,6 +675,6 @@ export default function StudySessions() {
           ))}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

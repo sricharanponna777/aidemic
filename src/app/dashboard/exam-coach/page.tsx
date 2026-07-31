@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Compass, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
-import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ToastProvider';
 import { createClient } from '@/lib/supabase-client';
@@ -155,26 +155,18 @@ export default function ExamCoachPage() {
   const hasEnoughData = attempts.length > 0;
 
   return (
-    <main className="space-y-6" aria-labelledby="exam-coach-title">
-      <RevisionCycleStepper current="improve" />
-
-      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Exam technique</p>
-            <div className="mt-2 flex items-center gap-3">
-              <Compass className="h-7 w-7 text-accent" />
-              <h1 id="exam-coach-title" className="text-3xl font-bold text-content dark:text-white">Exam Coach</h1>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm text-content-muted">
-              Patterns in why you keep losing marks, drawn from every Smart Practice attempt you&apos;ve marked so far.
-            </p>
-          </div>
+    <div className="space-y-6" aria-labelledby="exam-coach-title">
+      <PageHero
+        icon={Compass}
+        titleId="exam-coach-title"
+        title="Exam Coach"
+        description="Patterns in why you keep losing marks, drawn from every Smart Practice attempt you've marked so far."
+        actions={
           <Link href="/dashboard/ai-questions/stats" className={buttonStyles({ variant: 'secondary' })}>
             Practice stats
           </Link>
-        </div>
-      </section>
+        }
+      />
 
       {isLoading ? (
         <p className="text-sm text-content-subtle">Loading your practice history…</p>
@@ -289,6 +281,6 @@ export default function ExamCoachPage() {
           ) : null}
         </>
       )}
-    </main>
+    </div>
   );
 }

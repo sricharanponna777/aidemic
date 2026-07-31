@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Archive, ArchiveRestore, AlertTriangle, Check, ClipboardList, Copy, GraduationCap, Pencil, Plus, Share2, Target, Trash2, Users, X } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { useAuth } from '@/hooks/useAuth';
@@ -331,14 +332,12 @@ export default function TeacherDashboardPage() {
     <div className="space-y-6">
       <VerificationBanner verificationStatus={verificationStatus} schoolStatus={schoolStatus} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-content dark:text-white">My Classes</h1>
-          <p className="mt-1 text-sm text-content-muted">
-            Each class gets a code your students use to join. Once they&apos;re in, you can set them AI-generated practice assignments.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHero
+        icon={Users}
+        title="My Classes"
+        description="Each class gets a code your students use to join. Once they're in, you can set them AI-generated practice assignments."
+        actions={
+          <>
           {archivedClasses.length > 0 && (
             <button type="button" onClick={() => setShowArchived((v) => !v)} className={buttonStyles({ variant: 'secondary' })}>
               <Archive className="h-4 w-4" />
@@ -349,8 +348,9 @@ export default function TeacherDashboardPage() {
             <Plus className="h-4 w-4" />
             Create class
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[

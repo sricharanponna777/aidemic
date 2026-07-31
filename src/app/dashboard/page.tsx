@@ -7,6 +7,7 @@ import {
   ArrowRight,
   Brain,
   GraduationCap,
+  LayoutDashboard,
   Sparkles,
   Trophy,
 } from "lucide-react";
@@ -22,7 +23,7 @@ import { readSpecificationSubtopicCounts, readStudentMastery } from "@/lib/maste
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/subjectConfig";
 import { gcseTierLabelForGrade, gradeBadgeTone } from "@/lib/gradeTone";
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from "@/lib/ai/studentSubjects";
-import { RevisionCycleStepper } from "@/components/RevisionCycleStepper";
+import { PageHero } from "@/components/ui/feedback";
 import { DEFAULT_STUDY_GOALS, fetchStudyGoals } from "@/lib/studyGoals";
 import { BarChart } from "@/components/ui/charts";
 import { countLeeches } from "@/lib/leeches";
@@ -547,51 +548,33 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-
-      <RevisionCycleStepper />
-
-      {/* ── Hero ───────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden rounded-card border border-subtle bg-linear-to-br from-accent-muted via-surface to-accent-muted p-6 shadow-card sm:p-8">
-        {/* Ambient blobs */}
-        <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-8 right-24 h-48 w-48 rounded-full bg-purple-500/10 blur-2xl" />
-
-        <div className="relative flex flex-wrap items-center justify-between gap-8">
-          {/* Left: greeting */}
-          <div>
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-              <Sparkles className="h-3 w-3" />
-              Your Personal AI Revision Coach
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-content dark:text-white sm:text-4xl">
-              Welcome back,{" "}
-              <span className="bg-linear-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
-                {displayName}
-              </span>
-            </h1>
-            <p className="mt-2 text-sm text-content-muted sm:text-base">
-              Your AI tutor has analysed your progress. Here&apos;s what to focus on today.
-            </p>
-          </div>
-        </div>
-
-        {/* CTA */}
-        <div className="relative mt-6">
+      <PageHero
+        icon={LayoutDashboard}
+        title={
+          <>
+            Welcome back,{" "}
+            <span className="bg-linear-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+              {displayName}
+            </span>
+          </>
+        }
+        description="Your AI tutor has analysed your progress. Here's what to focus on today."
+        actions={
           <Link
             href="/dashboard/subjects"
-            className={buttonStyles({ variant: 'primary', size: 'lg', className: 'shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-px' })}
+            className={buttonStyles({ variant: 'primary', className: 'shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:-translate-y-px' })}
           >
             <GraduationCap className="h-4 w-4" />
             Subjects
           </Link>
-        </div>
-
+        }
+      >
         {loadError && (
-          <p className="relative mt-4 rounded-xl border border-red-200 bg-red-50 dark:border-red-700/40 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-300">
+          <p className="mt-4 rounded-xl border border-red-200 bg-red-50 dark:border-red-700/40 dark:bg-red-950/30 px-4 py-3 text-sm text-red-800 dark:text-red-300">
             {loadError}
           </p>
         )}
-      </section>
+      </PageHero>
 
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
@@ -159,18 +159,13 @@ export default function TakeAssignmentPage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        href={`/dashboard/classes/${classId}`}
-        className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to class
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">{assignment.title}</h1>
-        {assignment.description ? <p className="mt-1 text-sm text-content-muted">{assignment.description}</p> : null}
-      </div>
+      <PageHero
+        icon={ClipboardList}
+        title={assignment.title}
+        description={assignment.description || undefined}
+        backHref={`/dashboard/classes/${classId}`}
+        backLabel="Back to class"
+      />
 
       {assignment.source_material ? (
         <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">

@@ -6,7 +6,7 @@ import { CalendarDays, CheckCircle2, Circle, Sparkles, Trash2, Wand2 } from 'luc
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHeader, EmptyState } from '@/components/ui/feedback';
+import { PageHero, EmptyState } from '@/components/ui/feedback';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 import { buildRevisionPlan, daysUntilExam, type PlannerSubject } from '@/lib/revisionPlanner';
@@ -261,7 +261,8 @@ export default function PlannerPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHero
+        icon={CalendarDays}
         title="Revision Planner"
         description="A timetable weighted toward your weakest topics and nearest exams."
         actions={

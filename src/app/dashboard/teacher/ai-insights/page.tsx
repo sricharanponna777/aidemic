@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Lightbulb, Sparkles, TrendingDown } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import { atRiskStudents, buildClassStats, buildStudentStats, buildTopicStats } from '@/lib/teacherAnalytics';
@@ -115,10 +116,11 @@ export default function TeacherAiInsightsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">AI Insights</h1>
-        <p className="mt-1 text-sm text-content-muted">Patterns surfaced across your classes to help you decide what to do next.</p>
-      </div>
+      <PageHero
+        icon={Sparkles}
+        title="AI Insights"
+        description="Patterns surfaced across your classes to help you decide what to do next."
+      />
 
       {classes.length === 0 || !hasData ? (
         <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">

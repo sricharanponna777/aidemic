@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   Brain,
@@ -14,6 +13,7 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
 import { TopicInput } from '@/components/TopicInput';
@@ -234,39 +234,25 @@ export default function AIFlashcardsPage() {
   };
 
   return (
-    <main className="space-y-7" aria-labelledby="ai-flashcards-title">
-      <section className="overflow-hidden rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-7 w-7 text-accent" />
-              <h1 id="ai-flashcards-title" className="text-3xl font-bold text-content dark:text-white">
-                AI Flashcards
-              </h1>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm text-content-muted">
-              Turn a topic from notes into a saved deck with focused front/back cards.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/dashboard/flashcards"
-              className={buttonStyles({ variant: 'secondary' })}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Flashcards
-            </Link>
-            <Link
-              href="/dashboard/study-sessions"
-              className={buttonStyles({ variant: 'primary' })}
-            >
-              <Brain className="h-4 w-4" />
-              Flashcard Revision
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
+    <div className="space-y-6" aria-labelledby="ai-flashcards-title">
+      <PageHero
+        icon={Sparkles}
+        titleId="ai-flashcards-title"
+        title="AI Flashcards"
+        description="Turn a topic from notes into a saved deck with focused front/back cards."
+        backHref="/dashboard/flashcards"
+        backLabel="Flashcards"
+        actions={
+          <Link
+            href="/dashboard/study-sessions"
+            className={buttonStyles({ variant: 'primary' })}
+          >
+            <Brain className="h-4 w-4" />
+            Flashcard Revision
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        }
+      />
 
       {status && !validationMessage ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassNames[status.tone]}`}>{status.text}</div> : null}
 
@@ -525,6 +511,6 @@ export default function AIFlashcardsPage() {
           </section>
         </aside>
       </form>
-    </main>
+    </div>
   );
 }

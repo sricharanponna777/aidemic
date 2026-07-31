@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BarChart3, Target, Trophy } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
@@ -181,25 +182,21 @@ export default function SmartPracticeStatsPage() {
   }, [attempts, subjects]);
 
   return (
-    <main className="space-y-7" aria-labelledby="practice-stats-title">
-      <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Smart Practice</p>
-            <div className="mt-2 flex items-center gap-3">
-              <BarChart3 className="h-7 w-7 text-accent" />
-              <h1 id="practice-stats-title" className="text-3xl font-bold text-content dark:text-white">Statistics</h1>
-            </div>
-            <p className="mt-2 text-sm text-content-muted">
-              Review all marked practice attempts, grades, scores, and recurring weak areas.
-            </p>
-          </div>
+    <div className="space-y-6" aria-labelledby="practice-stats-title">
+      <PageHero
+        icon={BarChart3}
+        titleId="practice-stats-title"
+        title="Practice Statistics"
+        description="Review all marked practice attempts, grades, scores, and recurring weak areas."
+        backHref="/dashboard/ai-questions"
+        backLabel="Smart Practice"
+        actions={
           <Link href="/dashboard" className={buttonStyles({ variant: 'secondary' })}>
             <ArrowLeft className="h-4 w-4" />
             Dashboard
           </Link>
-        </div>
-      </section>
+        }
+      />
 
       {errorMessage ? (
         <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-700/60 dark:bg-red-950/35 dark:text-red-200">
@@ -343,6 +340,6 @@ export default function SmartPracticeStatsPage() {
           </div>
         </aside>
       </section>
-    </main>
+    </div>
   );
 }

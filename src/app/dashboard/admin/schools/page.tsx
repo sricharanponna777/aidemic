@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, X } from 'lucide-react';
+import { Check, ShieldAlert, X } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
@@ -85,10 +86,11 @@ export default function AdminSchoolsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">Pending Schools</h1>
-        <p className="mt-1 text-sm text-content-muted">Approve new schools before their founding admin can approve other teachers.</p>
-      </div>
+      <PageHero
+        icon={ShieldAlert}
+        title="Pending Schools"
+        description="Approve new schools before their founding admin can approve other teachers."
+      />
 
       {actionError ? <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p> : null}
 

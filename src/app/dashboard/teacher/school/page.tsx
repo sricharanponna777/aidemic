@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Check, UserPlus, X } from 'lucide-react';
+import { Check, ShieldCheck, UserPlus, X } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
@@ -163,15 +163,13 @@ export default function SchoolAdminPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/teacher/classes" className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        My Classes
-      </Link>
-
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">{schoolName}</h1>
-        <p className="mt-1 text-sm text-content-muted">Approve teachers requesting to join your school.</p>
-      </div>
+      <PageHero
+        icon={ShieldCheck}
+        title={schoolName}
+        description="Approve teachers requesting to join your school."
+        backHref="/dashboard/teacher/classes"
+        backLabel="My Classes"
+      />
 
       {actionError ? <p className="text-sm text-red-600 dark:text-red-400">{actionError}</p> : null}
 

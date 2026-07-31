@@ -2,12 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   AlertTriangle,
   Archive,
   ArchiveRestore,
-  ArrowLeft,
   Check,
   ClipboardList,
   Copy,
@@ -23,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { PageLoader } from '@/components/PageLoader';
 import { useToast } from '@/components/ToastProvider';
@@ -333,17 +332,16 @@ export default function TeacherClassPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/teacher/classes" className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        My Classes
-      </Link>
-
       <VerificationBanner verificationStatus={verificationStatus} schoolStatus={schoolStatus} />
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          {isEditingName ? (
-            <div className="flex items-center gap-1.5">
+      <PageHero
+        icon={Users}
+        backHref="/dashboard/teacher/classes"
+        backLabel="My Classes"
+        description={`${roster.length} student${roster.length === 1 ? '' : 's'}`}
+        title={
+          isEditingName ? (
+            <span className="flex items-center gap-1.5">
               <input
                 autoFocus
                 type="text"
@@ -361,10 +359,10 @@ export default function TeacherClassPage() {
               <button type="button" onClick={() => setIsEditingName(false)} aria-label="Cancel rename" className="text-content-subtle hover:text-content-muted dark:hover:text-slate-200">
                 <X className="h-5 w-5" />
               </button>
-            </div>
+            </span>
           ) : (
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-content dark:text-white">{classInfo.name}</h1>
+            <span className="flex items-center gap-2">
+              {classInfo.name}
               <button
                 type="button"
                 onClick={() => {
@@ -381,11 +379,11 @@ export default function TeacherClassPage() {
                   Archived
                 </span>
               )}
-            </div>
-          )}
-          <p className="mt-1 text-sm text-content-muted">{roster.length} student{roster.length === 1 ? '' : 's'}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+            </span>
+          )
+        }
+        actions={
+          <>
           <div className="flex items-center gap-3 rounded-lg border border-subtle bg-surface px-3 py-2">
             <div>
               <p className="flex items-center gap-1 text-[11px] text-content-subtle">
@@ -413,8 +411,9 @@ export default function TeacherClassPage() {
             <Trash2 className="h-4 w-4" />
             Delete
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {pendingDelete && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/40 dark:bg-red-950/30">

@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, Sparkles } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
 import { MathContent } from '@/components/MathContent';
 import { useAuth } from '@/hooks/useAuth';
@@ -296,10 +297,11 @@ export default function TeacherQuestionBankPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">Question Bank</h1>
-        <p className="mt-1 text-sm text-content-muted">Browse the curriculum, generate practice questions, and reuse saved assignments.</p>
-      </div>
+      <PageHero
+        icon={Layers}
+        title="Question Bank"
+        description="Browse the curriculum, generate practice questions, and reuse saved assignments."
+      />
 
       {classes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">

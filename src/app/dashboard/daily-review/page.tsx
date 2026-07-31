@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ListChecks, RotateCcw, Sparkles, Target } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
-import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { PageHero } from '@/components/ui/feedback';
 import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
 import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
 import { useAuth } from '@/hooks/useAuth';
@@ -552,27 +552,19 @@ export default function DailyReviewPage() {
   };
 
   return (
-    <main className="space-y-6" aria-labelledby="daily-review-title">
-      <RevisionCycleStepper current="review" />
-
-      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Daily practice</p>
-            <div className="mt-2 flex items-center gap-3">
-              <ListChecks className="h-7 w-7 text-accent" />
-              <h1 id="daily-review-title" className="text-3xl font-bold text-content dark:text-white">Daily Review</h1>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm text-content-muted">
-              One mixed queue: your due flashcards interleaved with quick questions targeting your recurring weak spots.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+    <div className="space-y-6" aria-labelledby="daily-review-title">
+      <PageHero
+        icon={ListChecks}
+        titleId="daily-review-title"
+        title="Daily Review"
+        description="One mixed queue: your due flashcards interleaved with quick questions targeting your recurring weak spots."
+        actions={
+          <>
             <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'secondary' })}>Flashcard Revision</Link>
             <Link href="/dashboard/ai-questions" className={buttonStyles({ variant: 'secondary' })}>Smart Practice</Link>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {phase === 'idle' && (
         <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
@@ -817,6 +809,6 @@ export default function DailyReviewPage() {
           </div>
         </section>
       )}
-    </main>
+    </div>
   );
 }

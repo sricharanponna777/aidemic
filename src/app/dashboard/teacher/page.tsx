@@ -2,7 +2,8 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ClipboardList, GraduationCap, Target, Users } from 'lucide-react';
+import { AlertTriangle, ClipboardList, GraduationCap, LayoutDashboard, Target, Users } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { VerificationBanner } from '@/components/VerificationBanner';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import { atRiskStudents, average, buildClassStats, buildStudentStats } from '@/lib/teacherAnalytics';
@@ -65,10 +66,11 @@ export default function TeacherDashboardPage() {
     <div className="space-y-6">
       <VerificationBanner verificationStatus={verificationStatus} schoolStatus={schoolStatus} />
 
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">Dashboard</h1>
-        <p className="mt-1 text-sm text-content-muted">Your at-a-glance overview across every class.</p>
-      </div>
+      <PageHero
+        icon={LayoutDashboard}
+        title="Dashboard"
+        description="Your at-a-glance overview across every class."
+      />
 
       {classes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { BarChart3 } from 'lucide-react';
+import { PageHero } from '@/components/ui/feedback';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import { buildClassStats, buildStudentStats, buildTopicStats } from '@/lib/teacherAnalytics';
 import { scoreBadgeTone, scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
@@ -154,10 +156,11 @@ export default function TeacherReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-content dark:text-white">Reports</h1>
-        <p className="mt-1 text-sm text-content-muted">Deep-dive performance reports for students and classes.</p>
-      </div>
+      <PageHero
+        icon={BarChart3}
+        title="Reports"
+        description="Deep-dive performance reports for students and classes."
+      />
 
       {classes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">

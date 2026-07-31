@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Circle } from 'lucide-react';
+import { CheckCircle2, Circle, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
+import { PageHero } from '@/components/ui/feedback';
 
 type ClassInfo = { id: string; name: string };
 type AssignmentRow = {
@@ -85,12 +86,12 @@ export default function StudentClassPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/dashboard/classes" className="inline-flex items-center gap-1.5 text-sm text-content-subtle hover:text-content-muted dark:hover:text-slate-100">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        My Classes
-      </Link>
-
-      <h1 className="text-2xl font-bold text-content dark:text-white">{classInfo.name}</h1>
+      <PageHero
+        icon={Users}
+        title={classInfo.name}
+        backHref="/dashboard/classes"
+        backLabel="My Classes"
+      />
 
       {assignments.length === 0 ? (
         <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">

@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Bot, Plus, Sparkles, Trash2, Brain, Layers } fro
 import { Flashcard, FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 import { Button, buttonStyles } from '@/components/ui/button';
-import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { PageHero } from '@/components/ui/feedback';
 
 type Deck = Pick<FlashcardDeck, 'id' | 'name' | 'card_count' | 'ai_generated' | 'updated_at' | 'created_at' | 'description'> & {
   due_count?: number;
@@ -166,21 +166,14 @@ export default function Flashcards() {
     : '';
 
   return (
-    <main className="space-y-8" aria-labelledby="flashcards-title">
-      <RevisionCycleStepper current="learn" />
-
-      <section className="overflow-hidden rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-raised">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <Layers className="h-7 w-7 text-accent" />
-              <h1 id="flashcards-title" className="text-3xl font-bold text-content dark:text-white">Flashcards</h1>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm text-content-muted">
-              Build flashcards from what you learned.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
+    <div className="space-y-6" aria-labelledby="flashcards-title">
+      <PageHero
+        icon={Layers}
+        titleId="flashcards-title"
+        title="Flashcards"
+        description="Build flashcards from what you learned."
+        actions={
+          <>
             <Link href="/dashboard/notes" className={buttonStyles({ variant: 'secondary' })}>
               <ArrowLeft className="h-4 w-4" />
               Learn
@@ -200,7 +193,6 @@ export default function Flashcards() {
               href="/dashboard/study-sessions"
               className={buttonStyles({
                 variant: 'primary',
-                size: 'lg',
                 className: 'shadow-lg shadow-indigo-500/25 hover:-translate-y-px hover:shadow-indigo-500/35',
               })}
             >
@@ -208,9 +200,9 @@ export default function Flashcards() {
               Flashcard Revision
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-        </div>
-
+          </>
+        }
+      >
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
           <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
             <p className="text-xs uppercase tracking-wide text-content-subtle">Decks</p>
@@ -229,7 +221,7 @@ export default function Flashcards() {
             <p className="mt-1 text-2xl font-bold text-content">{stats.aiDecks}</p>
           </div>
         </div>
-      </section>
+      </PageHero>
 
       <section className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
@@ -334,6 +326,6 @@ export default function Flashcards() {
           </div>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }

@@ -30,7 +30,7 @@ import {
   type UserSubject,
 } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
-import { RevisionCycleStepper } from '@/components/RevisionCycleStepper';
+import { PageHero } from '@/components/ui/feedback';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -508,21 +508,14 @@ export default function NotesPage() {
   };
 
   return (
-    <main className="space-y-7" aria-labelledby="notes-title">
-      <RevisionCycleStepper current="learn" />
-
-      <section className="rounded-2xl border border-subtle bg-linear-to-br from-accent-muted to-surface p-6 shadow-[0_20px_40px_-36px_rgba(15,23,42,0.8)] dark:shadow-[0_24px_48px_-30px_rgba(2,6,23,0.95)]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <BookOpen className="h-7 w-7 text-accent" />
-              <h1 id="notes-title" className="text-3xl font-bold text-content dark:text-white">Learn</h1>
-            </div>
-            <p className="mt-2 text-sm text-content-muted">
-              Generate focused study notes from one of your saved subjects.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+    <div className="space-y-6" aria-labelledby="notes-title">
+      <PageHero
+        icon={BookOpen}
+        titleId="notes-title"
+        title="Learn"
+        description="Generate focused study notes from one of your saved subjects."
+        actions={
+          <>
             <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'secondary' })}>
               <ArrowLeft className="h-4 w-4" />
               Subjects
@@ -532,9 +525,9 @@ export default function NotesPage() {
               Flashcards
               <ArrowRight className="h-4 w-4" />
             </Link>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {!activeTopic ? (
         <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
@@ -745,6 +738,6 @@ export default function NotesPage() {
         </section>
       )}
 
-    </main>
+    </div>
   );
 }
