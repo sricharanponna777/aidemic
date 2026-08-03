@@ -10,16 +10,23 @@ import { Alert, Label, fieldStyles } from '@/components/ui/field';
 function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [isSignUpOverride, setIsSignUpOverride] = useState<boolean | null>(null);
+  const [authModeOverride, setAuthModeOverride] = useState<'forgot' | 'reset' | null>(null);
   const [role, setRole] = useState<'student' | 'teacher' | 'parent'>('student');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isSignUp = isSignUpOverride ?? searchParams.get('mode') === 'signup';
+  const requestedMode = searchParams.get('mode');
+  const authMode = authModeOverride ?? (requestedMode === 'forgot' || requestedMode === 'reset' ? requestedMode : null);
+  const isForgotPassword = authMode === 'forgot';
+  const isResetPassword = authMode === 'reset';
+  const isSignUp = !authMode && (isSignUpOverride ?? requestedMode === 'signup');
 
   const envError =
     !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -29,12 +36,41 @@ function LoginContent() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setIsLoading(true);
 
     try {
       const supabase = createClient();
 
-      if (isSignUp) {
+      if (isForgotPassword) {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/login?mode=reset')}`,
+        });
+        if (resetError) {
+          throw new Error(resetError.message);
+        }
+        setMessage('Check your email for a secure link to reset your password.');
+        return;
+      } else if (isResetPassword) {
+        if (password.length < 8) {
+          throw new Error('Your new password must be at least 8 characters long.');
+        }
+        if (password !== passwordConfirmation) {
+          throw new Error('The passwords do not match.');
+        }
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) {
+          throw new Error(updateError.message);
+        }
+        await supabase.auth.signOut();
+        setPassword('');
+        setPasswordConfirmation('');
+        setAuthModeOverride(null);
+        setIsSignUpOverride(false);
+        router.replace('/login');
+        setMessage('Password updated. You can now sign in with your new password.');
+        return;
+      } else if (isSignUp) {
         const onboardingPath = `/onboarding?role=${role}`;
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -147,9 +183,15 @@ function LoginContent() {
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-control bg-linear-to-br from-accent to-accent-2 text-white shadow-raised">
             <Zap className="h-6 w-6" />
           </span>
-        <h1 className="text-display text-content">AIDemic</h1>
-        <p className="mt-1 text-body text-content-subtle">
-            {isSignUp ? 'Create your account to start revising' : 'Welcome back — pick up where you left off'}
+          <h1 className="text-display text-content">AIDemic</h1>
+          <p className="mt-1 text-body text-content-subtle">
+            {isForgotPassword
+              ? 'Enter your email and we’ll send you a reset link'
+              : isResetPassword
+                ? 'Choose a new password for your account'
+                : isSignUp
+                  ? 'Create your account to start revising'
+                  : 'Welcome back — pick up where you left off'}
           </p>
         </div>
 
@@ -160,7 +202,7 @@ function LoginContent() {
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
-          {isSignUp && (
+          {isSignUp && !authMode && (
             <div>
               <Label>I am a…</Label>
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Account type">
@@ -185,7 +227,7 @@ function LoginContent() {
             </div>
           )}
 
-          {isSignUp && (
+          {isSignUp && !authMode && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label htmlFor="firstName">First name</Label>
@@ -216,7 +258,7 @@ function LoginContent() {
             </div>
           )}
 
-          {isSignUp && (
+          {isSignUp && !authMode && (
             <div>
               <Label htmlFor="username">Username</Label>
               <input
@@ -234,61 +276,124 @@ function LoginContent() {
             </div>
           )}
 
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              disabled={isLoading || !!envError}
-              className={fieldStyles()}
-              required
-            />
-          </div>
+          {!isResetPassword && (
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                disabled={isLoading || !!envError}
+                className={fieldStyles()}
+                required
+              />
+            </div>
+          )}
 
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <input
-              id="password"
-              type="password"
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="********"
-              disabled={isLoading || !!envError}
-              className={fieldStyles()}
-              required
-            />
-          </div>
+          {!isForgotPassword && (
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <input
+                id="password"
+                type="password"
+                autoComplete={isSignUp || isResetPassword ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="********"
+                disabled={isLoading || !!envError}
+                className={fieldStyles()}
+                required
+              />
+            </div>
+          )}
+
+          {isResetPassword && (
+            <div>
+              <Label htmlFor="passwordConfirmation">Confirm new password</Label>
+              <input
+                id="passwordConfirmation"
+                type="password"
+                autoComplete="new-password"
+                value={passwordConfirmation}
+                onChange={(e) => setPasswordConfirmation(e.target.value)}
+                placeholder="********"
+                disabled={isLoading || !!envError}
+                className={fieldStyles()}
+                required
+              />
+            </div>
+          )}
 
           {error && <Alert tone="danger">{error}</Alert>}
+          {message && <Alert tone="success">{message}</Alert>}
 
           <button
             type="submit"
             disabled={isLoading || !!envError}
             className={buttonStyles({ variant: 'primary', className: 'w-full' })}
           >
-            {isLoading ? 'Processing…' : isSignUp ? 'Sign Up' : 'Sign In'}
+            {isLoading
+              ? 'Processing…'
+              : isForgotPassword
+                ? 'Send reset link'
+                : isResetPassword
+                  ? 'Update password'
+                  : isSignUp
+                    ? 'Sign Up'
+                    : 'Sign In'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-body text-content-subtle">
-            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+          {!authMode && !isSignUp && (
             <button
               type="button"
               onClick={() => {
-                setIsSignUpOverride(!isSignUp);
+                setAuthModeOverride('forgot');
                 setError('');
+                setMessage('');
               }}
-              className={buttonStyles({ variant: 'ghost', size: 'none', className: 'inline-flex px-2 py-1 align-baseline text-accent' })}
+              className={buttonStyles({ variant: 'ghost', size: 'none', className: 'mb-3 px-2 py-1 text-accent' })}
             >
-              {isSignUp ? 'Sign In' : 'Sign Up'}
+              Forgot your password?
             </button>
-          </p>
+          )}
+          {authMode ? (
+            <p className="text-body text-content-subtle">
+              Remembered your password?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthModeOverride(null);
+                  setIsSignUpOverride(false);
+                  setError('');
+                  setMessage('');
+                  router.replace('/login');
+                }}
+                className={buttonStyles({ variant: 'ghost', size: 'none', className: 'inline-flex px-2 py-1 align-baseline text-accent' })}
+              >
+                Sign In
+              </button>
+            </p>
+          ) : (
+            <p className="text-body text-content-subtle">
+              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUpOverride(!isSignUp);
+                  setError('');
+                  setMessage('');
+                }}
+                className={buttonStyles({ variant: 'ghost', size: 'none', className: 'inline-flex px-2 py-1 align-baseline text-accent' })}
+              >
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </div>
