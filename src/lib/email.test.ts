@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  buildPasswordResetData,
   buildWelcomeData,
   getEmailServerConfig,
   missingEmailEnv,
@@ -18,6 +19,15 @@ const WELCOME_VARIABLES = [
   'firstName',
   'highlights',
   'intro',
+  'supportEmail',
+] as const;
+
+/** Same contract for password-reset.html: subject + body + layout placeholders. */
+const PASSWORD_RESET_VARIABLES = [
+  'appName',
+  'expiryMinutes',
+  'firstName',
+  'resetUrl',
   'supportEmail',
 ] as const;
 
@@ -140,6 +150,54 @@ describe('buildWelcomeData', () => {
   it('throws when called without configuration, rather than sending a broken email', () => {
     delete process.env.SUPPORT_EMAIL;
     expect(() => buildWelcomeData({ first_name: 'Ada' })).toThrow(/not configured/i);
+  });
+});
+
+describe('buildPasswordResetData', () => {
+  const resetUrl = 'https://app.example.com/auth/confirm?token_hash=abc&type=recovery';
+
+  it('returns exactly the variables password-reset.html requires, all non-empty', () => {
+    const data = buildPasswordResetData({ resetUrl, firstName: 'Ada' });
+    expect(Object.keys(data).sort()).toEqual([...PASSWORD_RESET_VARIABLES]);
+    for (const [key, value] of Object.entries(data)) {
+      expect(String(value).trim(), key).not.toBe('');
+    }
+  });
+
+  it('passes the reset URL through untouched', () => {
+    expect(buildPasswordResetData({ resetUrl }).resetUrl).toBe(resetUrl);
+  });
+
+  it('falls back to a neutral greeting when no name is on file', () => {
+    expect(buildPasswordResetData({ resetUrl }).firstName).toBe('there');
+    expect(buildPasswordResetData({ resetUrl, firstName: '  ' }).firstName).toBe('there');
+    expect(buildPasswordResetData({ resetUrl, firstName: null }).firstName).toBe('there');
+  });
+
+  it('renders through Brevo without leaving an unsubstituted placeholder', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ messageId: '<test@example.com>' }), { status: 200 }));
+
+    const result = await sendTemplateEmail({
+      to: 'a@example.com',
+      template: 'password-reset',
+      data: buildPasswordResetData({ resetUrl, firstName: 'Ada' }),
+    });
+
+    expect(result.ok).toBe(true);
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit | undefined];
+    const body = JSON.parse(String(init?.body)) as { subject: string; htmlContent: string };
+    expect(body.subject).toBe('Reset your AIDemic password');
+    // Entity-escaped in the href, which is valid HTML -- clients decode it back
+    // to the URL the route built.
+    expect(body.htmlContent).toContain(resetUrl.replace(/&/g, '&amp;'));
+    expect(body.htmlContent).not.toContain('{{');
+  });
+
+  it('throws when called without configuration, rather than sending a broken email', () => {
+    delete process.env.SUPPORT_EMAIL;
+    expect(() => buildPasswordResetData({ resetUrl })).toThrow(/not configured/i);
   });
 });
 

@@ -27,6 +27,12 @@ function LoginContent() {
   const isForgotPassword = authMode === 'forgot';
   const isResetPassword = authMode === 'reset';
   const isSignUp = !authMode && (isSignUpOverride ?? requestedMode === 'signup');
+  // Set by /auth/confirm when a reset link no longer verifies.
+  const linkError =
+    searchParams.get('error') === 'link-invalid'
+      ? 'That reset link has expired or has already been used. Request a new one below.'
+      : '';
+  const shownError = error || (message ? '' : linkError);
 
   const envError =
     !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -43,11 +49,16 @@ function LoginContent() {
       const supabase = createClient();
 
       if (isForgotPassword) {
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/login?mode=reset')}`,
+        // Sent server-side through Brevo rather than by Supabase's mailer, so
+        // the link is built against APP_URL instead of this browser's origin.
+        const response = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
         });
-        if (resetError) {
-          throw new Error(resetError.message);
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || 'Could not send the reset email. Please try again.');
         }
         setMessage('Check your email for a secure link to reset your password.');
         return;
@@ -327,7 +338,7 @@ function LoginContent() {
             </div>
           )}
 
-          {error && <Alert tone="danger">{error}</Alert>}
+          {shownError && <Alert tone="danger">{shownError}</Alert>}
           {message && <Alert tone="success">{message}</Alert>}
 
           <button

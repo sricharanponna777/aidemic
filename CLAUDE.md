@@ -85,6 +85,13 @@ Emails are sent through the Brevo HTTP API (`https://api.brevo.com/v3/smtp/email
 - The Next app, via [src/lib/email.ts](src/lib/email.ts) and [src/lib/email-mailer.ts](src/lib/email-mailer.ts). Server-only (no `NEXT_PUBLIC_` prefix); returns ok: false and skips rather than throwing when unconfigured, so a missing email can never break a user flow.
 - The weekly digest Edge Function, over **public HTTPS** to [src/app/api/email/bulk/route.ts](src/app/api/email/bulk/route.ts).
 
+**Password reset does not use Supabase's mailer.** [src/app/api/auth/reset-password/route.ts](src/app/api/auth/reset-password/route.ts) calls `auth.admin.generateLink({ type: 'recovery' })`, which mints the token *without* sending anything, then sends the `password-reset` template through Brevo. The link it builds is `${APP_URL}/auth/confirm?token_hash=…&type=recovery&next=/login?mode=reset`, redeemed server-side by [src/app/auth/confirm/route.ts](src/app/auth/confirm/route.ts) via `verifyOtp`. Consequences worth knowing:
+
+- **`APP_URL` is what the user clicks.** The old flow used `window.location.origin`, which put a localhost URL in real inboxes. Nothing in the journey touches the `*.supabase.co` host, so no Redirect URL allowlist entry is needed.
+- **`verifyOtp` writes the recovery session to the SSR cookies**, which the browser client reads (`@supabase/ssr` sets them non-httpOnly) — that is how `/login?mode=reset` can call `updateUser({ password })`. [src/proxy.ts](src/proxy.ts) exempts `mode=reset` from the authenticated-user bounce off `/login` for the same reason.
+- **`generateLink` is an admin call**, so it bypasses Supabase's own rate limit on `/auth/v1/recover`; the route re-imposes per-IP and per-address limits itself. It returns `ok` for unknown addresses so it can't be used to enumerate accounts.
+- `PASSWORD_RESET_EXPIRY_MINUTES` in [src/lib/email.ts](src/lib/email.ts) is only the copy in the email — the real lifetime is the project's Auth email OTP expiry.
+
 Templates live in [src/emails/templates/](src/emails/templates/) — one `.html` body each plus `manifest.json`, all sharing `_layout.html`. Three things to know before editing:
 
 - **Adding a placeholder makes it a hard requirement for every caller** — a missing variable throws an error. [src/lib/email.test.ts](src/lib/email.test.ts) pins `welcome`'s required set.

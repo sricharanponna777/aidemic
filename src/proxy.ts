@@ -76,7 +76,10 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (pathname === '/login' && isAuthenticated) {
+  // `mode=reset` is the one authenticated state that belongs on /login: the
+  // recovery session minted by /auth/confirm exists purely so the user can set
+  // a new password, so bouncing it to /dashboard would strand the reset form.
+  if (pathname === '/login' && isAuthenticated && request.nextUrl.searchParams.get('mode') !== 'reset') {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

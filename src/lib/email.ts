@@ -86,6 +86,32 @@ export async function sendTemplateEmail(input: {
   return { ok: result.ok, error: result.error };
 }
 
+/**
+ * Mirrors the project's Auth > Providers > Email OTP expiry, which Supabase
+ * defaults to 3600 seconds. Only the copy in the email depends on it -- the
+ * token's real lifetime is whatever the dashboard says -- so raising the
+ * dashboard value without changing this understates the window, never the
+ * reverse.
+ */
+export const PASSWORD_RESET_EXPIRY_MINUTES = 60;
+
+/** Exactly the variables password-reset.html requires; pinned in email.test.ts. */
+export function buildPasswordResetData(input: {
+  resetUrl: string;
+  firstName?: string | null;
+}): TemplateData {
+  const config = getEmailServerConfig();
+  if (!config) throw new Error('Email is not configured.');
+
+  return {
+    appName: config.appName,
+    supportEmail: config.supportEmail,
+    firstName: sanitizeHeaderText(input.firstName?.trim() || 'there'),
+    expiryMinutes: PASSWORD_RESET_EXPIRY_MINUTES,
+    resetUrl: input.resetUrl,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Welcome email content.
 //
