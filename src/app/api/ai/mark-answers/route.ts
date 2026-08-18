@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase-server';
 import { createAdminClient, tryCreateAdminClient } from '@/lib/supabase-admin';
 import { recordMarkingEvidence } from '@/lib/mastery/fromMarking';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
-import { estimateGrade, getGcseTier, type GcseTier } from '@/lib/ai/gradeEstimate';
+import { gradeBoundaryNote, gradeFromPercentage, nextGradeUp, topGrade as topGradeFor } from '@/lib/ai/gradeScales';
+import { getExamBoardLabel, getExamTypeLabel, getSpecTier } from '@/lib/ai/qualifications';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { buildSpecString } from '@/lib/ai/subjectConfig';
 import {
@@ -22,7 +23,9 @@ import {
   normalizeBoard,
   normalizeExamType,
   SUPPORTED_EXAM_BOARDS,
+  SUPPORTED_EXAM_BOARDS_LABEL,
   SUPPORTED_EXAM_TYPES,
+  SUPPORTED_EXAM_TYPES_LABEL,
   SUPPORTED_SUBJECTS,
   type SupportedSubject,
 } from '@/lib/ai/validation';
@@ -311,39 +314,6 @@ const normalizePayload = (raw: MarkAnswersPayload) => {
   };
 };
 
-const getNextGrade = (grade: string, examType: 'gcse' | 'a-level', gcseTier: GcseTier) => {
-  const order =
-    examType === 'a-level'
-      ? ['U', 'E', 'D', 'C', 'B', 'A', 'A*']
-      : gcseTier === 'foundation'
-      ? ['U', '1', '2', '3', '4', '5']
-      : gcseTier === 'higher'
-      ? ['U', '3', '4', '5', '6', '7', '8', '9']
-      : ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-  const index = order.indexOf(grade);
-  if (index < 0 || index >= order.length - 1) return null;
-  return order[index + 1];
-};
-
-const getTopGrade = (examType: 'gcse' | 'a-level', gcseTier: GcseTier) => {
-  if (examType === 'a-level') return 'A*';
-  if (gcseTier === 'foundation') return '5';
-  return '9';
-};
-
-const getGradeBoundaryNote = (examType: 'gcse' | 'a-level', gcseTier: GcseTier) => {
-  if (examType === 'a-level') {
-    return 'Predicted from this practice set using approximate A-Level boundaries. Real grade boundaries vary by paper and exam series.';
-  }
-  if (gcseTier === 'foundation') {
-    return 'Predicted from this practice set using approximate GCSE Foundation tier boundaries. Foundation tier is capped at grade 5.';
-  }
-  if (gcseTier === 'higher') {
-    return 'Predicted from this practice set using approximate GCSE Higher tier boundaries. Higher tier awards grades 9-3; below grade 3 is U.';
-  }
-  return 'Predicted from this practice set using approximate GCSE 9-1 boundaries. Real grade boundaries vary by paper and exam series.';
-};
-
 const getBand = (marksAwarded: number, maxMarks: number) => {
   if (marksAwarded <= 0) return 'No credit yet';
   const ratio = marksAwarded / Math.max(maxMarks, 1);
@@ -469,10 +439,10 @@ const buildFinalReport = (
   const totalAvailableMarks = payload.questions.reduce((sum, item) => sum + item.marks, 0);
   const percentage = totalAvailableMarks > 0 ? Math.round((totalMarksAwarded / totalAvailableMarks) * 100) : 0;
   const examType = payload.examType || 'gcse';
-  const gcseTier = examType === 'gcse' ? getGcseTier(payload.specification) : null;
-  const predictedGrade = estimateGrade(percentage, examType, payload.examBoard, gcseTier);
-  const targetGrade = getNextGrade(predictedGrade, examType, gcseTier);
-  const topGrade = getTopGrade(examType, gcseTier);
+  const specTier = getSpecTier(payload.specification, examType);
+  const predictedGrade = gradeFromPercentage(percentage, examType, specTier, payload.examBoard);
+  const targetGrade = nextGradeUp(predictedGrade, examType, specTier);
+  const topGrade = topGradeFor(examType, specTier);
   const fullMarksAttempt = totalAvailableMarks > 0 && totalMarksAwarded >= totalAvailableMarks;
 
   const nonFullWeaknessTags = markedAnswers
@@ -517,7 +487,7 @@ const buildFinalReport = (
     ),
     weaknessAnalysis,
     gradeBoostAdvice,
-    gradeBoundaryNote: getGradeBoundaryNote(examType, gcseTier),
+    gradeBoundaryNote: gradeBoundaryNote(examType, specTier),
   };
 };
 
@@ -525,7 +495,7 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
   const config = getAIConfig();
 
   const system = [
-    `Mark exam answers as strict JSON. Board:${payload.examBoard} Type:${payload.examType} Subject:${payload.subject}.`,
+    `Mark exam answers as strict JSON. Board:${getExamBoardLabel(payload.examBoard ?? '')} Qualification:${getExamTypeLabel(payload.examType)} Subject:${payload.subject}.`,
     payload.specification ? `Spec:${payload.specification}` : '',
     'Award integer marks 0–maxMarks per question. Blank/irrelevant=0.',
     'MCQs marked by server; include in summary/weaknessAnalysis/gradeBoostAdvice only.',
@@ -729,10 +699,10 @@ export async function POST(request: Request) {
 
     if (!payload.topic) return NextResponse.json({ error: 'Topic is required.' }, { status: 400 });
     if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
-      return NextResponse.json({ error: 'Exam board must be one of: AQA, Edexcel, OCR.' }, { status: 400 });
+      return NextResponse.json({ error: `Exam board must be one of: ${SUPPORTED_EXAM_BOARDS_LABEL}.` }, { status: 400 });
     }
     if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
-      return NextResponse.json({ error: 'Exam type must be GCSE or A-Level.' }, { status: 400 });
+      return NextResponse.json({ error: `Qualification must be one of: ${SUPPORTED_EXAM_TYPES_LABEL}.` }, { status: 400 });
     }
     if (!payload.subject || !SUPPORTED_SUBJECTS.includes(payload.subject as SupportedSubject)) {
       return NextResponse.json(

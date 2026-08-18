@@ -21,6 +21,7 @@ import { weightedPredictedGrade } from "@/lib/ai/gradeAverages";
 import { describeMasteryCoverage, emptyMasteryCoverage, masteryCoverage, type MasteryCoverage } from "@/lib/ai/gradeFromMastery";
 import { readSpecificationSubtopicCounts, readStudentMastery } from "@/lib/mastery/read";
 import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from "@/lib/ai/subjectConfig";
+import type { ExamType } from "@/lib/ai/qualifications";
 import { gcseTierLabelForGrade, gradeBadgeTone } from "@/lib/gradeTone";
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from "@/lib/ai/studentSubjects";
 import { PageHero } from "@/components/ui/feedback";
@@ -41,7 +42,7 @@ type RecentPracticeAttempt = {
   id: string;
   topic: string;
   subject: string;
-  examType: "gcse" | "a-level" | null;
+  examType: ExamType | null;
   specTier: string | null;
   percentage: number | null;
   predictedGrade: string | null;
@@ -56,7 +57,7 @@ type WeaknessEntry = RankedWeakness;
 type SubjectPredictedGrade = {
   subject: string;
   examBoard: string | null;
-  examType: "gcse" | "a-level" | null;
+  examType: ExamType | null;
   specTier: string | null;
   predictedGrade: string;
   /** How much of the specification the grade actually rests on. */
@@ -81,7 +82,7 @@ type DashboardMetrics = {
   recentPracticeAttempts: RecentPracticeAttempt[];
   topWeaknesses: WeaknessEntry[];
   examAttemptsCount: number;
-  primaryExamType: "gcse" | "a-level" | null;
+  primaryExamType: ExamType | null;
   latestPracticePercentage: number | null;
   latestPracticeGrade: string | null;
   subjectPredictedGrades: SubjectPredictedGrade[];
@@ -170,7 +171,7 @@ const formatQualificationLabel = ({
   fallback = "Qualification pending",
 }: {
   examBoard?: string | null;
-  examType?: "gcse" | "a-level" | null;
+  examType?: ExamType | null;
   specTier?: string | null;
   grade?: string | null;
   fallback?: string;
@@ -334,7 +335,7 @@ export default function Dashboard() {
           ...specificationBySubject.values(),
         ]);
         const latestAttempt = attempts[0];
-        const primaryExamType = (attempts[0]?.exam_type === "a-level" ? "a-level" : attempts.length > 0 ? "gcse" : null) as "gcse" | "a-level" | null;
+        const primaryExamType = (attempts[0]?.exam_type ?? null) as ExamType | null;
         // Recency-weighted so the headline weakness reflects what is costing
         // marks now, not whatever was most common over the student's lifetime.
         const topWeaknesses: WeaknessEntry[] = rankWeaknesses(
@@ -348,7 +349,7 @@ export default function Dashboard() {
           id: attempt.id,
           topic: attempt.topic || "Practice attempt",
           subject: attempt.subject,
-          examType: attempt.exam_type === "a-level" ? "a-level" : attempt.exam_type === "gcse" ? "gcse" : null,
+          examType: (attempt.exam_type ?? null) as ExamType | null,
           specTier: (
             savedSubjects.find((subject) =>
               subject.subject === attempt.subject &&
@@ -375,14 +376,14 @@ export default function Dashboard() {
         }));
         const subjectGroups = new Map<string, DashboardAttemptRow[]>();
         for (const attempt of attempts) {
-          const examType = attempt.exam_type === "a-level" ? "a-level" : attempt.exam_type === "gcse" ? "gcse" : null;
+          const examType = (attempt.exam_type ?? null) as ExamType | null;
           const key = `${attempt.subject}|${examType ?? "unknown"}`;
           subjectGroups.set(key, [...(subjectGroups.get(key) ?? []), attempt]);
         }
         const subjectReportKeys = new Map<string, DashboardSubjectRow>();
         for (const group of subjectGroups.values()) {
           const first = group[0];
-          const examType = first.exam_type === "a-level" ? "a-level" : first.exam_type === "gcse" ? "gcse" : null;
+          const examType = (first.exam_type ?? null) as ExamType | null;
           const key = `${first.subject}|${examType ?? "unknown"}`;
           const savedSubject = (
             savedSubjects.find((subject) =>
@@ -402,7 +403,7 @@ export default function Dashboard() {
         }
         const subjectPredictedGrades: SubjectPredictedGrade[] = [...subjectReportKeys.values()]
           .map((subject) => {
-            const examType = (subject.exam_type === "a-level" ? "a-level" : subject.exam_type === "gcse" ? "gcse" : null) as "gcse" | "a-level" | null;
+            const examType = (subject.exam_type ?? null) as ExamType | null;
             const group = subjectGroups.get(`${subject.subject}|${examType ?? "unknown"}`) ?? [];
             const prediction = weightedPredictedGrade(group, examType, subject.spec_tier, subject.exam_board);
             const specificationId = specificationBySubject.get(subject.subject);
@@ -720,7 +721,7 @@ export default function Dashboard() {
                       ) : null}
                     </p>
                     <p className="mt-0.5 text-xs text-content-subtle">
-                      {capitalize(attempt.subject)} - {attempt.examType === "a-level" ? "A-Level" : "GCSE"} - {formatDate(attempt.createdAt)}
+                      {capitalize(attempt.subject)} - {getExamTypeLabel(attempt.examType)} - {formatDate(attempt.createdAt)}
                     </p>
                   </div>
                   <span className="text-sm font-bold text-content dark:text-white">

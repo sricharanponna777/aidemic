@@ -893,5 +893,879 @@
         }
       ]
     }
+  },
+  "cbse": {
+    "cbse-10": {
+      "english language": [
+        {
+          "name": "CBSE Class 10 English Language and Literature"
+        }
+      ],
+      "hindi": [
+        {
+          "name": "CBSE Class 10 Hindi Course A"
+        },
+        {
+          "name": "CBSE Class 10 Hindi Course B"
+        }
+      ],
+      "sanskrit": [
+        {
+          "name": "CBSE Class 10 Sanskrit (Communicative)"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "CBSE Class 10 Mathematics",
+          "tiers": [
+            "Standard",
+            "Basic"
+          ]
+        }
+      ],
+      "science": [
+        {
+          "name": "CBSE Class 10 Science"
+        }
+      ],
+      "social science": [
+        {
+          "name": "CBSE Class 10 Social Science"
+        }
+      ],
+      "computer applications": [
+        {
+          "name": "CBSE Class 10 Computer Applications (Code 165)"
+        }
+      ],
+      "information technology": [
+        {
+          "name": "CBSE Class 10 Information Technology (Code 402)"
+        }
+      ]
+    },
+    "cbse-12": {
+      "english language": [
+        {
+          "name": "CBSE Class 12 English Core"
+        }
+      ],
+      "hindi": [
+        {
+          "name": "CBSE Class 12 Hindi Core"
+        }
+      ],
+      "physics": [
+        {
+          "name": "CBSE Class 12 Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "CBSE Class 12 Chemistry"
+        }
+      ],
+      "biology": [
+        {
+          "name": "CBSE Class 12 Biology"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "CBSE Class 12 Mathematics"
+        },
+        {
+          "name": "CBSE Class 12 Applied Mathematics"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "CBSE Class 12 Computer Science (Code 083)"
+        },
+        {
+          "name": "CBSE Class 12 Informatics Practices (Code 065)"
+        }
+      ],
+      "accountancy": [
+        {
+          "name": "CBSE Class 12 Accountancy"
+        }
+      ],
+      "business studies": [
+        {
+          "name": "CBSE Class 12 Business Studies"
+        }
+      ],
+      "economics": [
+        {
+          "name": "CBSE Class 12 Economics"
+        }
+      ],
+      "history": [
+        {
+          "name": "CBSE Class 12 History"
+        }
+      ],
+      "political science": [
+        {
+          "name": "CBSE Class 12 Political Science"
+        }
+      ],
+      "geography": [
+        {
+          "name": "CBSE Class 12 Geography"
+        }
+      ],
+      "sociology": [
+        {
+          "name": "CBSE Class 12 Sociology"
+        }
+      ],
+      "psychology": [
+        {
+          "name": "CBSE Class 12 Psychology"
+        }
+      ]
+    }
+  },
+  "cisce": {
+    "icse": {
+      "english language": [
+        {
+          "name": "ICSE English Language (Paper 1)"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "ICSE Literature in English (Paper 2)"
+        }
+      ],
+      "hindi": [
+        {
+          "name": "ICSE Hindi"
+        }
+      ],
+      "sanskrit": [
+        {
+          "name": "ICSE Sanskrit"
+        }
+      ],
+      "french": [
+        {
+          "name": "ICSE French"
+        }
+      ],
+      "history and civics": [
+        {
+          "name": "ICSE History and Civics"
+        }
+      ],
+      "geography": [
+        {
+          "name": "ICSE Geography"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "ICSE Mathematics"
+        }
+      ],
+      "science": [
+        {
+          "name": "ICSE Science Paper 1 (Physics)"
+        },
+        {
+          "name": "ICSE Science Paper 2 (Chemistry)"
+        },
+        {
+          "name": "ICSE Science Paper 3 (Biology)"
+        }
+      ],
+      "economics": [
+        {
+          "name": "ICSE Economics"
+        }
+      ],
+      "commercial studies": [
+        {
+          "name": "ICSE Commercial Studies"
+        }
+      ],
+      "computer applications": [
+        {
+          "name": "ICSE Computer Applications"
+        }
+      ],
+      "environmental science": [
+        {
+          "name": "ICSE Environmental Science"
+        }
+      ]
+    },
+    "isc": {
+      "english language": [
+        {
+          "name": "ISC English Language (Paper 1)"
+        }
+      ],
+      "english literature": [
+        {
+          "name": "ISC Literature in English (Paper 2)"
+        }
+      ],
+      "hindi": [
+        {
+          "name": "ISC Hindi"
+        }
+      ],
+      "physics": [
+        {
+          "name": "ISC Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "ISC Chemistry"
+        }
+      ],
+      "biology": [
+        {
+          "name": "ISC Biology"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "ISC Mathematics"
+        }
+      ],
+      "computer science": [
+        {
+          "name": "ISC Computer Science"
+        }
+      ],
+      "accountancy": [
+        {
+          "name": "ISC Accounts"
+        }
+      ],
+      "commerce": [
+        {
+          "name": "ISC Commerce"
+        }
+      ],
+      "economics": [
+        {
+          "name": "ISC Economics"
+        }
+      ],
+      "business studies": [
+        {
+          "name": "ISC Business Studies"
+        }
+      ],
+      "history": [
+        {
+          "name": "ISC History"
+        }
+      ],
+      "geography": [
+        {
+          "name": "ISC Geography"
+        }
+      ],
+      "political science": [
+        {
+          "name": "ISC Political Science"
+        }
+      ],
+      "sociology": [
+        {
+          "name": "ISC Sociology"
+        }
+      ],
+      "psychology": [
+        {
+          "name": "ISC Psychology"
+        }
+      ]
+    }
+  },
+  "ib": {
+    "ib-dp": {
+      "english language": [
+        {
+          "name": "IB DP English A: Language and Literature",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "english literature": [
+        {
+          "name": "IB DP English A: Literature",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "hindi": [
+        {
+          "name": "IB DP Hindi B",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "french": [
+        {
+          "name": "IB DP French B",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "spanish": [
+        {
+          "name": "IB DP Spanish B",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "history": [
+        {
+          "name": "IB DP History",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "geography": [
+        {
+          "name": "IB DP Geography",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "economics": [
+        {
+          "name": "IB DP Economics",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "psychology": [
+        {
+          "name": "IB DP Psychology",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "business": [
+        {
+          "name": "IB DP Business Management",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "global politics": [
+        {
+          "name": "IB DP Global Politics",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "biology": [
+        {
+          "name": "IB DP Biology",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "IB DP Chemistry",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "physics": [
+        {
+          "name": "IB DP Physics",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "computer science": [
+        {
+          "name": "IB DP Computer Science",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "environmental science": [
+        {
+          "name": "IB DP Environmental Systems and Societies",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "IB DP Mathematics: Analysis and Approaches",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        },
+        {
+          "name": "IB DP Mathematics: Applications and Interpretation",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ],
+      "visual arts": [
+        {
+          "name": "IB DP Visual Arts",
+          "tiers": [
+            "HL",
+            "SL"
+          ]
+        }
+      ]
+    }
+  },
+  "nta": {
+    "jee-main": {
+      "physics": [
+        {
+          "name": "JEE Main Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "JEE Main Chemistry"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "JEE Main Mathematics"
+        }
+      ]
+    },
+    "neet-ug": {
+      "physics": [
+        {
+          "name": "NEET UG Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "NEET UG Chemistry"
+        }
+      ],
+      "biology": [
+        {
+          "name": "NEET UG Biology"
+        }
+      ]
+    },
+    "cuet-ug": {
+      "physics": [
+        {
+          "name": "CUET UG Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "CUET UG Chemistry"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "CUET UG Mathematics"
+        }
+      ],
+      "biology": [
+        {
+          "name": "CUET UG Biology"
+        }
+      ],
+      "english language": [
+        {
+          "name": "CUET UG English"
+        }
+      ],
+      "economics": [
+        {
+          "name": "CUET UG Economics"
+        }
+      ],
+      "history": [
+        {
+          "name": "CUET UG History"
+        }
+      ],
+      "political science": [
+        {
+          "name": "CUET UG Political Science"
+        }
+      ],
+      "business studies": [
+        {
+          "name": "CUET UG Business Studies"
+        }
+      ],
+      "accountancy": [
+        {
+          "name": "CUET UG Accountancy"
+        }
+      ],
+      "general knowledge": [
+        {
+          "name": "CUET UG General Test"
+        }
+      ]
+    }
+  },
+  "iit": {
+    "jee-advanced": {
+      "physics": [
+        {
+          "name": "JEE Advanced Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "JEE Advanced Chemistry"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "JEE Advanced Mathematics"
+        }
+      ]
+    }
+  },
+  "tsche": {
+    "ts-eamcet": {
+      "mathematics": [
+        {
+          "name": "TS EAMCET Mathematics"
+        }
+      ],
+      "physics": [
+        {
+          "name": "TS EAMCET Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "TS EAMCET Chemistry"
+        }
+      ],
+      "biology": [
+        {
+          "name": "TS EAMCET Biology"
+        }
+      ]
+    }
+  },
+  "apsche": {
+    "ap-eapcet": {
+      "mathematics": [
+        {
+          "name": "AP EAPCET Mathematics"
+        }
+      ],
+      "physics": [
+        {
+          "name": "AP EAPCET Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "AP EAPCET Chemistry"
+        }
+      ],
+      "biology": [
+        {
+          "name": "AP EAPCET Biology"
+        }
+      ]
+    }
+  },
+  "mahacet": {
+    "mht-cet": {
+      "mathematics": [
+        {
+          "name": "MHT CET Mathematics"
+        }
+      ],
+      "physics": [
+        {
+          "name": "MHT CET Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "MHT CET Chemistry"
+        }
+      ],
+      "biology": [
+        {
+          "name": "MHT CET Biology"
+        }
+      ]
+    }
+  },
+  "cee": {
+    "keam": {
+      "mathematics": [
+        {
+          "name": "KEAM Mathematics"
+        }
+      ],
+      "physics": [
+        {
+          "name": "KEAM Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "KEAM Chemistry"
+        }
+      ],
+      "biology": [
+        {
+          "name": "KEAM Biology"
+        }
+      ]
+    }
+  },
+  "wbjeeb": {
+    "wbjee": {
+      "mathematics": [
+        {
+          "name": "WBJEE Mathematics"
+        }
+      ],
+      "physics": [
+        {
+          "name": "WBJEE Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "WBJEE Chemistry"
+        }
+      ]
+    }
+  },
+  "comedk": {
+    "comedk": {
+      "mathematics": [
+        {
+          "name": "COMEDK UGET Mathematics"
+        }
+      ],
+      "physics": [
+        {
+          "name": "COMEDK UGET Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "COMEDK UGET Chemistry"
+        }
+      ]
+    }
+  },
+  "bits": {
+    "bitsat": {
+      "physics": [
+        {
+          "name": "BITSAT Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "BITSAT Chemistry"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "BITSAT Mathematics"
+        }
+      ],
+      "english proficiency": [
+        {
+          "name": "BITSAT English Proficiency"
+        }
+      ],
+      "logical reasoning": [
+        {
+          "name": "BITSAT Logical Reasoning"
+        }
+      ]
+    }
+  },
+  "vit": {
+    "viteee": {
+      "physics": [
+        {
+          "name": "VITEEE Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "VITEEE Chemistry"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "VITEEE Mathematics"
+        }
+      ],
+      "biology": [
+        {
+          "name": "VITEEE Biology"
+        }
+      ],
+      "aptitude": [
+        {
+          "name": "VITEEE Aptitude"
+        }
+      ],
+      "english proficiency": [
+        {
+          "name": "VITEEE English"
+        }
+      ]
+    }
+  },
+  "srm": {
+    "srmjeee": {
+      "physics": [
+        {
+          "name": "SRMJEEE Physics"
+        }
+      ],
+      "chemistry": [
+        {
+          "name": "SRMJEEE Chemistry"
+        }
+      ],
+      "mathematics": [
+        {
+          "name": "SRMJEEE Mathematics"
+        }
+      ],
+      "biology": [
+        {
+          "name": "SRMJEEE Biology"
+        }
+      ],
+      "aptitude": [
+        {
+          "name": "SRMJEEE Aptitude"
+        }
+      ],
+      "english proficiency": [
+        {
+          "name": "SRMJEEE English"
+        }
+      ]
+    }
+  },
+  "nlu": {
+    "clat": {
+      "english language": [
+        {
+          "name": "CLAT English Language"
+        }
+      ],
+      "current affairs": [
+        {
+          "name": "CLAT Current Affairs and General Knowledge"
+        }
+      ],
+      "legal reasoning": [
+        {
+          "name": "CLAT Legal Reasoning"
+        }
+      ],
+      "logical reasoning": [
+        {
+          "name": "CLAT Logical Reasoning"
+        }
+      ],
+      "quantitative ability": [
+        {
+          "name": "CLAT Quantitative Techniques"
+        }
+      ]
+    }
+  },
+  "upsc": {
+    "nda": {
+      "mathematics": [
+        {
+          "name": "NDA Mathematics"
+        }
+      ],
+      "english language": [
+        {
+          "name": "NDA General Ability Test — English"
+        }
+      ],
+      "general knowledge": [
+        {
+          "name": "NDA General Ability Test — General Knowledge"
+        }
+      ]
+    }
+  },
+  "iim": {
+    "ipmat": {
+      "quantitative ability": [
+        {
+          "name": "IPMAT Quantitative Ability"
+        }
+      ],
+      "verbal ability": [
+        {
+          "name": "IPMAT Verbal Ability"
+        }
+      ]
+    }
   }
 }

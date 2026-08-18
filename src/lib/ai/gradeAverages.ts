@@ -1,8 +1,4 @@
-const GCSE_GRADES = ['U', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const A_LEVEL_GRADES = ['U', 'E', 'D', 'C', 'B', 'A', 'A*'];
-
-const getGradeScale = (examType: string | null | undefined) =>
-  examType === 'a-level' ? A_LEVEL_GRADES : GCSE_GRADES;
+import { gradeFromPercentage, gradeScaleOrder } from '@/lib/ai/gradeScales';
 
 export const normalisePredictedGrade = (grade: string | null | undefined) =>
   (grade ?? '').trim().toUpperCase();
@@ -11,7 +7,7 @@ export const averagePredictedGrade = (
   grades: Array<string | null | undefined>,
   examType: string | null | undefined
 ) => {
-  const scale = getGradeScale(examType);
+  const scale = gradeScaleOrder(examType);
   const values = grades
     .map((grade) => scale.indexOf(normalisePredictedGrade(grade)))
     .filter((value) => value >= 0);
@@ -28,67 +24,6 @@ export const averagePredictedGrade = (
     totalAvailableMarks: null,
     percentage: null,
   };
-};
-
-const normalizeGcseTier = (specTier: string | null | undefined) => {
-  const normalized = (specTier ?? '').toLowerCase();
-  if (normalized.includes('foundation')) return 'foundation';
-  if (normalized.includes('higher')) return 'higher';
-  return null;
-};
-
-const gradeFromPercentage = (
-  percentage: number,
-  examType: string | null | undefined,
-  specTier?: string | null,
-  examBoard?: string | null
-) => {
-  const gcseTier = normalizeGcseTier(specTier);
-  const adjustment = examBoard === 'edexcel' ? -2 : examBoard === 'ocr' ? -1 : 0;
-  const boundaries =
-    examType === 'a-level'
-      ? [
-          ['A*', 85],
-          ['A', 75],
-          ['B', 65],
-          ['C', 55],
-          ['D', 45],
-          ['E', 35],
-        ]
-      : gcseTier === 'foundation'
-        ? [
-            ['5', 70],
-            ['4', 55],
-            ['3', 40],
-            ['2', 25],
-            ['1', 10],
-          ]
-        : gcseTier === 'higher'
-          ? [
-              ['9', 85],
-              ['8', 78],
-              ['7', 70],
-              ['6', 60],
-              ['5', 50],
-              ['4', 40],
-              ['3', 30],
-            ]
-      : [
-          ['9', 85],
-          ['8', 78],
-          ['7', 70],
-          ['6', 60],
-          ['5', 50],
-          ['4', 40],
-          ['3', 30],
-          ['2', 20],
-          ['1', 10],
-        ];
-
-  for (const [grade, boundary] of boundaries) {
-    if (percentage >= Number(boundary) + adjustment) return String(grade);
-  }
-  return 'U';
 };
 
 export type PracticeGradeInput = {

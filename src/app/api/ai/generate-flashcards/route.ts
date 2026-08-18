@@ -13,7 +13,9 @@ import {
   normalizeExamType,
   normalizeSubject,
   SUPPORTED_EXAM_BOARDS,
+  SUPPORTED_EXAM_BOARDS_LABEL,
   SUPPORTED_EXAM_TYPES,
+  SUPPORTED_EXAM_TYPES_LABEL,
   SUPPORTED_SUBJECTS,
   type SupportedSubject,
 } from '@/lib/ai/validation';
@@ -324,10 +326,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Subject must be one of: ${SUPPORTED_SUBJECTS.join(', ')}.` }, { status: 400 });
     }
     if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
-      return NextResponse.json({ error: 'Exam board must be one of: AQA, Edexcel, OCR.' }, { status: 400 });
+      return NextResponse.json({ error: `Exam board must be one of: ${SUPPORTED_EXAM_BOARDS_LABEL}.` }, { status: 400 });
     }
     if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
-      return NextResponse.json({ error: 'Exam type must be GCSE or A-Level.' }, { status: 400 });
+      return NextResponse.json({ error: `Qualification must be one of: ${SUPPORTED_EXAM_TYPES_LABEL}.` }, { status: 400 });
     }
     if (payload.topic) {
       const allowedTopics = getMajorTopicsForQualification({

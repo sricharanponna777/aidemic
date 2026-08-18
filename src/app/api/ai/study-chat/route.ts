@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
+import { getExamTypeLabel } from '@/lib/ai/qualifications';
 import { extractChatMessageText, type ChatCompletionsResponseBody } from '@/lib/ai/json';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { cleanText } from '@/lib/ai/text';
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
       `Topic: ${payload.concept}`,
       `Subject: ${payload.subject}`,
       payload.examBoard !== 'general' ? `Exam board: ${payload.examBoard.toUpperCase()}` : '',
-      payload.examType !== 'general' ? `Level: ${payload.examType}` : '',
+      payload.examType !== 'general' ? `Qualification: ${getExamTypeLabel(payload.examType)}` : '',
       'Current study mode: study notes',
     ]
       .filter(Boolean)

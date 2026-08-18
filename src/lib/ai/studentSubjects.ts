@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UserSubject } from '@/lib/ai/subjectConfig';
+import { qualificationByDbName } from '@/lib/ai/qualifications';
 
 export const STUDENT_SUBJECT_SELECT = `
   id,
@@ -39,11 +40,16 @@ export const mapStudentSubjectRow = (row: StudentSubjectRow): UserSubject => {
   const board = subject?.exam_boards;
   const qualification = board?.qualifications;
 
+  // The qualification name round-trips back through getExamTypeLabel when resolving a
+  // specification, so it must map to a registry slug rather than a bare lowercase name.
+  const examType =
+    qualificationByDbName(qualification?.name)?.id ?? (qualification?.name ?? '').toLowerCase();
+
   return {
     id: row.id,
     subject: (subject?.name ?? '').toLowerCase() as UserSubject['subject'],
     exam_board: (board?.name ?? '').toLowerCase() as UserSubject['exam_board'],
-    exam_type: (qualification?.name ?? '').toLowerCase() as UserSubject['exam_type'],
+    exam_type: examType as UserSubject['exam_type'],
     spec_name: spec?.name ?? null,
     spec_tier: spec?.tier ?? null,
   };
@@ -57,12 +63,18 @@ export const resolveSubjectId = async (
 ): Promise<string | null> => {
   const { qualificationLabel, boardLabel, subjectLabel } = params;
 
-  const { data: examBoard } = await supabase
+  // Board names are only unique within a curriculum, and .maybeSingle() errors rather
+  // than picking one when two curricula share a board, so scope by country whenever the
+  // qualification is one we know about.
+  const country = qualificationByDbName(qualificationLabel)?.country ?? null;
+  let boardQuery = supabase
     .from('exam_boards')
-    .select('id, qualifications!inner(name)')
+    .select('id, qualifications!inner(name, curricula!inner(country))')
     .ilike('name', boardLabel)
-    .eq('qualifications.name', qualificationLabel)
-    .maybeSingle();
+    .eq('qualifications.name', qualificationLabel);
+  if (country) boardQuery = boardQuery.eq('qualifications.curricula.country', country);
+
+  const { data: examBoard } = await boardQuery.maybeSingle();
   if (!examBoard) return null;
 
   const { data: subjectRow } = await supabase

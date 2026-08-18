@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { createAdminClient } from '@/lib/supabase-admin';
-import { estimateGrade, getGcseTier } from '@/lib/ai/gradeEstimate';
+import { gradeFromPercentage } from '@/lib/ai/gradeScales';
+import { getSpecTier } from '@/lib/ai/qualifications';
 import { buildSpecString } from '@/lib/ai/subjectConfig';
 import { normalizeBoard, normalizeExamType } from '@/lib/ai/validation';
 
@@ -128,8 +129,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
     const subjectChain = spec?.subjects;
     const examType = normalizeExamType(subjectChain?.exam_boards?.qualifications?.name) || 'gcse';
     const board = normalizeBoard(subjectChain?.exam_boards?.name);
-    const gcseTier = examType === 'gcse' ? getGcseTier(buildSpecString(spec?.name ?? '', spec?.tier ?? '', '')) : null;
-    const predictedGrade = estimateGrade(percentage, examType, board, gcseTier);
+    const tier = getSpecTier(buildSpecString(spec?.name ?? '', spec?.tier ?? '', ''), examType);
+    const predictedGrade = gradeFromPercentage(percentage, examType, tier, board);
 
     const updatedReport: MarkingReport = {
       ...attempt.ai_feedback,

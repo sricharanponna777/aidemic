@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError, getTTSConfig } from '@/lib/ai/config';
+import { getExamTypeLabel } from '@/lib/ai/qualifications';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
@@ -170,7 +171,7 @@ async function generateScript(
   if (missingKeyError) throw new Error(missingKeyError);
 
   const boardContext = examBoard && examBoard !== 'general' ? `Exam board: ${examBoard.toUpperCase()}.` : '';
-  const levelContext = examType && examType !== 'general' ? `Level: ${examType}.` : '';
+  const levelContext = examType && examType !== 'general' ? `Qualification: ${getExamTypeLabel(examType)}.` : '';
   const examContext = [boardContext, levelContext].filter(Boolean).join(' ');
   const specContext = specification ? `Specification: ${specification}.` : '';
   const courseContext = [examContext, specContext].filter(Boolean).join(' ');

@@ -147,7 +147,7 @@ export async function POST(request: Request) {
     if (missingKeyError) return NextResponse.json({ error: missingKeyError }, { status: 500 });
 
     const system = [
-      'You write one short multiple-choice retrieval-practice question for a UK GCSE/A-Level student.',
+      'You write one short multiple-choice retrieval-practice question for a secondary or pre-university student.',
       'Return strict JSON only with: "question", "options" (exactly 4 plausible answers, no A)/B) prefixes), "correctOption" (one of A, B, C, D matching the option order), and "explanation" (one or two sentences on why the answer is right).',
       'Target the named subtopic precisely. Keep it answerable in under a minute. Make the distractors reflect genuine misconceptions rather than obvious throwaways.',
     ].join('\n');

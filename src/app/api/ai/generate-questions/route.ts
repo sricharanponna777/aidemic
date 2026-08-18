@@ -16,12 +16,15 @@ import { normalizePlotSpec, PLOT_SPEC_JSON_SCHEMA } from '@/lib/ai/plotSpec';
 import { DIAGRAM_SPEC_JSON_SCHEMA } from '@/lib/ai/diagramSpec';
 import { buildDiagramTemplateCatalog, DIAGRAM_TEMPLATE_JSON_SCHEMA, normalizeDiagramTemplateSelection, resolveDiagramSpec } from '@/lib/ai/diagramTemplate';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
+import { getExamBoardLabel, getExamTypeLabel, isUkQualification } from '@/lib/ai/qualifications';
 import {
   clampCount,
   normalizeBoard,
   normalizeExamType,
   SUPPORTED_EXAM_BOARDS,
+  SUPPORTED_EXAM_BOARDS_LABEL,
   SUPPORTED_EXAM_TYPES,
+  SUPPORTED_EXAM_TYPES_LABEL,
   SUPPORTED_SUBJECTS,
   type SupportedSubject,
 } from '@/lib/ai/validation';
@@ -424,7 +427,9 @@ const inferMarks = (record: Record<string, unknown>, questionText: string, quest
 const getQuestionFingerprint = (question: ExamQuestion) => `${question.marks}:${question.question.toLowerCase()}`;
 
 const getSourceMaterialFromRawItem = (value: unknown, payload: ReturnType<typeof normalizePayload>) => {
-  if (payload.subject !== 'english language' || !value || typeof value !== 'object') return '';
+  // Only the AQA fixed papers ask for a separate Source A/B extract. Applying this to any
+  // other course silently eats returned questions that merely mention a source.
+  if (!usesAqaEnglishLanguagePapers(payload) || !value || typeof value !== 'object') return '';
   const record = value as Record<string, unknown>;
   const sourceText = readString(record, [
     'sourceMaterial',
@@ -598,8 +603,16 @@ const applyFigureReferences = (questions: ExamQuestion[], figureUrls: string[]) 
   return { questions: next, missingFigureReference: false };
 };
 
+/** The fixed-paper English Language flow below reproduces the AQA GCSE papers exactly —
+ * a fiction extract as Source A, four 1-mark MCQs, then 8/8/20/40. It is meaningless for
+ * any other English Language course, and forcing it on one produces questions that fail
+ * normalisation wholesale. The client gates the same way (ai-questions/page.tsx), so this
+ * keeps the two ends in agreement. */
+const usesAqaEnglishLanguagePapers = (payload: ReturnType<typeof normalizePayload>) =>
+  payload.subject === 'english language' && payload.examBoard === 'aqa' && payload.examType === 'gcse';
+
 const getEnglishLanguagePaper = (payload: ReturnType<typeof normalizePayload>) => {
-  if (payload.subject !== 'english language') return null;
+  if (!usesAqaEnglishLanguagePapers(payload)) return null;
   const combined = `${payload.topic} ${payload.prompt} ${payload.specification}`.toLowerCase();
   if (/\bpaper\s*2\b/.test(combined)) return 'paper2';
   return 'paper1';
@@ -687,7 +700,7 @@ const buildPrompt = (
     : 'Never set questionType="diagram"; leave diagramSpec=null and diagramTemplate={templateId:"",stringParams:[],numberParams:[],listParams:[]} on every question.';
 
   const system = [
-    `Generate ${englishLanguageInstructions ? 'the required fixed-paper set' : payload.questionCount} exam practice questions as strict JSON. Board:${payload.examBoard} Type:${payload.examType} Subject:${payload.subject}.`,
+    `Generate ${englishLanguageInstructions ? 'the required fixed-paper set' : payload.questionCount} exam practice questions as strict JSON. Board:${getExamBoardLabel(payload.examBoard ?? '')} Qualification:${getExamTypeLabel(payload.examType)} Subject:${payload.subject}.`,
     payload.specification ? `Spec: ${payload.specification}` : '',
     payload.allowPlot ? plotInstructions : '',
     payload.allowDiagram ? diagramInstructions : '',
@@ -1023,8 +1036,8 @@ async function validateTopicWithAI(
 
   const specLine = specification ? `Specification / option: ${specification}.\n` : '';
   const prompt =
-    `UK exam board expert. Decide whether the student's topic is genuinely assessable in this qualification.\n\n` +
-    `Subject: ${subject}\nExam board: ${examBoard}\nLevel: ${examType}\n${specLine}` +
+    `Exam board expert. Decide whether the student's topic is genuinely assessable in this qualification.\n\n` +
+    `Subject: ${subject}\nExam board: ${getExamBoardLabel(examBoard ?? '')}\nQualification: ${getExamTypeLabel(examType)}\n${specLine}` +
     `Student topic: "${topic}"\n\n` +
     `Rules:\n` +
     `- ACCEPT topics that directly appear in, or are a clear sub-topic of, this specification.\n` +
@@ -1057,8 +1070,8 @@ async function validateTopicWithAI(
     if (isValid) return { valid: true, reason: '' };
 
     const aiReason = typeof parsed.reason === 'string' && parsed.reason.trim() ? parsed.reason.trim() : '';
-    const examBoardLabel = examBoard ? examBoard.toUpperCase() : 'this exam board';
-    const examTypeLabel = examType || 'this level';
+    const examBoardLabel = examBoard ? getExamBoardLabel(examBoard) : 'this exam board';
+    const examTypeLabel = examType ? getExamTypeLabel(examType) : 'this qualification';
     const fallbackReason =
       `"${topic}" doesn't appear to be part of ${examBoardLabel} ${examTypeLabel} ${subject}. ` +
       `Check your qualification settings or try a topic from your specification.`;
@@ -1082,10 +1095,10 @@ export async function POST(request: Request) {
     const payload = normalizePayload(rawBody);
 
     if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
-      return NextResponse.json({ error: 'Exam board must be one of: AQA, Edexcel, OCR.' }, { status: 400 });
+      return NextResponse.json({ error: `Exam board must be one of: ${SUPPORTED_EXAM_BOARDS_LABEL}.` }, { status: 400 });
     }
     if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
-      return NextResponse.json({ error: 'Exam type must be GCSE or A-Level.' }, { status: 400 });
+      return NextResponse.json({ error: `Qualification must be one of: ${SUPPORTED_EXAM_TYPES_LABEL}.` }, { status: 400 });
     }
     if (!payload.subject || !SUPPORTED_SUBJECTS.includes(payload.subject as SupportedSubject)) {
       return NextResponse.json(
@@ -1093,8 +1106,10 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (payload.subject === 'english language' && payload.examBoard !== 'aqa') {
-      return NextResponse.json({ error: 'English Language practice currently supports AQA only.' }, { status: 400 });
+    // UK English Language practice is built around the AQA papers. Other countries have a
+    // single board of their own, so the restriction must not apply to them.
+    if (payload.subject === 'english language' && isUkQualification(payload.examType) && payload.examBoard !== 'aqa') {
+      return NextResponse.json({ error: 'UK English Language practice currently supports AQA only.' }, { status: 400 });
     }
     const englishLanguagePaper = getEnglishLanguagePaper(payload);
     if (!englishLanguagePaper && payload.topic) {
@@ -1170,6 +1185,24 @@ export async function POST(request: Request) {
     }
 
     if (uniqueQuestions.length === 0) {
+      // Without the raw items this failure is undiagnosable: the message says only that
+      // everything was discarded, not which required field was missing.
+      console.error(
+        '[generate-questions] every returned item failed normalisation',
+        JSON.stringify(
+          {
+            subject: payload.subject,
+            examBoard: payload.examBoard,
+            examType: payload.examType,
+            specification: payload.specification,
+            topic: payload.topic,
+            totalRawQuestions,
+            rawQuestions: rawQuestions.slice(0, 3),
+          },
+          null,
+          2
+        ).slice(0, MAX_AI_RESPONSE_LOG_TEXT)
+      );
       return NextResponse.json(
         {
           error:

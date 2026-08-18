@@ -8,7 +8,7 @@ import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { buttonStyles } from '@/components/ui/button';
 import { Alert, Label, fieldStyles } from '@/components/ui/field';
 import { PageHero, EmptyState } from '@/components/ui/feedback';
-import { getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { scoreBadgeTone } from '@/lib/scoreTone';
 import Link from 'next/link';
 
@@ -222,7 +222,7 @@ export default function BlurtPage() {
               >
                 {subjects.map((s, i) => (
                   <option key={`${s.subject}-${i}`} value={i}>
-                    {getSubjectLabel(s.subject)} · {s.exam_type === 'a-level' ? 'A-Level' : 'GCSE'}
+                    {getSubjectLabel(s.subject)} · {getExamTypeLabel(s.exam_type)}
                   </option>
                 ))}
               </select>

@@ -41,6 +41,51 @@ Two separate clients exist for different rendering contexts:
 
 All tables have Row-Level Security policies that enforce per-user data isolation automatically.
 
+### Curriculum and qualifications
+
+The curriculum tree is `curricula(country) → qualifications → exam_boards → subjects → specifications(tier) → topics → subtopics → learning_objectives`. Two curricula are seeded: **UK** (GCSE, A-Level × AQA/Edexcel/OCR) and **India**, which carries both the school qualifications (CBSE Class 10/12, ICSE, ISC, IB Diploma) and sixteen competitive entrance exams:
+
+| Group | Qualifications (board) |
+|---|---|
+| National engineering / medical | JEE Main (NTA), JEE Advanced (IIT), NEET UG (NTA) |
+| State CETs | TS EAMCET (TSCHE), AP EAPCET (APSCHE), MHT CET (MAHACET), KEAM (CEE), WBJEE (WBJEEB), COMEDK UGET (COMEDK) |
+| National / private university | CUET UG (NTA), BITSAT (BITS), VITEEE (VIT), SRMJEEE (SRM) |
+| Non-engineering | CLAT (NLU), NDA (UPSC), IPMAT (IIM) |
+
+Entrance exams sit alongside the school qualifications rather than replacing them, since a Class 12 student typically studies for both. `nta` is shared by JEE Main, NEET UG and CUET UG — safe because `resolveSubjectId` scopes the board lookup by `qualifications.name`.
+
+Three things follow from the non-engineering exams in particular. Their papers are not school subjects, so [subjects.ts](src/lib/ai/subjects.ts) carries slugs like `legal reasoning`, `verbal ability` and `general knowledge` purely for them. `COMEDK UGET` is the one `dbName` that does not `collapse()` onto its own slug (`comedk`), so its alias in [validation.ts](src/lib/ai/validation.ts) is load-bearing rather than a convenience — assignment marking feeds `qualifications.name` straight through `normalizeExamType`. And CUET is the only entrance exam whose syllabus is **Class 12 only**, which is why its topic lists are authored separately instead of reusing the shared `NCERT_*_TOPICS` constants.
+
+[src/lib/ai/qualifications.ts](src/lib/ai/qualifications.ts) is the registry every other module reads. Each entry carries an `id` (the slug stored in `exam_practice_attempts.exam_type`), a `dbName` (the exact `qualifications.name`), its country, boards, grade scale, and tier scheme. Three things follow from it:
+
+- **`id` ↔ `dbName` is a load-bearing round-trip.** `mapStudentSubjectRow` turns a `qualifications.name` into a slug; `getExamTypeLabel` turns it back into the name, which `resolveSpecificationId` uses as a **database lookup key**. If they ever disagree, every specification silently fails to resolve. `qualifications.test.ts` pins this.
+- **`ExamType` and `ExamBoard` are derived from the registry**, not hand-written unions. Adding a qualification means adding a registry entry, not editing types across the codebase.
+- **`tier` generalises the Foundation/Higher split**: CBSE Class 10 Mathematics uses Standard/Basic, IB uses HL/SL. `requiresTierSelection` and `getSpecTier` read the scheme rather than testing for `'gcse'`. No entrance exam is tiered — the EAMCET Engineering / Agriculture & Medical streams differ by which subjects a student takes (Mathematics vs Biology), not by parallel routes through one subject.
+
+Grade boundaries live in [src/lib/ai/gradeScales.ts](src/lib/ai/gradeScales.ts) — one table per scale (GCSE 9-1 with tier variants, A-Level A*-E, CBSE A1-E, ICSE/ISC 1-9, IB 1-7), plus the `edexcel -2 / ocr -1` board adjustment that applies to UK boards only. `averagePredictedGrade` deliberately always uses the **untiered** ladder; switching it to the tier ladder would move existing predicted grades.
+
+The entrance exams report a percentile or an all-India rank rather than a grade, so their "grade" is an **outcome band**. Eleven scales cover the sixteen exams:
+
+- **Percentile ladders** — `jee-main`, `state-cet` (the four state CETs share it), `cuet`. `state-cet` is deliberately percentile rather than rank: those pools run from ~80k (COMEDK) to ~500k (MHT CET), so one rank ladder would mean four different things.
+- **Rank ladders** — `jee-advanced`, `eamcet`, `private-univ-entrance` (VITEEE + SRMJEEE), `clat`, `ipmat`.
+- **Score ladders**, where the band is literally that percentage of the marks available — `neet-ug` (/720), `bitsat` (/390), `nda` (/900).
+
+The boundaries map percentage scored on a practice set onto the band that percentage of the real paper has historically produced, so they are indicative only: real cut-offs move with the cohort every year, and most of these papers carry negative marking that a practice set does not. Each `boundaryNote` says so, and `gradeScales.test.ts` pins that wording.
+
+Because those bands are neither 1-9 numerics nor A*-E letters, [src/lib/gradeTone.ts](src/lib/gradeTone.ts) colours **every non-UK scale** from the grade's position on its own ladder (bottom third red, middle amber, top green). GCSE and A-Level keep their hand-written branches: GCSE's boundary falls after index 3 of 10 and A-Level's after index 2 of 7, and no single fraction reproduces both. `gradeTone.test.ts` pins the UK colours against exactly that regression.
+
+India's curriculum data is authored in [scripts/data/india-curriculum.ts](scripts/data/india-curriculum.ts) and is the single source for both `specifications.json` and the SQL seeds, so the two cannot drift:
+
+```bash
+bun run scripts/generate-india-curriculum.ts            # regenerate JSON + SQL
+bun run scripts/generate-india-curriculum.ts --apply    # also upsert into the DB
+bun --env-file=.env.local run scripts/seed-curriculum-subtopics.ts --country india
+```
+
+Row ids are deterministic UUIDv5 values keyed on each row's path in the tree, so regenerating is idempotent. **Do not change the `NAMESPACE` constant** — every seeded id depends on it. The subtopic generator is resumable (it skips topics that already have subtopics) and rewrites its migration from the full set each run.
+
+Note that `getMajorTopicsForQualification` in [src/lib/ai/majorTopics.ts](src/lib/ai/majorTopics.ts) holds **UK-only** static topic lists and returns `[]` for other qualifications; `getQualificationTopicError` treats an empty list as "no opinion" rather than "nothing allowed". Non-UK topics are validated against the seeded `topics` table and the AI relevance gate instead.
+
 ### AI Integration
 
 [src/lib/ai/config.ts](src/lib/ai/config.ts) centralizes the OpenAI-compatible client. It supports OpenAI, OpenRouter, and local LLMs via environment variables — no provider is hardcoded. All API routes under `src/app/api/ai/` follow the same pattern: validate input → call the AI config → extract JSON from the response via [src/lib/ai/json.ts](src/lib/ai/json.ts) → return structured data.

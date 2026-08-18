@@ -24,6 +24,20 @@ describe('averagePredictedGrade', () => {
     // C(index3) and A(index5) -> average 4 -> B
     expect(averagePredictedGrade(['C', 'A'], 'a-level').grade).toBe('B');
   });
+
+  it('averages on the untiered ladder regardless of tier', () => {
+    // The Higher-tier ladder starts at 3, so if it were used here the indices would
+    // shift and '6','8' would no longer average to '7'.
+    expect(averagePredictedGrade(['6', '8'], 'gcse').grade).toBe('7');
+  });
+
+  it('averages CBSE letter bands and ICSE numeric grades', () => {
+    // C1(index3) and A2(index6) -> average 4.5 -> rounds to index 5 -> B1
+    expect(averagePredictedGrade(['C1', 'A2'], 'cbse-12').grade).toBe('B1');
+    // ICSE counts down: '6'(index3) and '4'(index5) -> average 4 -> '5'
+    expect(averagePredictedGrade(['6', '4'], 'icse').grade).toBe('5');
+    expect(averagePredictedGrade(['5', '7'], 'ib-dp').grade).toBe('6');
+  });
 });
 
 describe('weightedPredictedGrade', () => {

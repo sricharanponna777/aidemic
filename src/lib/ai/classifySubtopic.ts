@@ -37,7 +37,7 @@ const buildPrompt = (subtopics: SubtopicCandidate[], questions: string[]) => {
   const items = questions.map((q, i) => `Q${i}: ${q.slice(0, 600)}`).join('\n\n');
 
   return [
-    'You are mapping exam questions onto the subtopics of a GCSE/A-Level specification.',
+    'You are mapping exam questions onto the subtopics of an exam specification.',
     '',
     'Subtopics:',
     list,

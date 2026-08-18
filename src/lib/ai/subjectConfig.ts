@@ -1,25 +1,20 @@
 import specificationsData from '@/lib/ai/specifications.json';
+import { SUPPORTED_SUBJECTS, SUBJECT_LABELS, getSubjectLabel, type SupportedSubject } from '@/lib/ai/subjects';
+import {
+  getExamBoardLabel,
+  getExamTypeLabel,
+  isUkQualification,
+  qualificationById,
+  type ExamBoard,
+  type ExamType,
+} from '@/lib/ai/qualifications';
 
-export const SUPPORTED_SUBJECTS = [
-  'biology',
-  'chemistry',
-  'physics',
-  'mathematics',
-  'english language',
-  'english literature',
-  'english',
-  'history',
-  'geography',
-  'economics',
-  'psychology',
-  'business',
-  'computer science',
-] as const;
+export { SUPPORTED_SUBJECTS, SUBJECT_LABELS, getSubjectLabel, getExamBoardLabel, getExamTypeLabel };
+export type { SupportedSubject, ExamBoard, ExamType };
 
-export type SupportedSubject = (typeof SUPPORTED_SUBJECTS)[number];
+/** 'english' is a legacy catch-all kept for validating older rows; it is never offered
+ * in a picker. Every other supported subject is. */
 export const SELECTABLE_SUBJECTS = SUPPORTED_SUBJECTS.filter((subject) => subject !== 'english');
-export type ExamBoard = 'aqa' | 'edexcel' | 'ocr';
-export type ExamType = 'gcse' | 'a-level';
 
 export type UserSubject = {
   id: string;
@@ -35,32 +30,26 @@ type SpecBoard = Record<string, Record<string, Record<string, SpecEntry[]>>>;
 
 export const specifications = specificationsData as SpecBoard;
 
-export const SUBJECT_LABELS: Record<SupportedSubject, string> = {
-  biology: 'Biology',
-  chemistry: 'Chemistry',
-  physics: 'Physics',
-  mathematics: 'Mathematics',
-  'english language': 'English Language',
-  'english literature': 'English Literature',
-  english: 'English',
-  history: 'History',
-  geography: 'Geography',
-  economics: 'Economics',
-  psychology: 'Psychology',
-  business: 'Business',
-  'computer science': 'Computer Science',
+/** The subjects offered for a board + qualification, read from specifications.json so a
+ * picker never offers a combination that has no specification behind it. Ordered by
+ * SUPPORTED_SUBJECTS so the list reads the same everywhere. */
+export const getSelectableSubjects = (board?: string | null, examType?: string | null): SupportedSubject[] => {
+  const available = specifications[board ?? '']?.[examType ?? ''];
+  if (!available) return [...SELECTABLE_SUBJECTS];
+  return SELECTABLE_SUBJECTS.filter((subject) => subject in available);
 };
-
-export const getSubjectLabel = (subject: string) =>
-  SUBJECT_LABELS[subject as SupportedSubject] ?? subject.charAt(0).toUpperCase() + subject.slice(1);
-
-export const getExamBoardLabel = (board: string) => board.toUpperCase();
-
-export const getExamTypeLabel = (type: string) => type === 'a-level' ? 'A-Level' : 'GCSE';
 
 export const getSpecEntries = (subject?: UserSubject | null) => {
   if (!subject) return [];
-  if (subject.subject === 'english language' && subject.exam_board !== 'aqa') return [];
+  // UK English Language practice is built around the AQA papers only. Other countries
+  // have their own single board, so the rule must not leak outside the UK.
+  if (
+    subject.subject === 'english language' &&
+    isUkQualification(subject.exam_type) &&
+    subject.exam_board !== 'aqa'
+  ) {
+    return [];
+  }
   return specifications[subject.exam_board]?.[subject.exam_type]?.[subject.subject] ?? [];
 };
 
@@ -71,7 +60,12 @@ export const getSelectedSpecEntry = (subject: UserSubject | null, specName?: str
 };
 
 export const requiresTierSelection = (subject: UserSubject | null, specName?: string | null) =>
-  subject?.exam_type === 'gcse' && !!getSelectedSpecEntry(subject, specName)?.tiers?.length;
+  !!qualificationById(subject?.exam_type)?.tier &&
+  !!getSelectedSpecEntry(subject, specName)?.tiers?.length;
+
+/** The label for the tier/level picker — "Tier" for GCSE, "Level" for CBSE and IB. */
+export const getTierLabel = (examType?: string | null) =>
+  qualificationById(examType)?.tier?.label ?? 'Tier';
 
 export const getPaperCount = (subject: UserSubject | null, specName?: string | null): number =>
   getSelectedSpecEntry(subject, specName ?? getSavedSpecName(subject))?.papers ?? 0;

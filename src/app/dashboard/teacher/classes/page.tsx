@@ -14,15 +14,17 @@ import { PageLoader } from '@/components/PageLoader';
 import { useToast } from '@/components/ToastProvider';
 import {
   getExamBoardLabel,
+  getSelectableSubjects,
   getSpecEntries,
   getSubjectLabel,
+  getTierLabel,
   requiresTierSelection,
-  SELECTABLE_SUBJECTS,
   type ExamBoard,
   type SupportedSubject,
   type UserSubject,
 } from '@/lib/ai/subjectConfig';
-import { getQualificationConfig, getQualifications, type Country } from '@/lib/ai/countryConfig';
+import { type Country } from '@/lib/ai/countryConfig';
+import { getQualificationConfig, getQualifications } from '@/lib/ai/qualifications';
 import { resolveSpecificationId } from '@/lib/ai/studentSubjects';
 
 const selectClass =
@@ -93,10 +95,16 @@ export default function TeacherDashboardPage() {
   const effectiveQualId = qualifications.some((q) => q.id === qualId) ? qualId : qualifications[0]?.id ?? '';
   const qualConfig = getQualificationConfig(userCountry, effectiveQualId);
   const isComingSoon = qualConfig?.comingSoon ?? false;
-  const examType = qualConfig?.examType ?? 'gcse';
-  const boardOptions: ExamBoard[] = subject === 'english language' ? ['aqa'] : qualConfig?.boards ?? ['aqa', 'edexcel', 'ocr'];
+  const examType = (qualConfig?.id ?? 'gcse') as UserSubject['exam_type'];
+  const qualBoards = (qualConfig?.boards ?? ['aqa', 'edexcel', 'ocr']) as ExamBoard[];
+  const boardOptions: ExamBoard[] =
+    subject === 'english language' && qualBoards.includes('aqa') ? ['aqa'] : qualBoards;
+  // Qualifications with a single awarding body (CBSE, CISCE, IB) don't get a board picker.
+  const effectiveBoard = boardOptions.includes(board) ? board : boardOptions[0];
+  const selectableSubjects = getSelectableSubjects(effectiveBoard, examType);
+  const effectiveSubject = selectableSubjects.includes(subject) ? subject : selectableSubjects[0];
 
-  const pendingSubject: UserSubject = { id: 'new', subject, exam_board: board, exam_type: examType, spec_name: specName, spec_tier: specTier };
+  const pendingSubject: UserSubject = { id: 'new', subject: effectiveSubject, exam_board: effectiveBoard, exam_type: examType, spec_name: specName, spec_tier: specTier };
   const specEntries = getSpecEntries(pendingSubject);
   const effectiveSpecName = specEntries.length === 1 ? specEntries[0].name : specName;
   const selectedSpecEntry = specEntries.length === 1 ? specEntries[0] : specEntries.find((e) => e.name === specName) ?? null;
@@ -221,15 +229,15 @@ export default function TeacherDashboardPage() {
       return;
     }
     if (tierRequired && !specTier) {
-      setFormError('Choose Foundation or Higher for this class.');
+      setFormError(`Choose ${(selectedSpecEntry?.tiers ?? []).join(' or ')} for this class.`);
       return;
     }
 
     setIsSaving(true);
     const specificationId = await resolveSpecificationId(supabase, {
-      qualificationLabel: qualConfig?.label ?? '',
-      boardLabel: getExamBoardLabel(board),
-      subjectLabel: getSubjectLabel(subject),
+      qualificationLabel: qualConfig?.dbName ?? '',
+      boardLabel: getExamBoardLabel(effectiveBoard),
+      subjectLabel: getSubjectLabel(effectiveSubject),
       specName: effectiveSpecName,
       specTier: specTier || null,
     });
@@ -435,38 +443,38 @@ export default function TeacherDashboardPage() {
             </div>
             {!isComingSoon && (
               <>
-                <div className="flex items-center gap-2">
-                  <label className="shrink-0 text-xs font-medium text-content-subtle">Exam Board</label>
-                  <select
-                    value={board}
-                    onChange={(e) => {
-                      setBoard(e.target.value as ExamBoard);
-                      setSpecName('');
-                      setSpecTier('');
-                    }}
-                    className={selectClass}
-                  >
-                    {boardOptions.map((b) => (
-                      <option key={b} value={b}>
-                        {getExamBoardLabel(b)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {boardOptions.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <label className="shrink-0 text-xs font-medium text-content-subtle">Exam Board</label>
+                    <select
+                      value={effectiveBoard}
+                      onChange={(e) => {
+                        setBoard(e.target.value as ExamBoard);
+                        setSpecName('');
+                        setSpecTier('');
+                      }}
+                      className={selectClass}
+                    >
+                      {boardOptions.map((b) => (
+                        <option key={b} value={b}>
+                          {getExamBoardLabel(b)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <label className="shrink-0 text-xs font-medium text-content-subtle">Subject</label>
                   <select
-                    value={subject}
+                    value={effectiveSubject}
                     onChange={(e) => {
-                      const next = e.target.value as SupportedSubject;
-                      setSubject(next);
-                      if (next === 'english language') setBoard('aqa');
+                      setSubject(e.target.value as SupportedSubject);
                       setSpecName('');
                       setSpecTier('');
                     }}
                     className={selectClass}
                   >
-                    {SELECTABLE_SUBJECTS.map((s) => (
+                    {selectableSubjects.map((s) => (
                       <option key={s} value={s}>
                         {getSubjectLabel(s)}
                       </option>
@@ -510,7 +518,7 @@ export default function TeacherDashboardPage() {
               )}
               {selectedSpecEntry?.tiers?.length ? (
                 <select value={specTier} onChange={(e) => setSpecTier(e.target.value)} className={selectClass}>
-                  <option value="">Tier</option>
+                  <option value="">{getTierLabel(examType)}</option>
                   {selectedSpecEntry.tiers.map((tier) => (
                     <option key={tier} value={tier}>
                       {tier}

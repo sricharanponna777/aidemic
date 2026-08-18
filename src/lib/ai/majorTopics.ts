@@ -7,6 +7,7 @@ import {
   type SupportedSubject,
   type UserSubject,
 } from '@/lib/ai/subjectConfig';
+import { isUkQualification } from '@/lib/ai/qualifications';
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
 
@@ -435,9 +436,13 @@ const TOPIC_OVERRIDES: Record<string, string[]> = {
   ],
 };
 
+/** Gated to UK qualifications: the branch this unlocks is the AQA/Edexcel/OCR poetry-cluster
+ * and set-text machinery below, which has no meaning for an ICSE or IB literature course.
+ * Non-UK literature subjects fall through to the seeded topics table instead. */
 export const isEnglishLiteratureSubject = (subject: UserSubject | null, specName = '') =>
-  subject?.subject === 'english literature' ||
-  (subject?.subject === 'english' && specName.toLowerCase().includes('literature'));
+  isUkQualification(subject?.exam_type) &&
+  (subject?.subject === 'english literature' ||
+    (subject?.subject === 'english' && specName.toLowerCase().includes('literature')));
 
 export const isPoetryCluster = (value?: string | null) => !!value && !!POETRY_CLUSTER_POEMS[value];
 
@@ -502,6 +507,11 @@ export const getMajorTopicsForQualification = (input: QualificationTopicInput): 
   const examBoard = normalise(input.examBoard) as ExamBoard;
   const examType = normalise(input.examType) as ExamType;
   if (!subject || !examBoard || !examType) return [];
+  // GCSE_TOPICS/A_LEVEL_TOPICS below are UK lists. Returning them for a CBSE or IB
+  // course would be worse than returning nothing: the caller would reject the
+  // student's real topics and accept topics from a syllabus they do not study.
+  // Those qualifications are validated against the seeded topics table instead.
+  if (!isUkQualification(examType)) return [];
 
   const specName = getSpecNameFromLabel(input);
   const subjectRow: UserSubject = {
@@ -546,6 +556,11 @@ export const isAllowedQualificationTopic = (topic: string, topics: string[]) => 
 };
 
 export const getQualificationTopicError = (topic: string, topics: string[]) => {
+  // An empty list means we hold no static topic catalogue for this qualification, not
+  // that every topic is disallowed. Blocking here would reject every request for a
+  // qualification whose topics live only in the database. The AI relevance check in the
+  // generation routes still runs either way.
+  if (topics.length === 0) return null;
   if (isAllowedQualificationTopic(topic, topics)) return null;
   return 'Choose one of the suggested topics for this qualification before generating content.';
 };

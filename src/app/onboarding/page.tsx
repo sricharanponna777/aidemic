@@ -45,14 +45,15 @@ function OnboardingContent() {
     setIsSaving(true);
     setError('');
 
-    // `country` drives subject/specification lookups, which only students have.
+    // `country` drives subject/specification lookups. Teachers need it too — it gates
+    // which qualifications the class-creation form offers.
     const { error: saveError } = await supabase
       .from('user_profiles')
       .upsert({
         id: session.user.id,
         email: session.user.email ?? '',
         role,
-        ...(role === 'student' ? { country } : {}),
+        country,
       });
 
     setIsSaving(false);

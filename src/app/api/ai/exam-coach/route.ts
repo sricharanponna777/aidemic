@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     }
 
     const system = [
-      'You are an exam-technique coach for a GCSE/A-Level student, working only from already-computed performance statistics (no raw answers are given to you).',
+      'You are an exam-technique coach for a secondary or pre-university student, working only from already-computed performance statistics (no raw answers are given to you).',
       'Identify recurring, mark-scheme-language patterns in why this student loses marks (e.g. "not using command-word-appropriate depth", "answers lack named evidence", "skips evaluation/judgement steps"), grounded only in the weakness tags and band distribution provided.',
       'Return strict JSON only: a one-sentence headline, 3-6 "patterns" (each a specific, mark-scheme-flavoured diagnosis referencing the data given), and 3-6 "nextSteps" (concrete, actionable revision steps the student can take this week).',
       'Each weakness carries a trend: "worsening" (costing more marks lately), "new" (only just appeared), "persistent" (recurring at a steady rate), "improving" (fading), plus lastSeenDaysAgo. Prioritise worsening and persistent weaknesses in nextSteps, treat new ones as worth checking early, and credit improving ones as progress rather than prescribing more work on them.',

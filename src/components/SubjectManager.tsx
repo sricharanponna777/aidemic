@@ -9,20 +9,18 @@ import { createClient } from '@/lib/supabase-client';
 import {
   buildSpecString,
   getExamBoardLabel,
+  getExamTypeLabel,
+  getSelectableSubjects,
   getSpecEntries,
   getSubjectLabel,
+  getTierLabel,
   requiresTierSelection,
-  SELECTABLE_SUBJECTS,
   type ExamBoard,
   type UserSubject,
   type SupportedSubject,
 } from '@/lib/ai/subjectConfig';
-import {
-  COUNTRY_LABELS,
-  getQualificationConfig,
-  getQualifications,
-  type Country,
-} from '@/lib/ai/countryConfig';
+import { COUNTRY_LABELS, type Country } from '@/lib/ai/countryConfig';
+import { getQualificationConfig, getQualifications } from '@/lib/ai/qualifications';
 import {
   mapStudentSubjectRow,
   resolveSpecificationId,
@@ -56,14 +54,21 @@ export function SubjectManager() {
     : qualifications[0]?.id ?? '';
   const qualConfig = getQualificationConfig(userCountry, effectiveQualId);
   const isComingSoon = qualConfig?.comingSoon ?? false;
-  const newType = qualConfig?.examType ?? 'gcse';
+  const newType = (qualConfig?.id ?? 'gcse') as UserSubject['exam_type'];
+  const qualBoards = (qualConfig?.boards ?? ['aqa', 'edexcel', 'ocr']) as ExamBoard[];
+  // UK English Language practice is AQA-only; elsewhere the qualification's own board wins.
   const boardOptions: ExamBoard[] =
-    newSubject === 'english language' ? ['aqa'] : (qualConfig?.boards ?? ['aqa', 'edexcel', 'ocr']);
+    newSubject === 'english language' && qualBoards.includes('aqa') ? ['aqa'] : qualBoards;
+  // A qualification whose board is also its awarding body (CBSE, CISCE, IB) has a single
+  // option, so the picker is noise — select it and leave it out of the form.
+  const effectiveBoard = boardOptions.includes(newBoard) ? newBoard : boardOptions[0];
+  const selectableSubjects = getSelectableSubjects(effectiveBoard, newType);
+  const effectiveSubject = selectableSubjects.includes(newSubject) ? newSubject : selectableSubjects[0];
 
   const pendingSubject: UserSubject = {
     id: 'new',
-    subject: newSubject,
-    exam_board: newBoard,
+    subject: effectiveSubject,
+    exam_board: effectiveBoard,
     exam_type: newType,
     spec_name: newSpecName,
     spec_tier: newSpecTier,
@@ -123,13 +128,14 @@ export function SubjectManager() {
       return;
     }
     if (tierRequired && !newSpecTier) {
-      setSubjectError('Choose Foundation or Higher for this subject.');
+      const options = selectedSpecEntry?.tiers ?? [];
+      setSubjectError(`Choose ${options.join(' or ')} for this subject.`);
       return;
     }
     const duplicate = subjects.some(
       (s) =>
-        s.subject === newSubject &&
-        s.exam_board === newBoard &&
+        s.subject === effectiveSubject &&
+        s.exam_board === effectiveBoard &&
         s.exam_type === newType &&
         (s.spec_name ?? '') === effectiveSpecName &&
         (s.spec_tier ?? '') === newSpecTier,
@@ -141,9 +147,9 @@ export function SubjectManager() {
 
     setSubjectSaving(true);
     const specificationId = await resolveSpecificationId(supabase, {
-      qualificationLabel: qualConfig?.label ?? '',
-      boardLabel: getExamBoardLabel(newBoard),
-      subjectLabel: getSubjectLabel(newSubject),
+      qualificationLabel: qualConfig?.dbName ?? '',
+      boardLabel: getExamBoardLabel(effectiveBoard),
+      subjectLabel: getSubjectLabel(effectiveSubject),
       specName: effectiveSpecName,
       specTier: newSpecTier || null,
     });
@@ -184,9 +190,9 @@ export function SubjectManager() {
       .eq('id', id);
   };
 
+  // Clears the downstream selections; the board and subject fall back to the first valid
+  // option for the newly chosen qualification via effectiveBoard/effectiveSubject.
   const resetSubjectFields = () => {
-    setNewSubject('biology');
-    setNewBoard('aqa');
     setNewSpecName('');
     setNewSpecTier('');
   };
@@ -222,7 +228,7 @@ export function SubjectManager() {
                     {getExamBoardLabel(subject.exam_board)}
                   </span>
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-content-muted dark:bg-slate-700">
-                    {subject.exam_type === 'a-level' ? 'A-Level' : 'GCSE'}
+                    {getExamTypeLabel(subject.exam_type)}
                   </span>
                   {buildSpecString(subject.spec_name ?? '', subject.spec_tier ?? '', '') ? (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
@@ -293,38 +299,38 @@ export function SubjectManager() {
         </div>
         {!isComingSoon && (
           <>
-            <div className="flex items-center gap-2">
-              <label className="shrink-0 text-xs font-medium text-content-subtle">Exam Board</label>
-              <select
-                value={newBoard}
-                onChange={(event) => {
-                  setNewBoard(event.target.value as ExamBoard);
-                  setNewSpecName('');
-                  setNewSpecTier('');
-                }}
-                className={selectClass}
-              >
-                {boardOptions.map((board) => (
-                  <option key={board} value={board}>
-                    {getExamBoardLabel(board)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {boardOptions.length > 1 && (
+              <div className="flex items-center gap-2">
+                <label className="shrink-0 text-xs font-medium text-content-subtle">Exam Board</label>
+                <select
+                  value={effectiveBoard}
+                  onChange={(event) => {
+                    setNewBoard(event.target.value as ExamBoard);
+                    setNewSpecName('');
+                    setNewSpecTier('');
+                  }}
+                  className={selectClass}
+                >
+                  {boardOptions.map((board) => (
+                    <option key={board} value={board}>
+                      {getExamBoardLabel(board)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <label className="shrink-0 text-xs font-medium text-content-subtle">Subject</label>
               <select
-                value={newSubject}
+                value={effectiveSubject}
                 onChange={(event) => {
-                  const next = event.target.value as SupportedSubject;
-                  setNewSubject(next);
-                  if (next === 'english language') setNewBoard('aqa');
+                  setNewSubject(event.target.value as SupportedSubject);
                   setNewSpecName('');
                   setNewSpecTier('');
                 }}
                 className={selectClass}
               >
-                {SELECTABLE_SUBJECTS.map((subject) => (
+                {selectableSubjects.map((subject) => (
                   <option key={subject} value={subject}>
                     {getSubjectLabel(subject)}
                   </option>
@@ -374,7 +380,7 @@ export function SubjectManager() {
                 onChange={(event) => setNewSpecTier(event.target.value)}
                 className={selectClass}
               >
-                <option value="">Tier</option>
+                <option value="">{getTierLabel(newType)}</option>
                 {selectedSpecEntry.tiers.map((tier) => (
                   <option key={tier} value={tier}>
                     {tier}

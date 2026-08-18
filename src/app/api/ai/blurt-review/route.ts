@@ -11,6 +11,7 @@ import {
   type OpenAIResponseBody,
 } from '@/lib/ai/json';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
+import { getExamTypeLabel } from '@/lib/ai/qualifications';
 import { MAX_AI_ERROR_TEXT, txt } from '@/lib/ai/text';
 
 type BlurtPayload = {
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
     if (missingKeyError) return NextResponse.json({ error: missingKeyError }, { status: 500 });
 
     const system = [
-      'You are a GCSE/A-Level examiner grading a "blurting" (free-recall) exercise: the student has written down everything they can remember about a topic, and you assess how completely and accurately they covered it.',
+      `You are ${examType ? `a ${getExamTypeLabel(examType)}` : 'an'} examiner grading a "blurting" (free-recall) exercise: the student has written down everything they can remember about a topic, and you assess how completely and accurately they covered it.`,
       'Compare their brain dump against what a strong specification answer for this topic would contain.',
       'Return strict JSON only with: "covered" (key points they correctly recalled, 3-10 concise items), "missed" (important spec points they omitted, 3-10 items), "misconceptions" (anything they stated that is wrong or imprecise, 0-6 items, each naming the error and the correction), "coverageScore" (0-100, how complete their recall was), and "summary" (one encouraging sentence with the single most useful next step).',
       'Be specific to the subject and topic. Do not invent that they wrote something they did not. Reward correct recall generously but be honest about gaps.',
