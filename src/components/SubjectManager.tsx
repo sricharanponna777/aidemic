@@ -27,9 +27,10 @@ import {
   STUDENT_SUBJECT_SELECT,
   type StudentSubjectRow,
 } from '@/lib/ai/studentSubjects';
+import { QualificationPicker } from '@/components/QualificationPicker';
 
 const selectClass =
-  'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
+  'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content w-full';
 
 export function SubjectManager() {
   const { session, profile } = useAuth();
@@ -223,12 +224,10 @@ export function SubjectManager() {
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <span className="font-semibold text-content">
                     {getSubjectLabel(subject.subject)}
+                    <span className="font-normal text-content-subtle"> &middot; {getExamTypeLabel(subject.exam_type)}</span>
                   </span>
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-indigo-500/15 dark:text-blue-300">
                     {getExamBoardLabel(subject.exam_board)}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-content-muted dark:bg-slate-700">
-                    {getExamTypeLabel(subject.exam_type)}
                   </span>
                   {buildSpecString(subject.spec_name ?? '', subject.spec_tier ?? '', '') ? (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
@@ -274,72 +273,70 @@ export function SubjectManager() {
         )}
       </div>
 
-      <div className="mt-5 rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 text-sm text-content-muted dark:bg-surface/3">
-        Country: <span className="font-semibold text-content">{COUNTRY_LABELS[userCountry]}</span>
-      </div>
-
-      {/* Qualification + Exam Board + Subject */}
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="flex items-center gap-2">
-          <label className="shrink-0 text-xs font-medium text-content-subtle">Qualification</label>
-          <select
+      {/* Country -> Qualification */}
+      <div className="mt-3 flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-content-subtle">Country</span>
+          <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 dark:bg-surface/3">
+            <span className="text-sm font-semibold text-content">{COUNTRY_LABELS[userCountry]}</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-content-subtle">Qualification</label>
+          <QualificationPicker
+            qualifications={qualifications}
             value={effectiveQualId}
-            onChange={(event) => {
-              setNewQualId(event.target.value);
+            onChange={(id) => {
+              setNewQualId(id);
               resetSubjectFields();
             }}
-            className={selectClass}
-          >
-            {qualifications.map((qual) => (
-              <option key={qual.id} value={qual.id}>
-                {qual.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
-        {!isComingSoon && (
-          <>
-            {boardOptions.length > 1 && (
-              <div className="flex items-center gap-2">
-                <label className="shrink-0 text-xs font-medium text-content-subtle">Exam Board</label>
-                <select
-                  value={effectiveBoard}
-                  onChange={(event) => {
-                    setNewBoard(event.target.value as ExamBoard);
-                    setNewSpecName('');
-                    setNewSpecTier('');
-                  }}
-                  className={selectClass}
-                >
-                  {boardOptions.map((board) => (
-                    <option key={board} value={board}>
-                      {getExamBoardLabel(board)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <label className="shrink-0 text-xs font-medium text-content-subtle">Subject</label>
+      </div>
+
+      {/* Exam Board + Subject */}
+      {!isComingSoon && (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {boardOptions.length > 1 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-content-subtle">Exam Board</label>
               <select
-                value={effectiveSubject}
+                value={effectiveBoard}
                 onChange={(event) => {
-                  setNewSubject(event.target.value as SupportedSubject);
+                  setNewBoard(event.target.value as ExamBoard);
                   setNewSpecName('');
                   setNewSpecTier('');
                 }}
                 className={selectClass}
               >
-                {selectableSubjects.map((subject) => (
-                  <option key={subject} value={subject}>
-                    {getSubjectLabel(subject)}
+                {boardOptions.map((board) => (
+                  <option key={board} value={board}>
+                    {getExamBoardLabel(board)}
                   </option>
                 ))}
               </select>
             </div>
-          </>
-        )}
-      </div>
+          )}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-content-subtle">Subject</label>
+            <select
+              value={effectiveSubject}
+              onChange={(event) => {
+                setNewSubject(event.target.value as SupportedSubject);
+                setNewSpecName('');
+                setNewSpecTier('');
+              }}
+              className={selectClass}
+            >
+              {selectableSubjects.map((subject) => (
+                <option key={subject} value={subject}>
+                  {getSubjectLabel(subject)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {isComingSoon ? (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-300">
@@ -349,54 +346,65 @@ export function SubjectManager() {
         <>
           {/* Specification + Tier + Add */}
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
-            {specEntries.length === 0 ? (
-              <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-subtle dark:bg-surface/3">
-                No specification options available for this combination.
-              </div>
-            ) : specEntries.length === 1 ? (
-              <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-muted dark:bg-surface/3 dark:text-slate-300">
-                {specEntries[0].name}
-              </div>
-            ) : (
-              <select
-                value={newSpecName}
-                onChange={(event) => {
-                  setNewSpecName(event.target.value);
-                  setNewSpecTier('');
-                }}
-                className={selectClass}
-              >
-                <option value="">Select specification</option>
-                {specEntries.map((entry) => (
-                  <option key={entry.name} value={entry.name}>
-                    {entry.name}
-                  </option>
-                ))}
-              </select>
-            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-content-subtle">Specification</label>
+              {specEntries.length === 0 ? (
+                <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-subtle dark:bg-surface/3">
+                  No specification options available for this combination.
+                </div>
+              ) : specEntries.length === 1 ? (
+                <div className="rounded-lg border border-subtle bg-surface-sunken px-3 py-2 text-sm text-content-muted dark:bg-surface/3 dark:text-slate-300">
+                  {specEntries[0].name}
+                </div>
+              ) : (
+                <select
+                  value={newSpecName}
+                  onChange={(event) => {
+                    setNewSpecName(event.target.value);
+                    setNewSpecTier('');
+                  }}
+                  className={selectClass}
+                >
+                  <option value="">Select specification</option>
+                  {specEntries.map((entry) => (
+                    <option key={entry.name} value={entry.name}>
+                      {entry.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             {selectedSpecEntry?.tiers?.length ? (
-              <select
-                value={newSpecTier}
-                onChange={(event) => setNewSpecTier(event.target.value)}
-                className={selectClass}
-              >
-                <option value="">{getTierLabel(newType)}</option>
-                {selectedSpecEntry.tiers.map((tier) => (
-                  <option key={tier} value={tier}>
-                    {tier}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-content-subtle">
+                  {getTierLabel(newType)}
+                </label>
+                <select
+                  value={newSpecTier}
+                  onChange={(event) => setNewSpecTier(event.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">Select {getTierLabel(newType).toLowerCase()}</option>
+                  {selectedSpecEntry.tiers.map((tier) => (
+                    <option key={tier} value={tier}>
+                      {tier}
+                    </option>
+                  ))}
+                </select>
+              </div>
             ) : null}
-            <button
-              type="button"
-              onClick={handleAddSubject}
-              disabled={subjectSaving || specEntries.length === 0}
-              className={buttonStyles({ variant: 'primary' })}
-            >
-              <Plus className="h-4 w-4" />
-              {subjectSaving ? 'Adding...' : 'Add'}
-            </button>
+            <div className="flex flex-col gap-1.5">
+              <span className="invisible text-xs font-medium">Add</span>
+              <button
+                type="button"
+                onClick={handleAddSubject}
+                disabled={subjectSaving || specEntries.length === 0}
+                className={buttonStyles({ variant: 'primary' })}
+              >
+                <Plus className="h-4 w-4" />
+                {subjectSaving ? 'Adding...' : 'Add'}
+              </button>
+            </div>
           </div>
 
           {selectedSpecLabel ? (

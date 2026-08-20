@@ -26,6 +26,26 @@ export type GradeScaleId =
  * (Mathematics Standard/Basic), IB calls it Higher/Standard Level. */
 export type TierScheme = { readonly label: string; readonly values: readonly string[] };
 
+/** Buckets qualifications for the picker so a long, flat list (16 India entrance exams
+ * alongside the school boards) reads as grouped headings instead of one continuous list. */
+export type QualificationGroup = 'school' | 'engineering' | 'medical' | 'other';
+
+export const QUALIFICATION_GROUP_LABELS: Record<QualificationGroup, string> = {
+  school: 'School Boards',
+  engineering: 'Engineering Entrance',
+  medical: 'Medical Entrance',
+  other: 'Other Competitive Exams',
+};
+
+/** Order the groups should appear in the picker, regardless of declaration order in
+ * QUALIFICATIONS. */
+export const QUALIFICATION_GROUP_ORDER: readonly QualificationGroup[] = [
+  'school',
+  'engineering',
+  'medical',
+  'other',
+];
+
 export type QualificationDef = {
   /** Stable slug. Also the value stored in exam_practice_attempts.exam_type. */
   readonly id: string;
@@ -43,6 +63,10 @@ export type QualificationDef = {
   readonly tier?: TierScheme;
   /** Listed in the picker but not yet seeded in the curriculum tables. */
   readonly comingSoon?: boolean;
+  /** Headings this qualification sits under in the picker. Most have one; a few state CETs
+   * (EAMCET/EAPCET, KEAM) examine both an engineering stream and a medical/agriculture one
+   * under a single exam, so they appear under both headings. */
+  readonly groups: readonly QualificationGroup[];
 };
 
 const UK_BOARDS = ['aqa', 'edexcel', 'ocr'] as const;
@@ -57,6 +81,7 @@ export const QUALIFICATIONS = [
     boards: UK_BOARDS,
     gradeScale: 'gcse',
     tier: { label: 'Tier', values: ['Foundation', 'Higher'] },
+    groups: ['school'],
   },
   {
     id: 'a-level',
@@ -66,6 +91,7 @@ export const QUALIFICATIONS = [
     country: 'uk',
     boards: UK_BOARDS,
     gradeScale: 'a-level',
+    groups: ['school'],
   },
   {
     id: 'cbse-10',
@@ -76,6 +102,7 @@ export const QUALIFICATIONS = [
     boards: ['cbse'],
     gradeScale: 'cbse',
     tier: { label: 'Level', values: ['Standard', 'Basic'] },
+    groups: ['school'],
   },
   {
     id: 'cbse-12',
@@ -85,6 +112,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['cbse'],
     gradeScale: 'cbse',
+    groups: ['school'],
   },
   {
     id: 'icse',
@@ -94,6 +122,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['cisce'],
     gradeScale: 'cisce-icse',
+    groups: ['school'],
   },
   {
     id: 'isc',
@@ -103,6 +132,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['cisce'],
     gradeScale: 'cisce-isc',
+    groups: ['school'],
   },
   {
     id: 'ib-dp',
@@ -113,6 +143,7 @@ export const QUALIFICATIONS = [
     boards: ['ib'],
     gradeScale: 'ib-dp',
     tier: { label: 'Level', values: ['HL', 'SL'] },
+    groups: ['school'],
   },
   // Competitive entrance exams. They sit alongside the school qualifications rather than
   // replacing them — a Class 12 student typically studies for both. None is tiered: the
@@ -126,6 +157,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['nta'],
     gradeScale: 'jee-main',
+    groups: ['engineering'],
   },
   {
     id: 'jee-advanced',
@@ -135,6 +167,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['iit'],
     gradeScale: 'jee-advanced',
+    groups: ['engineering'],
   },
   {
     id: 'neet-ug',
@@ -144,6 +177,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['nta'],
     gradeScale: 'neet-ug',
+    groups: ['medical'],
   },
   {
     id: 'ts-eamcet',
@@ -153,6 +187,8 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['tsche'],
     gradeScale: 'eamcet',
+    // Engineering, Agriculture and Medical Common Entrance Test — one exam, two streams.
+    groups: ['engineering', 'medical'],
   },
   {
     id: 'ap-eapcet',
@@ -162,6 +198,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['apsche'],
     gradeScale: 'eamcet',
+    groups: ['engineering', 'medical'],
   },
   // State engineering CETs. All four examine Class 11-12 PCM/PCB on their own state board's
   // syllabus and report a rank, so they share one percentile ladder — rank alone is not
@@ -174,6 +211,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['mahacet'],
     gradeScale: 'state-cet',
+    groups: ['engineering'],
   },
   {
     id: 'keam',
@@ -183,6 +221,9 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['cee'],
     gradeScale: 'state-cet',
+    // Kerala Engineering Architecture Medical — engineering and medical/pharmacy streams
+    // under one exam.
+    groups: ['engineering', 'medical'],
   },
   {
     id: 'wbjee',
@@ -192,6 +233,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['wbjeeb'],
     gradeScale: 'state-cet',
+    groups: ['engineering'],
   },
   {
     id: 'comedk',
@@ -201,6 +243,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['comedk'],
     gradeScale: 'state-cet',
+    groups: ['engineering'],
   },
   // National and private-university entrance tests.
   {
@@ -211,6 +254,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['nta'],
     gradeScale: 'cuet',
+    groups: ['other'],
   },
   {
     id: 'bitsat',
@@ -220,6 +264,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['bits'],
     gradeScale: 'bitsat',
+    groups: ['engineering'],
   },
   {
     id: 'viteee',
@@ -229,6 +274,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['vit'],
     gradeScale: 'private-univ-entrance',
+    groups: ['engineering'],
   },
   {
     id: 'srmjeee',
@@ -238,6 +284,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['srm'],
     gradeScale: 'private-univ-entrance',
+    groups: ['engineering'],
   },
   // Non-engineering streams. Their papers are mostly not school subjects, which is why
   // subjects.ts carries slugs like 'legal reasoning' and 'verbal ability'.
@@ -249,6 +296,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['nlu'],
     gradeScale: 'clat',
+    groups: ['other'],
   },
   {
     id: 'nda',
@@ -258,6 +306,7 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['upsc'],
     gradeScale: 'nda',
+    groups: ['other'],
   },
   {
     id: 'ipmat',
@@ -267,13 +316,14 @@ export const QUALIFICATIONS = [
     country: 'india',
     boards: ['iim'],
     gradeScale: 'ipmat',
+    groups: ['other'],
   },
   // Not yet seeded. Listed so the picker can show them behind the "coming soon"
   // banner; each maps to its closest existing grade scale so the type resolves.
-  { id: 'ap', dbName: 'AP', label: 'AP (Advanced Placement)', level: 'HS', country: 'us', boards: [], gradeScale: 'a-level', comingSoon: true },
-  { id: 'ib-dp-intl', dbName: 'IB Diploma Programme (International)', label: 'IB Diploma Programme', level: 'Class 11-12', country: 'international', boards: [], gradeScale: 'ib-dp', comingSoon: true },
-  { id: 'cambridge-igcse', dbName: 'Cambridge IGCSE', label: 'Cambridge IGCSE', level: 'KS4', country: 'international', boards: [], gradeScale: 'gcse', comingSoon: true },
-  { id: 'cambridge-a-level', dbName: 'Cambridge International A-Level', label: 'Cambridge A-Level', level: 'KS5', country: 'international', boards: [], gradeScale: 'a-level', comingSoon: true },
+  { id: 'ap', dbName: 'AP', label: 'AP (Advanced Placement)', level: 'HS', country: 'us', boards: [], gradeScale: 'a-level', comingSoon: true, groups: ['school'] },
+  { id: 'ib-dp-intl', dbName: 'IB Diploma Programme (International)', label: 'IB Diploma Programme', level: 'Class 11-12', country: 'international', boards: [], gradeScale: 'ib-dp', comingSoon: true, groups: ['school'] },
+  { id: 'cambridge-igcse', dbName: 'Cambridge IGCSE', label: 'Cambridge IGCSE', level: 'KS4', country: 'international', boards: [], gradeScale: 'gcse', comingSoon: true, groups: ['school'] },
+  { id: 'cambridge-a-level', dbName: 'Cambridge International A-Level', label: 'Cambridge A-Level', level: 'KS5', country: 'international', boards: [], gradeScale: 'a-level', comingSoon: true, groups: ['school'] },
 ] as const satisfies readonly QualificationDef[];
 
 export type ExamType = (typeof QUALIFICATIONS)[number]['id'];
@@ -297,6 +347,18 @@ export const getQualifications = (country: Country): readonly QualificationDef[]
 
 export const getQualificationConfig = (country: Country, id: string): QualificationDef | null =>
   ALL.find((qual) => qual.country === country && qual.id === id) ?? null;
+
+/** Buckets a qualification list under each group heading it belongs to, in
+ * QUALIFICATION_GROUP_ORDER, skipping empty groups. A qualification with more than one
+ * group (e.g. EAMCET/EAPCET, KEAM) appears under each of its headings. */
+export const groupQualifications = (
+  quals: readonly QualificationDef[]
+): { group: QualificationGroup; label: string; items: readonly QualificationDef[] }[] =>
+  QUALIFICATION_GROUP_ORDER.map((group) => ({
+    group,
+    label: QUALIFICATION_GROUP_LABELS[group],
+    items: quals.filter((qual) => qual.groups.includes(group)),
+  })).filter((bucket) => bucket.items.length > 0);
 
 /** Maps an exam_type slug back to the exact `qualifications.name` it was derived from.
  * This value is used as a DB lookup key by resolveSpecificationId, so an unknown slug

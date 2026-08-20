@@ -50,3 +50,10 @@ next-env.d.ts
 DEMO_SCRIPT.md
 FEATURE_PLANNING.md
 .mcp.json
+
+# playwright / e2e
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+/e2e/.auth
