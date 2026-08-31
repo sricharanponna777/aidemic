@@ -259,6 +259,13 @@ export interface PlotScatterData {
   connectPoints: boolean; // true for cumulative frequency graphs
   xAxisMax: number;
   yAxisMax: number;
+  // Axis intervals are derived from the point coordinates at generation time so every
+  // correct point lands on a minor gridline (see deriveAxisFromValues). They are stored
+  // rather than re-derived in the browser because the student-facing spec blanks the y
+  // coordinates -- without the stored step, drag-snapping could not reach the answer.
+  // Optional: specs generated before this field existed fall back to re-deriving.
+  xAxisStep?: number;
+  yAxisStep?: number;
 }
 
 export interface PlotHistogramBar {

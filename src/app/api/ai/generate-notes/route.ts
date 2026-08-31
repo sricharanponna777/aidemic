@@ -49,12 +49,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
-      videoId: row.id,
-      status: row.status,
-      slides: normalizeGeneratedSlides(row.video_url ? JSON.parse(row.video_url) : []),
-      script: normalizeGeneratedText(row.script_content || ''),
-    });
+    // `private`, not `public`: a shared/CDN cache keyed only on this URL would
+    // serve one user's notes to anyone who guesses the id. Only cache once
+    // generation has actually finished — content is immutable after that.
+    const headers = row.status === 'completed' ? { 'Cache-Control': 'private, max-age=3600' } : undefined;
+
+    return NextResponse.json(
+      {
+        videoId: row.id,
+        status: row.status,
+        slides: normalizeGeneratedSlides(row.video_url ? JSON.parse(row.video_url) : []),
+        script: normalizeGeneratedText(row.script_content || ''),
+      },
+      headers ? { headers } : undefined
+    );
   } catch (error) {
     console.error('GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch content' }, { status: 500 });
@@ -99,6 +107,42 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Every field below shapes the generation prompt, so an exact match here
+    // means the AI would produce equivalent notes -- reuse them instead of
+    // spending a generation call (and the student's daily AI quota) on
+    // content that already exists. Checked before the rate limit for the same
+    // reason: reopening old notes shouldn't count against it.
+    const matchParams = {
+      concept: concept || 'General revision',
+      subject,
+      duration: parseInt(duration, 10),
+      exam_board: examBoard || '',
+      exam_type: examType || '',
+      specification: specification || '',
+      subtopic: subtopic || '',
+      learning_objective: learningObjective || '',
+      paper: paper || '',
+    };
+
+    const { data: existing } = await supabase
+      .from('generated_videos')
+      .select('id, video_url, script_content')
+      .eq('user_id', user.id)
+      .eq('status', 'completed')
+      .match(matchParams)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      return NextResponse.json({
+        videoId: existing.id,
+        status: 'completed',
+        slides: normalizeGeneratedSlides(existing.video_url ? JSON.parse(existing.video_url) : []),
+        script: normalizeGeneratedText(existing.script_content || ''),
+      });
+    }
+
     const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.generateVideo);
     if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
 
@@ -109,15 +153,13 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         flashcard_id: flashcardId ?? null,
-        concept: concept || 'General revision',
-        subject,
         style: 'study-notes',
-        duration: parseInt(duration, 10),
         service_used: 'ai-compatible',
         status: 'completed',
         video_url: JSON.stringify(slides),
         script_content: script,
         completed_at: new Date().toISOString(),
+        ...matchParams,
       })
       .select()
       .single();

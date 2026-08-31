@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-vi.mock('../curriculum/resolve', async (importOriginal) => ({
-  // attributeQuestions is pure and doing its real lexical work is the point --
-  // only the DB-backed resolveTopic is faked.
-  ...(await importOriginal<typeof import('../curriculum/resolve')>()),
-  resolveTopic: vi.fn(),
-}));
+// attributeQuestions is pure and doing its real lexical work is the point --
+// only the DB-backed resolveTopic (now reached via the cache wrapper) is faked.
+vi.mock('../curriculum/cache', () => ({ cachedResolveTopic: vi.fn() }));
 vi.mock('../ai/classifySubtopic', () => ({ classifyQuestionsToSubtopics: vi.fn() }));
 vi.mock('./record', () => ({ recordMasteryEvents: vi.fn() }));
 
-import { resolveTopic } from '../curriculum/resolve';
+import { cachedResolveTopic as resolveTopic } from '../curriculum/cache';
 import { classifyQuestionsToSubtopics } from '../ai/classifySubtopic';
 import { recordMasteryEvents, type EvidenceInput } from './record';
 import { recordBlurtEvidence } from './fromBlurt';

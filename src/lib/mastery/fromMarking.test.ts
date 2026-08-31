@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-vi.mock('../curriculum/resolve', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../curriculum/resolve')>()),
-  resolveTopic: vi.fn(),
-}));
+vi.mock('../curriculum/cache', () => ({ cachedResolveTopic: vi.fn() }));
 vi.mock('../ai/classifySubtopic', () => ({ classifyQuestionsToSubtopics: vi.fn() }));
 vi.mock('./record', () => ({ recordMasteryEvents: vi.fn() }));
 
-import { resolveTopic } from '../curriculum/resolve';
+import { cachedResolveTopic as resolveTopic } from '../curriculum/cache';
 import { classifyQuestionsToSubtopics } from '../ai/classifySubtopic';
 import { recordMasteryEvents, type EvidenceInput } from './record';
 import { recordMarkingEvidence } from './fromMarking';

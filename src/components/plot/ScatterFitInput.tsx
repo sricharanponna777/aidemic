@@ -110,8 +110,10 @@ const FIT_OPTIONS = [
 ];
 
 export function ScatterFitInput({ spec, value, onChange, readOnly = false, correctValue }: ScatterFitInputProps) {
-  const xAxis = deriveAxisFromValues(spec.givenPoints.map((point) => point.x));
-  const yAxis = deriveAxisFromValues(spec.givenPoints.map((point) => point.y));
+  // Read the stored axes rather than re-deriving from givenPoints: those coordinates
+  // are the answer key, so the student-facing spec blanks their y values.
+  const xAxis = { max: spec.xAxisMax, step: spec.xAxisStep ?? deriveAxisFromValues([spec.xAxisMax]).step };
+  const yAxis = { max: spec.yAxisMax, step: spec.yAxisStep ?? deriveAxisFromValues([spec.yAxisMax]).step };
   const [local, setLocal] = useState<ScatterValue>(() => value ?? { points: defaultPoints(spec, yAxis.max), fitShape: 'none' });
 
   const emit = (next: ScatterValue) => {

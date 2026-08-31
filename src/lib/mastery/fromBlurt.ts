@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { resolveTopic, attributeQuestions } from '../curriculum/resolve';
+import { attributeQuestions } from '../curriculum/resolve';
+import { cachedResolveTopic } from '../curriculum/cache';
 import { classifyQuestionsToSubtopics } from '../ai/classifySubtopic';
 import { recordMasteryEvents, type EvidenceInput } from './record';
 
@@ -40,8 +41,7 @@ export async function recordBlurtEvidence(
   input: BlurtEvidenceInput
 ): Promise<void> {
   try {
-    const resolved = await resolveTopic(
-      admin,
+    const resolved = await cachedResolveTopic(
       { subject: input.subject, examBoard: input.examBoard, examType: input.examType },
       input.topic
     );

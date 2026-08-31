@@ -25,6 +25,17 @@ AIDemic is an AI-powered study platform built on **Next.js 16 App Router** with 
 
 Middleware in [src/proxy.ts](src/proxy.ts) guards `/dashboard/*` routes using `supabase.auth.getUser()`. Unauthenticated requests redirect to `/login`; authenticated users visiting `/login` redirect to `/dashboard`. Role gating for `/dashboard/teacher/*`, `/dashboard/admin/*`, and `/dashboard/parent/*` is also enforced here (defense-in-depth only — RLS is the real backstop).
 
+The matcher is deliberately **wider than the routes it authenticates**, because the same middleware sets the Content-Security-Policy (see below). `requiresAuthCheck()` gates the Supabase client and its `getClaims()` round trip to the original prefixes, so widening the matcher did not put a database call on every request.
+
+### Content-Security-Policy
+
+Built per request in [src/lib/csp.ts](src/lib/csp.ts) and set by the middleware, not by `next.config.ts` — a nonce cannot be a static header. There are **two policies**, and the split is load-bearing:
+
+- **`/dashboard/*`** gets `'nonce-…' 'strict-dynamic'` and no `'unsafe-inline'`. Next can only stamp a nonce onto its inline bootstrap scripts on pages it renders **per request**, which is why [src/app/dashboard/layout.tsx](src/app/dashboard/layout.tsx) is a thin server wrapper carrying `export const dynamic = 'force-dynamic'` around the client shell in `DashboardShell.tsx`. Remove that flag and every dashboard page is prerendered, its script tags lose the nonce, and the browser blanks the app.
+- **Everything else** keeps `'unsafe-inline'`. Public pages are statically prerendered, so their script tags cannot carry a nonce; sending one would block every script. They hold no session and no user data.
+
+Neither policy allows `'unsafe-eval'` in production — nothing in the client bundle calls `eval()` or `new Function()`. `style-src` keeps `'unsafe-inline'` in both: React writes element style props as inline style attributes and KaTeX injects its own, and `style-src-attr` has no nonce mechanism at all.
+
 ### Roles
 
 `user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student. Linking is **parent-initiated** (migration `20260801000000`): a parent enters the student's email or username via `request_parent_link()` — from onboarding or [src/app/dashboard/parent/layout.tsx](src/app/dashboard/parent/layout.tsx) — which inserts a `pending` row with `link_source='parent'`; the student then accepts or declines it on [src/app/dashboard/family/page.tsx](src/app/dashboard/family/page.tsx) via `accept_parent_link_request()` / `decline_parent_link_request()`.
@@ -108,6 +119,24 @@ All TypeScript interfaces are in [src/types.ts](src/types.ts). Add new shared ty
 
 Tailwind CSS 4 with PostCSS. Dark/light theme is stored in `localStorage` under the key `aidemic-theme` and managed by [src/hooks/useTheme.ts](src/hooks/useTheme.ts). Icons come from Lucide React.
 
+## Assignment answer keys
+
+[src/lib/assignments/studentSafeSpecs.ts](src/lib/assignments/studentSafeSpecs.ts) projects `PlotSpec` and `DiagramSpec` down to what a student may see, and [src/app/api/assignments/[assignmentId]/route.ts](src/app/api/assignments/[assignmentId]/route.ts) applies it to every question of an **in-progress** attempt. A completed attempt still gets the full spec, because review has to show the right answer.
+
+Both spec types interleave the question with its answer key, so stripping `correctOption`/`markScheme`/`modelAnswer` at the question level was never enough — `correctLabel`, `correctValues`, `slot.correctOption` and the endpoints of connections the student must draw were all readable in the network tab. Four consequences worth knowing:
+
+- **The word bank is shuffled with a seed of `${assignmentId}:${index}`.** `labelBank` is built as "every blank node's correct label, in node order, then distractors", so its ordering alone gave away the mapping. The seed keeps the order stable across refreshes.
+- **Templated diagrams are resolved server-side** and `diagramTemplate` is withheld while in progress — the client re-resolves from template code bundled in the browser, which would regenerate the answers it had just been denied.
+- **Plot inputs may not derive axes or defaults from `correct*` fields.** They read the stored `yAxisMax`/`yAxisStep` instead, which `normalizeBar`/`normalizeLine` compute from exactly those values, so the axis is identical without reading the answer. `PlotScatterData` gained `xAxisStep`/`yAxisStep` for this reason: its y-axis step is chosen so every correct point lands on a snappable minor gridline, and re-deriving it from blanked coordinates would put the answer out of reach.
+- **`frequencyPolygon` has nothing to strip.** Its correct points are `((classStart+classEnd)/2, frequency)` — all given data. Histogram density is likewise recomputed from `frequency / (classEnd - classStart)` in the component.
+
+## Rate limiting
+
+Two separate limiters, both able to run without Redis but meaningfully weaker that way:
+
+- [src/lib/ipRateLimit.ts](src/lib/ipRateLimit.ts) — unauthenticated endpoints (`/api/auth`, `/api/auth/reset-password`). Backed by Upstash when configured so the window is shared across serverless instances; falls back to a per-process map on an outage rather than locking everyone out. **`getClientIp` counts back from the right of `X-Forwarded-For`** by `RATE_LIMIT_TRUSTED_PROXY_HOPS` (default 1): that header is a list each proxy appends to, so reading the leftmost entry let anyone reset their own limit by forging one. `checkIpRateLimit` is **async** — await it.
+- [src/lib/ai/rateLimit.ts](src/lib/ai/rateLimit.ts) — per-user daily caps per AI route, via the `increment_ai_usage()` RPC. When the RPC itself errors it now **fails closed in production** and open in dev; `AI_RATE_LIMIT_FAIL_CLOSED` overrides both. Failing open there turns a database hiccup into an uncapped provider bill.
+
 ## Environment Variables
 
 Copy `.env.local.example` to `.env.local`. Required variables:
@@ -123,12 +152,14 @@ See `.env.local.example` for the full list including OpenRouter and local LLM op
 
 Optional, for transactional email (see below): `BREVO_API_KEY`, `BREVO_SMTP_FROM`, `APP_NAME`, `APP_URL`, `SUPPORT_EMAIL`. If any is unset, emails are skipped with a console warning and signup still works.
 
+Optional, `ROLE_CACHE_SECRET`: signs the short-lived cookie [src/proxy.ts](src/proxy.ts) uses to skip the `user_profiles` role-check query on most dashboard navigations (defense-in-depth only -- RLS is the real backstop). Unset just disables the cache; every request re-queries as before.
+
 ### Transactional email (Brevo API)
 
 Emails are sent through the Brevo HTTP API (`https://api.brevo.com/v3/smtp/email`) with `fetch` — there is no SMTP client or Nodemailer dependency. Two consumers:
 
 - The Next app, via [src/lib/email.ts](src/lib/email.ts) and [src/lib/email-mailer.ts](src/lib/email-mailer.ts). Server-only (no `NEXT_PUBLIC_` prefix); returns ok: false and skips rather than throwing when unconfigured, so a missing email can never break a user flow.
-- The weekly digest Edge Function, over **public HTTPS** to [src/app/api/email/bulk/route.ts](src/app/api/email/bulk/route.ts).
+- The weekly digest Edge Function, over **public HTTPS** to [src/app/api/email/bulk/route.ts](src/app/api/email/bulk/route.ts). That route **fails closed**: with `BULK_EMAIL_SECRET` unset it answers 503 and sends nothing, in every environment including dev. It also caps a batch at 100 messages, rejects a body over 1 MB, and validates every message before sending any of them. `sendBulkEmail` sends with a concurrency of 5 rather than strictly in sequence.
 
 **Password reset does not use Supabase's mailer.** [src/app/api/auth/reset-password/route.ts](src/app/api/auth/reset-password/route.ts) calls `auth.admin.generateLink({ type: 'recovery' })`, which mints the token *without* sending anything, then sends the `password-reset` template through Brevo. The link it builds is `${APP_URL}/auth/confirm?token_hash=…&type=recovery&next=/login?mode=reset`, redeemed server-side by [src/app/auth/confirm/route.ts](src/app/auth/confirm/route.ts) via `verifyOtp`. Consequences worth knowing:
 
