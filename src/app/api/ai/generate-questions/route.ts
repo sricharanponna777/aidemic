@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
+import { getOrSetCache } from '@/lib/redis';
 import { OPENAI_DEFAULT_BASE_URL, buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import {
@@ -1029,7 +1030,7 @@ const getSources = (questions: ExamQuestion[]): SourceReference[] => {
 };
 
 async function validateTopicWithAI(
-  payload: ReturnType<typeof normalizePayload>,
+  payload: Pick<ReturnType<typeof normalizePayload>, 'topic' | 'subject' | 'examBoard' | 'examType' | 'specification'>,
   config: ReturnType<typeof getAIConfig>
 ): Promise<{ valid: boolean; reason: string }> {
   const { topic, subject, examBoard, examType, specification } = payload;
@@ -1081,6 +1082,19 @@ async function validateTopicWithAI(
     return { valid: true, reason: '' }; // fail open on any error
   }
 }
+
+/**
+ * Cached spec-validation gate. Runs at temperature 0 with no side effects, so
+ * the verdict is the same for every student on the same course asking about
+ * the same topic — safe to share across requests, unlike question generation
+ * itself, which should stay fresh on every call.
+ */
+const cachedValidateTopicWithAI = (
+  fields: Pick<ReturnType<typeof normalizePayload>, 'topic' | 'subject' | 'examBoard' | 'examType' | 'specification'>
+) => {
+  const key = `ai:topic-validation:${JSON.stringify([fields.subject, fields.examBoard, fields.examType, fields.specification, fields.topic])}`;
+  return getOrSetCache(key, 60 * 60 * 24 * 7, () => validateTopicWithAI(fields, getAIConfig()));
+};
 
 export async function POST(request: Request) {
   try {
@@ -1148,7 +1162,13 @@ export async function POST(request: Request) {
 
     // AI spec validation — skip for English Language (fixed paper formats have their own logic)
     if (!englishLanguagePaper) {
-      const specCheck = await validateTopicWithAI(payload, config);
+      const specCheck = await cachedValidateTopicWithAI({
+        topic: payload.topic,
+        subject: payload.subject,
+        examBoard: payload.examBoard,
+        examType: payload.examType,
+        specification: payload.specification,
+      });
       if (!specCheck.valid) {
         return NextResponse.json({ error: specCheck.reason }, { status: 400 });
       }

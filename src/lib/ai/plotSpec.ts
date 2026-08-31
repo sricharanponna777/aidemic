@@ -138,10 +138,21 @@ const normalizeScatter = (raw: unknown): PlotScatterData | null => {
   if (!xLabel || !yLabel || !givenPoints || (fitShape !== 'line' && fitShape !== 'curve' && fitShape !== 'none')) return null;
   const fitDescription = txt(String(record.fitDescription ?? ''), 300);
   const connectPoints = Boolean(record.connectPoints);
-  const xAxisMax = deriveAxisFromValues(givenPoints.map((p) => p.x)).max;
-  const yAxisMax = deriveAxisFromValues(givenPoints.map((p) => p.y)).max;
+  const xAxis = deriveAxisFromValues(givenPoints.map((p) => p.x));
+  const yAxis = deriveAxisFromValues(givenPoints.map((p) => p.y));
 
-  return { xLabel, yLabel, givenPoints, fitShape, fitDescription, connectPoints, xAxisMax, yAxisMax };
+  return {
+    xLabel,
+    yLabel,
+    givenPoints,
+    fitShape,
+    fitDescription,
+    connectPoints,
+    xAxisMax: xAxis.max,
+    yAxisMax: yAxis.max,
+    xAxisStep: xAxis.step,
+    yAxisStep: yAxis.step,
+  };
 };
 
 const normalizeHistogram = (raw: unknown): PlotHistogramData | null => {

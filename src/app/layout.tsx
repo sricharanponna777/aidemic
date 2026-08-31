@@ -1,19 +1,28 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import { SfxProvider } from "@/components/SfxProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 
-const spaceGrotesk = Space_Grotesk({
+// Self-hosted rather than next/font/google: that helper fetches the font files from
+// fonts.gstatic.com during `next build`, so a build could only succeed with outbound
+// network access and could silently pick up a different file revision over time.
+// These are the same latin-subset variable faces, committed to the repo.
+const spaceGrotesk = localFont({
+  src: "./fonts/SpaceGrotesk-latin-variable.woff2",
   variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: "300 700", // one variable file spans the whole range
+  display: "swap",
+  fallback: ["system-ui", "sans-serif"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/GeistMono-latin-variable.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+  display: "swap",
+  fallback: ["ui-monospace", "monospace"],
 });
 
 export const metadata: Metadata = {

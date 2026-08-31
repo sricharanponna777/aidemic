@@ -44,7 +44,11 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
 
-      return NextResponse.json({ podcast: row });
+      // `private`, not `public`: a shared/CDN cache keyed only on this URL would
+      // serve one user's podcast to anyone who guesses the id. The row is only
+      // ever inserted once its audio has finished generating, so it's always
+      // safe to cache once found.
+      return NextResponse.json({ podcast: row }, { headers: { 'Cache-Control': 'private, max-age=3600' } });
     }
 
     const { data: rows, error } = await supabase

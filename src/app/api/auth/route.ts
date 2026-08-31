@@ -7,7 +7,7 @@ import { checkIpRateLimit, getClientIp } from '@/lib/ipRateLimit';
 export async function POST(request: Request) {
   try {
     // Coarse per-IP throttle so this session-setting endpoint can't be hammered.
-    if (!checkIpRateLimit(`auth:${getClientIp(request)}`, 20, 60_000)) {
+    if (!(await checkIpRateLimit(`auth:${getClientIp(request)}`, 20, 60_000))) {
       return NextResponse.json({ error: 'Too many requests. Please slow down.' }, { status: 429 });
     }
 

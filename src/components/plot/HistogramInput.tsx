@@ -81,7 +81,7 @@ interface HistogramInputProps {
 export function HistogramInput({ spec, value, onChange, readOnly = false, correctValues }: HistogramInputProps) {
   const xMin = Math.min(...spec.bars.map((b) => b.classStart));
   const xMax = Math.max(...spec.bars.map((b) => b.classEnd));
-  const yMax = Math.max(...spec.bars.map((b) => b.correctFrequencyDensity), 1) * 1.25;
+  const yMax = Math.max(...spec.bars.map((b) => b.frequency / (b.classEnd - b.classStart)), 1) * 1.25;
 
   const [localValues, setLocalValues] = useState<number[]>(() => value ?? spec.bars.map(() => 0));
 

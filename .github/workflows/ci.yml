@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes the in-flight run redundant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    env:
+      # Placeholders, not secrets. `next build` prerenders pages whose modules read
+      # these at import time, so they have to parse as a URL and a key -- nothing in
+      # the build actually connects to Supabase.
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # --frozen-lockfile: CI must build the dependency tree the lockfile pins, and
+      # fail loudly if package.json and bun.lock have drifted, rather than quietly
+      # resolving something nobody has run locally.
+      - run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Unit tests
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # Reports without failing the run. Every advisory currently outstanding is in a
+      # transitive dependency pinned by `next` (sharp, postcss, nanoid) or `eslint`
+      # (js-yaml, brace-expansion), so there is no version of them this repo can choose
+      # -- a blocking gate here would fail every PR for something no PR can fix. Read
+      # the output, and drop continue-on-error once the tree is clean.
+      - name: bun audit
+        run: bun audit
+        continue-on-error: true
+
+  e2e:
+    name: E2E smoke
+    runs-on: ubuntu-latest
+    # Opt-in: the suite creates real accounts and writes real rows, so it only runs
+    # when E2E_BASE_URL points at a deployment wired to a disposable Supabase branch.
+    # See e2e/README.md -- never point this at production.
+    if: vars.E2E_BASE_URL != ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run smoke suite
+        run: bun run test:e2e
+        env:
+          E2E_BASE_URL: ${{ vars.E2E_BASE_URL }}
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

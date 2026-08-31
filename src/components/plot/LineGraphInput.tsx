@@ -111,7 +111,7 @@ const FIT_OPTIONS = [
 export function LineGraphInput({ spec, value, yAxisChoice, xAxisChoice, onChange, readOnly = false, correctValue }: LineGraphInputProps) {
   const xValues = spec.points.map((p) => p.x);
   const defaultXAxis = deriveAxisFromValues(xValues);
-  const defaultYAxis = deriveAxisFromValues(spec.correctYValues);
+  const defaultYAxis = { max: spec.yAxisMax, step: spec.yAxisStep };
   const [local, setLocal] = useState<LineGraphValue>(
     () => value ?? { yValues: spec.points.map(() => defaultYAxis.max * 0.4), fitShape: 'none' }
   );

@@ -152,6 +152,50 @@ export async function sendEmail(input: {
   }
 }
 
+// Brevo is called concurrently but never more than this many at a time: sending a
+// 100-parent digest strictly in sequence took 100 round-trips end to end, while an
+// unbounded Promise.all would fire 100 at once and trip Brevo's own rate limiting.
+const BULK_SEND_CONCURRENCY = 5;
+
+type BulkResult = { to: string; status: 'sent' | 'failed'; error?: string };
+
+async function sendOne(
+  msg: { to: string; template: string; data: TemplateData },
+  config: { apiKey: string; from: string }
+): Promise<BulkResult> {
+  try {
+    const rendered = await renderTemplate(msg.template, msg.data);
+
+    const response = await fetch(BREVO_API_URL, {
+      method: 'POST',
+      headers: {
+        'api-key': config.apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: parseFromAddress(config.from),
+        to: [{ email: msg.to }],
+        subject: rendered.subject,
+        htmlContent: rendered.html,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`[email-bulk] sent to ${msg.to} (${data.messageId})`);
+      return { to: msg.to, status: 'sent' };
+    }
+
+    const errorMsg = await response.text().catch(() => `HTTP ${response.status}`);
+    console.error(`[email-bulk] failed for ${msg.to}: ${errorMsg}`);
+    return { to: msg.to, status: 'failed', error: errorMsg };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[email-bulk] failed for ${msg.to}:`, errorMsg);
+    return { to: msg.to, status: 'failed', error: errorMsg };
+  }
+}
+
 export async function sendBulkEmail(input: {
   messages: Array<{
     to: string;
@@ -163,11 +207,7 @@ export async function sendBulkEmail(input: {
   total: number;
   sent: number;
   failed: number;
-  results: Array<{
-    to: string;
-    status: 'sent' | 'failed';
-    error?: string;
-  }>;
+  results: BulkResult[];
 }> {
   const config = getBrevoConfig();
   if (!config) {
@@ -184,51 +224,25 @@ export async function sendBulkEmail(input: {
     };
   }
 
-  const results: Array<{
-    to: string;
-    status: 'sent' | 'failed';
-    error?: string;
-  }> = [];
+  // Results are written by index, so the response stays in request order however
+  // the concurrent sends happen to interleave.
+  const results = new Array<BulkResult>(input.messages.length);
+  let next = 0;
 
-  let sent = 0;
-  let failed = 0;
-
-  for (const msg of input.messages) {
-    try {
-      const rendered = await renderTemplate(msg.template, msg.data);
-
-      const response = await fetch(BREVO_API_URL, {
-        method: 'POST',
-        headers: {
-          'api-key': config.apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sender: parseFromAddress(config.from),
-          to: [{ email: msg.to }],
-          subject: rendered.subject,
-          htmlContent: rendered.html,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        results.push({ to: msg.to, status: 'sent' });
-        sent += 1;
-        console.log(`[email-bulk] sent to ${msg.to} (${data.messageId})`);
-      } else {
-        const errorMsg = await response.text().catch(() => `HTTP ${response.status}`);
-        results.push({ to: msg.to, status: 'failed', error: errorMsg });
-        failed += 1;
-        console.error(`[email-bulk] failed for ${msg.to}: ${errorMsg}`);
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      results.push({ to: msg.to, status: 'failed', error: errorMsg });
-      failed += 1;
-      console.error(`[email-bulk] failed for ${msg.to}:`, errorMsg);
+  const worker = async () => {
+    while (next < input.messages.length) {
+      const index = next;
+      next += 1;
+      results[index] = await sendOne(input.messages[index]!, config);
     }
-  }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(BULK_SEND_CONCURRENCY, input.messages.length) }, worker)
+  );
+
+  const sent = results.filter((r) => r.status === 'sent').length;
+  const failed = results.length - sent;
 
   return {
     ok: failed === 0,

@@ -1,14 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { bandScale, clamp, deriveAxisFromValues, snapToStep } from '@/lib/plot/scale';
+import { bandScale, clamp, snapToStep } from '@/lib/plot/scale';
 import type { AxisScaleChoice } from '@/lib/plot/scaleRules';
 import { getOwnerSvg, svgPointFromEvent } from '@/lib/plot/svgPointer';
 import type { PlotBarData } from '@/types';
 import { AxisScaleInput } from './AxisScaleInput';
 import { PlotCanvas, usePlotScale } from './PlotCanvas';
 
-const defaultValues = (spec: PlotBarData) => spec.categories.map(() => deriveAxisFromValues(spec.correctValues).max * 0.4);
+const defaultValues = (spec: PlotBarData) => spec.categories.map(() => spec.yAxisMax * 0.4);
 
 function CategoryLabels({ spec }: { spec: PlotBarData }) {
   const { plotLeft, plotRight, plotBottom } = usePlotScale();
@@ -98,7 +98,7 @@ interface BarChartInputProps {
 }
 
 export function BarChartInput({ spec, value, axisChoice, onChange, readOnly = false, correctValues }: BarChartInputProps) {
-  const defaultAxis = deriveAxisFromValues(spec.correctValues);
+  const defaultAxis = { max: spec.yAxisMax, step: spec.yAxisStep };
   const [localValues, setLocalValues] = useState<number[]>(() => value ?? defaultValues(spec));
   const [localAxis, setLocalAxis] = useState<AxisScaleChoice>(() => axisChoice ?? defaultAxis);
 

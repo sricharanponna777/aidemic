@@ -40,36 +40,68 @@ describe('POST /api/email/bulk', () => {
     expect(response.status).toBe(401);
   });
 
-  it('allows requests without API key when BULK_EMAIL_SECRET is unset (dev mode)', async () => {
+  it('refuses to send at all when BULK_EMAIL_SECRET is unset, in every environment', async () => {
+    // This used to skip the auth check entirely and send, which meant a deploy that
+    // forgot one env var silently exposed an unauthenticated "send mail as us" endpoint.
     delete process.env.BULK_EMAIL_SECRET;
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ messageId: 'test' }), { status: 200 })
-    );
+    const sendSpy = vi.spyOn(globalThis, 'fetch');
 
     const request = new Request('http://localhost:3000/api/email/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [] }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+    expect(response.status).toBe(503);
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a batch larger than the 100-message cap', async () => {
+    const sendSpy = vi.spyOn(globalThis, 'fetch');
+    const messages = Array.from({ length: 101 }, (_, i) => ({
+      to: `user${i}@example.com`,
+      template: 'welcome',
+      data: {},
+    }));
+
+    const request = new Request('http://localhost:3000/api/email/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'test-secret' },
+      body: JSON.stringify({ messages }),
+    });
+
+    const response = await POST(request as unknown as NextRequest);
+    expect(response.status).toBe(400);
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed recipient before sending anything', async () => {
+    const sendSpy = vi.spyOn(globalThis, 'fetch');
+    const request = new Request('http://localhost:3000/api/email/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'test-secret' },
       body: JSON.stringify({
-        messages: [
-          {
-            to: 'user@example.com',
-            template: 'welcome',
-            data: {
-              appName: 'TestApp',
-              supportEmail: 'support@example.com',
-              firstName: 'Test',
-              intro: 'Welcome',
-              actionLabel: 'Go',
-              actionUrl: 'https://test.example.com',
-              highlights: '<div></div>',
-            },
-          },
-        ],
+        messages: [{ to: 'not-an-email', template: 'welcome', data: {} }],
       }),
     });
 
     const response = await POST(request as unknown as NextRequest);
-    expect(response.status).toBeLessThan(400);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('messages[0].to') });
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a nested object in template data', async () => {
+    const request = new Request('http://localhost:3000/api/email/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'test-secret' },
+      body: JSON.stringify({
+        messages: [{ to: 'user@example.com', template: 'welcome', data: { nested: { a: 1 } } }],
+      }),
+    });
+
+    expect((await POST(request as unknown as NextRequest)).status).toBe(400);
   });
 
   it('returns proper bulk email response format', async () => {

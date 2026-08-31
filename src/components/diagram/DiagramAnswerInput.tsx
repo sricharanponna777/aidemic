@@ -461,6 +461,11 @@ export function DiagramAnswerInput({ diagramSpec: rawDiagramSpec, value, onChang
     window.addEventListener('pointerup', onUp);
   };
 
+  // A blank node has no correctLabel outside review (the student-facing spec strips it),
+  // so its chip is labelled with whatever the student typed, falling back to the node id.
+  const endpointLabel = (node: DiagramNode | undefined) =>
+    node ? labelsMap.get(node.id)?.trim() || node.correctLabel || node.id : '?';
+
   const nodeState = (node: DiagramNode): 'given' | 'editing' | 'filled' | 'blank' | 'correct' | 'wrong' => {
     if (node.given) return 'given';
     if (readOnly) {
@@ -1112,7 +1117,7 @@ export function DiagramAnswerInput({ diagramSpec: rawDiagramSpec, value, onChang
                 onClick={() => removeConnection(index)}
                 className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 transition hover:border-amber-500 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
               >
-                {(from?.correctLabel || from?.id) ?? '?'} → {(to?.correctLabel || to?.id) ?? '?'}
+                {endpointLabel(from)} → {endpointLabel(to)}
                 <X className="h-3 w-3" aria-hidden />
               </button>
             );

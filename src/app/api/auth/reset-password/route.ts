@@ -34,8 +34,8 @@ export async function POST(request: Request) {
     // against a burst from a single client, one so no single inbox can be
     // mail-bombed from rotating addresses.
     if (
-      !checkIpRateLimit(`reset-password:ip:${getClientIp(request)}`, 5, 60_000) ||
-      !checkIpRateLimit(`reset-password:email:${email}`, 3, 900_000)
+      !(await checkIpRateLimit(`reset-password:ip:${getClientIp(request)}`, 5, 60_000)) ||
+      !(await checkIpRateLimit(`reset-password:email:${email}`, 3, 900_000))
     ) {
       return NextResponse.json(
         { error: 'Too many reset requests. Please wait a few minutes and try again.' },
