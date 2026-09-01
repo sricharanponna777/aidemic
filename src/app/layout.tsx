@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "katex/dist/katex.min.css";
 import "./globals.css";
-import { SfxProvider } from "@/components/SfxProvider";
 import { ToastProvider } from "@/components/ToastProvider";
 
 // Self-hosted rather than next/font/google: that helper fetches the font files from
@@ -84,9 +83,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitializer }} />
       </head>
       <body className={`${spaceGrotesk.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}>
-        <SfxProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </SfxProvider>
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );

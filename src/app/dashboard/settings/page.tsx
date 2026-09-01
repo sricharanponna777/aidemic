@@ -4,9 +4,8 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, hasChosenTheme, useTheme } from "@/hooks/useTheme";
-import { useSfxMuted } from "@/hooks/useSfxMuted";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Moon, Settings as SettingsIcon, Sun, Target, Volume2, VolumeX } from "lucide-react";
+import { BookOpen, LogOut, Moon, Settings as SettingsIcon, Sun, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
 import { Alert, Label, fieldStyles } from "@/components/ui/field";
@@ -48,7 +47,6 @@ export default function Settings() {
   const [isLoading, setIsLoading] = useState(false);
   const [isThemeSaving, setIsThemeSaving] = useState(false);
   const { theme, setTheme } = useTheme();
-  const { muted, toggleMuted } = useSfxMuted();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -325,26 +323,6 @@ export default function Settings() {
           {isThemeSaving ? "Saving preference…" : "Preference is saved to your profile."}
         </p>
       </SettingsCard>
-
-      <section className="rounded-card border border-subtle bg-surface p-6 shadow-card sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-title text-content">Sound effects</h2>
-            <p className="mt-1 text-body text-content-subtle">
-              Clicks and keystrokes make a subtle sound as you use AIDemic.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={toggleMuted}
-            aria-pressed={!muted}
-            className={buttonStyles({ variant: muted ? "secondary" : "primary" })}
-          >
-            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-            {muted ? "Muted" : "On"}
-          </button>
-        </div>
-      </section>
 
       <section className="rounded-card border border-subtle bg-danger-muted p-6 sm:p-8">
         <div className="mb-4 flex items-center gap-3">

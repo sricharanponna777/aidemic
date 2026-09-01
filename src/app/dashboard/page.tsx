@@ -545,6 +545,10 @@ export default function Dashboard() {
   const displayName =
     profile?.first_name || profile?.username || session?.user.email?.split("@")[0] || "there";
 
+  // Held back until the metrics land: `metrics` starts empty, so testing the
+  // count alone greets every returning user as a first-timer while loading.
+  const hasNoPractice = !isLoading && metrics.examAttemptsCount === 0;
+
   if (isAuthLoading || isTeacher || isParent) return null;
 
   return (
@@ -559,7 +563,11 @@ export default function Dashboard() {
             </span>
           </>
         }
-        description="Your AI tutor has analysed your progress. Here's what to focus on today."
+        description={
+          hasNoPractice
+            ? "Complete your first Smart Practice and AIDemic will personalise your revision."
+            : "Your AI tutor has analysed your progress. Here's what to focus on today."
+        }
         actions={
           <Link
             href="/dashboard/subjects"
@@ -848,7 +856,7 @@ export default function Dashboard() {
                       href="/dashboard/ai-questions"
                       className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100"
                     >
-                      Complete your first Smart Practice and AIDemic will personalise your revision.
+                      Take your first Smart Practice test to get personalised recommendations
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   ) : (
