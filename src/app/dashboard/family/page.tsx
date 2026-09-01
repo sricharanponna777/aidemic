@@ -264,26 +264,6 @@ export default function FamilyPage() {
                     ) : null}
                   </div>
                 </div>
-                {link.link_source !== 'teacher' ? (
-                  <button
-                    type="button"
-                    onClick={() => handleRevoke(link.id)}
-                    className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Revoke access
-                  </button>
-                ) : link.revocation_requested_at ? (
-                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400">Removal requested — awaiting teacher approval</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleRequestRemoval(link.id)}
-                    className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
-                  >
-                    Request removal
-                  </button>
-                )}
               </div>
             ))}
           </div>

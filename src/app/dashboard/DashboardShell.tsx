@@ -188,6 +188,20 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     router.push("/");
   };
 
+  // Settings saves the choice to user_profiles.theme; persisting here too
+  // keeps the stored preference in step with the toggle, so a new device
+  // starts on the theme the user actually last picked.
+  const handleThemeToggle = async () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    toggleTheme();
+    if (!session) return;
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({ theme: nextTheme })
+      .eq("id", session.user.id);
+    if (error) console.error("Failed to save theme preference:", error.message);
+  };
+
   const renderNavLinks = (onNavigate?: () => void, allowFlyouts = true) =>
     navGroups.map((group, groupIndex) => {
       const isCollapsibleGroup = allowFlyouts && group.label !== null;
@@ -296,7 +310,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={toggleTheme}
+              onClick={handleThemeToggle}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-content-subtle hover:bg-slate-100 dark:hover:bg-surface/6 hover:text-content-muted dark:hover:text-white transition-all"
               aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
@@ -338,7 +352,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={toggleTheme}
+            onClick={handleThemeToggle}
             className="flex items-center justify-center rounded-lg p-2 text-content-subtle hover:bg-slate-100 dark:hover:bg-surface/6 transition-colors"
             aria-label="Toggle theme"
           >

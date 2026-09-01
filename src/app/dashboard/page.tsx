@@ -848,7 +848,7 @@ export default function Dashboard() {
                       href="/dashboard/ai-questions"
                       className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100"
                     >
-                      Take your first Smart Practice test to get personalised recommendations
+                      Complete your first Smart Practice and AIDemic will personalise your revision.
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   ) : (

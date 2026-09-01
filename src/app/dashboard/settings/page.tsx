@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
-import { ThemeMode, useTheme } from "@/hooks/useTheme";
+import { ThemeMode, hasChosenTheme, useTheme } from "@/hooks/useTheme";
 import { useSfxMuted } from "@/hooks/useSfxMuted";
 import { useRouter } from "next/navigation";
 import { BookOpen, LogOut, Moon, Settings as SettingsIcon, Sun, Target, Volume2, VolumeX } from "lucide-react";
@@ -64,7 +64,11 @@ export default function Settings() {
   const [goalsError, setGoalsError] = useState("");
   const [goalsSaved, setGoalsSaved] = useState(false);
 
+  // The saved profile theme only seeds a device that has never picked one.
+  // Applying it unconditionally undid every choice made from the header
+  // toggle, so opening Settings snapped the app back to the column default.
   useEffect(() => {
+    if (hasChosenTheme()) return;
     if (loadedProfile?.theme === "light" || loadedProfile?.theme === "dark") {
       setTheme(loadedProfile.theme);
     }
