@@ -31,6 +31,7 @@ users and to schools. Build the mechanism first, or publish only what is true.
 | Email delivery logs (Brevo/Resend) | Per processor default | Held by the processor |
 | Application logs | 30 days | Debugging and incident response |
 | Generated podcasts/videos | Life of the account, or until deleted | Storage cost |
+| Handwriting scans (`paper-scans` bucket) | Life of the account, or until the paper is deleted | Marks have to stay checkable against what was written |
 
 **Inactive accounts:** delete after **[24?] months** of no sign-in, after two
 warning emails at 30 days and 7 days before.
@@ -50,8 +51,10 @@ tables, but **cascade is not a deletion policy** — each of these needs checkin
 
 - Rows keyed on `user_id` **without** `ON DELETE CASCADE` — audit every table
   before relying on this.
-- **Storage objects** — avatars, generated podcast/video files. These are not rows
-  and will not cascade.
+- **Storage objects** — avatars, generated podcast/video files, and handwriting
+  scans in the private `paper-scans` bucket. These are not rows and will not
+  cascade; `scripts/reset-user-data.ts` removes the scans explicitly and account
+  deletion must do the same.
 - **`parent_links` in both directions** — as the student and as the parent.
 - **Teacher-owned data.** Deleting a teacher must not delete their students' work.
   Classes and assignments need reassignment or archival, which is a product

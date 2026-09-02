@@ -470,3 +470,82 @@ export interface DiagramTemplateSelection {
   numberParams: DiagramTemplateParamKV<number>[];
   listParams: DiagramTemplateListParam[]; // e.g. blankPartIds, blankSlotIds
 }
+
+// ── Printed papers ──────────────────────────────────────────────────────────
+// A paper the student prints, writes on by hand, photographs and uploads.
+// PaperQuestion is the server-side row shape (it carries the answer key);
+// StudentSafePaperQuestion is the only projection that may reach a browser.
+// See src/lib/papers/studentSafePaper.ts.
+
+export interface PaperQuestion {
+  questionType: 'open' | 'mcq';
+  question: string;
+  marks: number;
+  commandWord: string;
+  isCalculation: boolean;
+  options: string[];
+  correctOption: '' | 'A' | 'B' | 'C' | 'D';
+  markScheme: string[];
+  modelAnswer: string;
+  skillsAssessed: string[];
+  sourceTitle: string;
+  sourceUrl: string;
+}
+
+export interface StudentSafePaperQuestion {
+  questionType: 'open' | 'mcq';
+  question: string;
+  marks: number;
+  commandWord: string;
+  isCalculation: boolean;
+  options: string[];
+  sourceTitle: string;
+  sourceUrl: string;
+}
+
+export type PrintedPaperStatus = 'printed' | 'uploaded' | 'transcribed' | 'marked';
+
+export interface PaperTranscriptEntry {
+  questionIndex: number;
+  text: string;
+  /** 0-1. Below LOW_CONFIDENCE the review UI flags the entry for checking. */
+  confidence: number;
+}
+
+export interface PrintedPaperPage {
+  id: string;
+  pageIndex: number;
+  /** Short-lived signed URL: the `paper-scans` bucket is private. */
+  signedUrl: string;
+}
+
+export interface StudentSafePaper {
+  id: string;
+  paperCode: string;
+  subject: string;
+  examBoard: string;
+  examType: string;
+  topic: string;
+  specification: string;
+  sourceMaterial: string;
+  status: PrintedPaperStatus;
+  attemptId: string | null;
+  createdAt: string;
+  questions: StudentSafePaperQuestion[];
+  transcript: PaperTranscriptEntry[] | null;
+  pages: PrintedPaperPage[];
+}
+
+export interface PaperSummary {
+  id: string;
+  paperCode: string;
+  subject: string;
+  topic: string;
+  examBoard: string;
+  examType: string;
+  status: PrintedPaperStatus;
+  questionCount: number;
+  totalMarks: number;
+  pageCount: number;
+  createdAt: string;
+}

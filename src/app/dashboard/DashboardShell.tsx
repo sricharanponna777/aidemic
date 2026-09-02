@@ -277,7 +277,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     <div className="min-h-screen bg-canvas">
 
       {/* Fixed sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col max-lg:hidden bg-surface dark:bg-[#0D1324] border-r border-subtle dark:border-indigo-500/20 shadow-[2px_0_16px_-4px_rgba(99,102,241,0.08)] dark:shadow-[2px_0_28px_-4px_rgba(99,102,241,0.25)]">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col max-lg:hidden print:hidden bg-surface dark:bg-[#0D1324] border-r border-subtle dark:border-indigo-500/20 shadow-[2px_0_16px_-4px_rgba(99,102,241,0.08)] dark:shadow-[2px_0_28px_-4px_rgba(99,102,241,0.25)]">
 
         {/* Brand */}
         <div className="border-b border-subtle px-5 py-5">
@@ -330,7 +330,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       </aside>
 
       {/* Mobile top bar */}
-      <div className="lg:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-subtle bg-surface/90 dark:bg-[#0D1324]/90 backdrop-blur-xl px-4 py-3">
+      <div className="lg:hidden print:hidden fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-subtle bg-surface/90 dark:bg-[#0D1324]/90 backdrop-blur-xl px-4 py-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -406,8 +406,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       )}
 
       {/* Main content */}
-      <div className="lg:pl-64">
-        <main className="mx-auto max-w-6xl px-4 pt-16 pb-10 sm:px-6 lg:pt-8">
+      <div className="lg:pl-64 print:pl-0">
+        <main className="mx-auto max-w-6xl px-4 pt-16 pb-10 sm:px-6 lg:pt-8 print:mx-0 print:max-w-none print:p-0">
           <div className="animate-page-enter space-y-6">
             {!isTeacher && !isParent && <SectionBreadcrumb />}
             {children}

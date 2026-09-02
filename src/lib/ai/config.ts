@@ -43,6 +43,20 @@ export const buildAIHeaders = (config: Pick<AIConfig, 'apiKey' | 'isOpenRouter' 
 export const getMissingHostedKeyError = (config: AIConfig) =>
   config.isOpenAIHosted && !config.apiKey ? 'OPENAI_API_KEY (or AI_API_KEY) is required for OpenAI hosted API.' : '';
 
+/**
+ * Vision model, used to transcribe photographed handwriting.
+ *
+ * Split from getAIConfig() the same way getTTSConfig() is: transcription is a
+ * different job from marking, and the cheapest model that reads handwriting
+ * well is rarely the one you want writing feedback. AI_VISION_MODEL falls back
+ * to AI_MODEL, so an unset variable keeps working on any multimodal default.
+ */
+export const getVisionConfig = () => {
+  const config = getAIConfig();
+  const model = txt(process.env.AI_VISION_MODEL || '', 120) || config.model;
+  return { ...config, model };
+};
+
 export const getTTSConfig = () => {
   const baseUrl = normalizeBaseUrl(process.env.TTS_BASE_URL || 'https://openrouter.ai/api/v1');
   const apiKey = txt(process.env.TTS_API_KEY || process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '', 300);

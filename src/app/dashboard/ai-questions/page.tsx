@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   RefreshCw,
   Rocket,
+  Printer,
   Sigma,
   Sparkles,
   Target,
@@ -43,7 +44,7 @@ import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, isSu
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 import { isDiagramCompletionTopic } from '@/lib/ai/text';
-import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
+import type { DiagramSpec, DiagramTemplateSelection, PaperSummary, PlotSpec } from '@/types';
 
 
 type Subject =
@@ -384,6 +385,11 @@ export default function AIQuestionsPage() {
     return deepLink.subjectId || deepLink.topic ? null : ssRead<SessionMeta | null>(SS_SESSION_META, null);
   });
   const [isMockExam, setIsMockExam] = useState(() => ssRead<boolean>(SS_MOCK_MODE, false));
+  // Paper mode is a property of the generation, not of the session: it decides
+  // what gets generated and then hands off to the paper page, so unlike the
+  // mock-exam flags there is nothing to restore on a refresh.
+  const [isPaperMode, setIsPaperMode] = useState(false);
+  const [pendingPapers, setPendingPapers] = useState<PaperSummary[]>([]);
   const [mockDurationMinutes, setMockDurationMinutes] = useState<number>(() => ssRead<number>(SS_MOCK_DURATION, 45));
   const [mockDeadline, setMockDeadline] = useState<number | null>(() => ssRead<number | null>(SS_MOCK_DEADLINE, null));
   const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number | null>(null);
@@ -393,6 +399,19 @@ export default function AIQuestionsPage() {
     const deepLink = readDeepLinkParams();
     if (deepLink.subjectId || deepLink.topic) router.replace('/dashboard/ai-questions');
   }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/papers')
+      .then((response) => (response.ok ? response.json() : { papers: [] }))
+      .then((body) => {
+        if (!cancelled) setPendingPapers(Array.isArray(body.papers) ? body.papers : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => { ssWrite(SS_QUESTIONS, questions); }, [questions]);
   useEffect(() => { ssWrite(SS_ANSWERS, answers); }, [answers]);
@@ -503,7 +522,14 @@ export default function AIQuestionsPage() {
       // Interactive diagram-completion is unlocked by the diagram-completion learning
       // objective OR by topic/subtopic wording that implies a labelled/structural diagram
       // (mirrors isDiagramCompletionTopic's own gating); the server re-validates the same way.
-      allowDiagram: !isEnglishLanguagePractice && isDiagramCompletionTopic(selectedSubject.subject, form.topic, form.subtopic, form.learningObjective || ''),
+      // Plot and diagram questions are marked by deterministic server code against
+      // coordinates and node labels, which a photograph of handwriting cannot
+      // produce -- so a paper never asks for one.
+      allowPlot: !isPaperMode,
+      allowDiagram:
+        !isPaperMode &&
+        !isEnglishLanguagePractice &&
+        isDiagramCompletionTopic(selectedSubject.subject, form.topic, form.subtopic, form.learningObjective || ''),
       useOnlineResources: true,
     };
 
@@ -541,6 +567,31 @@ export default function AIQuestionsPage() {
       const warnings: string[] = Array.isArray(body.warnings)
         ? body.warnings.filter((item: unknown): item is string => typeof item === 'string')
         : [];
+      if (isPaperMode) {
+        // The paper is stored server-side and answered on paper, so this flow
+        // never enters the on-screen practice state at all.
+        const paperResponse = await fetch('/api/papers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: payload.topic || 'General revision',
+            subject: selectedSubject.subject,
+            examBoard: selectedSubject.exam_board,
+            examType: selectedSubject.exam_type,
+            specification,
+            sourceMaterial: nextSourceMaterial,
+            questions: cleanQuestions,
+          }),
+        });
+        const paperBody = await paperResponse.json();
+        if (!paperResponse.ok) {
+          setStatus({ tone: 'error', text: paperBody.error || 'Could not create the paper.' });
+          return;
+        }
+        router.push(`/dashboard/ai-questions/paper/${paperBody.paperId}`);
+        return;
+      }
+
       setSessionMeta({
         topic: payload.topic || 'General revision',
         subject: selectedSubject.subject,
@@ -767,6 +818,42 @@ export default function AIQuestionsPage() {
         </>
       ) : null}
 
+      {!inPractice && pendingPapers.length > 0 ? (
+        <section className="rounded-2xl border border-subtle bg-surface p-5 shadow-card">
+          <h2 className="flex items-center gap-2 text-title text-content">
+            <Printer className="h-5 w-5 text-accent" />
+            Papers waiting for you
+          </h2>
+          <p className="mt-1 text-caption text-content-subtle">
+            Printed papers you have not uploaded and marked yet.
+          </p>
+          <ul className="mt-4 space-y-2">
+            {pendingPapers.map((paper) => (
+              <li key={paper.id}>
+                <Link
+                  href={`/dashboard/ai-questions/paper/${paper.id}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-subtle bg-surface-sunken px-4 py-3 transition-colors hover:border-strong"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-body font-semibold text-content">{paper.topic}</span>
+                    <span className="block text-caption text-content-subtle">
+                      {paper.paperCode} · {paper.questionCount} questions · {paper.totalMarks} marks
+                    </span>
+                  </span>
+                  <span className="text-caption font-semibold text-accent">
+                    {paper.status === 'printed'
+                      ? 'Upload your pages'
+                      : paper.status === 'uploaded'
+                        ? `${paper.pageCount} page${paper.pageCount === 1 ? '' : 's'} — transcribe`
+                        : 'Check and mark'}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {!inPractice ? (
         <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <SubjectSpecSelector
@@ -959,6 +1046,22 @@ export default function AIQuestionsPage() {
                   className="h-4 w-4 rounded border-subtle text-accent"
                 />
                 Timed mock exam (countdown, no feedback until submitted)
+              </label>
+            ) : null}
+
+            {!isEnglishLanguagePractice ? (
+              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
+                <input
+                  type="checkbox"
+                  checked={isPaperMode}
+                  onChange={(event) => {
+                    setIsPaperMode(event.target.checked);
+                    // Nothing on paper can be timed by a countdown in the browser.
+                    if (event.target.checked) setIsMockExam(false);
+                  }}
+                  className="h-4 w-4 rounded border-subtle text-accent"
+                />
+                Sit on paper (print, write by hand, photograph, upload)
               </label>
             ) : null}
 

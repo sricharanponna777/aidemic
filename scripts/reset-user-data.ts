@@ -60,6 +60,7 @@ const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistS
 const USER_DATA: Array<{ table: string; column: string; legacy?: boolean; note?: string }> = [
   // Practice, assessment and marking history
   { table: 'exam_practice_attempts', column: 'user_id' },
+  { table: 'printed_papers', column: 'user_id', note: 'cascades to printed_paper_pages; the scans themselves are removed below' },
   { table: 'assignment_attempts', column: 'student_id' },
   { table: 'mock_test_attempts', column: 'user_id', note: 'cascades to mock_test_answers' },
   { table: 'mock_tests', column: 'user_id', note: 'only their own; system tests have user_id NULL' },
@@ -215,6 +216,31 @@ async function main() {
 
     const suffix = entry.note ? `  -- ${entry.note}` : '';
     console.log(`  ${CONFIRM ? 'deleted' : '  would delete'} ${String(rows).padStart(6)}  ${label}${suffix}`);
+  }
+
+  // Storage objects are not reached by any row cascade, so the photographed
+  // handwriting has to be removed on its own. Everything under the user's own
+  // folder is theirs by construction (the bucket policies enforce the prefix).
+  const { data: scanPaperFolders, error: scanListError } = await admin.storage
+    .from('paper-scans')
+    .list(user.id, { limit: 1000 });
+
+  if (scanListError) {
+    skipped.push(`paper-scans storage (${scanListError.message})`);
+  } else if ((scanPaperFolders ?? []).length > 0) {
+    const paths: string[] = [];
+    for (const folder of scanPaperFolders ?? []) {
+      const { data: files } = await admin.storage.from('paper-scans').list(`${user.id}/${folder.name}`, { limit: 1000 });
+      for (const file of files ?? []) paths.push(`${user.id}/${folder.name}/${file.name}`);
+    }
+
+    if (paths.length > 0) {
+      if (CONFIRM) {
+        const { error: removeError } = await admin.storage.from('paper-scans').remove(paths);
+        if (removeError) throw new Error(`Deleting paper scans: ${removeError.message}`);
+      }
+      console.log(`  ${CONFIRM ? 'deleted' : '  would delete'} ${String(paths.length).padStart(6)}  paper-scans/${user.id}/`);
+    }
   }
 
   if (INCLUDE_TEACHER_DATA) {

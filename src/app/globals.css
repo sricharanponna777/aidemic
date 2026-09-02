@@ -484,3 +484,63 @@ h3 {
 .dark .katex .base {
   color: var(--foreground);
 }
+
+/* ==========================================================================
+   Print — the paper arc of the loop (/dashboard/ai-questions/paper/[id]).
+   A student prints a generated paper, writes on it by hand, then photographs
+   it. Everything here exists so what comes out of the printer is an exam
+   paper rather than a screenshot of the app.
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
+  /* The theme tokens are whatever the student is browsing in, and a dark
+     dashboard prints as a solid black page. Force the light palette for the
+     printed sheet regardless of the active theme. */
+  :root,
+  :root.dark,
+  :root.light {
+    color-scheme: light;
+    --t-canvas: #ffffff;
+    --t-surface: #ffffff;
+    --t-surface-raised: #ffffff;
+    --t-surface-sunken: #ffffff;
+    --t-subtle: #94a3b8;
+    --t-strong: #475569;
+    --t-content: #000000;
+    --t-content-muted: #1e293b;
+    --t-content-subtle: #334155;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Shadows and rounded cards read as printer noise. */
+  * {
+    box-shadow: none !important;
+  }
+
+  /* A question split across a page break is one a student answers in the
+     wrong space, and the transcriber then reads out of order. */
+  [data-print-question] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Ruled answer space: the lines are the point of printing at all. */
+  [data-print-lines] {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 7mm,
+      #cbd5e1 7mm,
+      #cbd5e1 calc(7mm + 1px)
+    );
+  }
+}

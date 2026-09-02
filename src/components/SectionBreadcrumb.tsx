@@ -36,7 +36,7 @@ export function SectionBreadcrumb() {
   return (
     <div
       ref={containerRef}
-      className="flex flex-wrap items-center gap-1.5 rounded-card border border-subtle bg-surface px-3 py-2.5 text-sm"
+      className="flex flex-wrap items-center gap-1.5 rounded-card border border-subtle bg-surface px-3 py-2.5 text-sm print:hidden"
     >
       {SECTIONS.map((section, index) => {
         const label = section.label as string;

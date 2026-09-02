@@ -2,6 +2,8 @@ import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { createAdminClient, tryCreateAdminClient } from '@/lib/supabase-admin';
 import { recordMarkingEvidence } from '@/lib/mastery/fromMarking';
+import { loadOwnedPaper } from '@/lib/papers/loadPaper';
+import { coerceTranscript, transcriptToAnswers } from '@/lib/papers/transcript';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { gradeBoundaryNote, gradeFromPercentage, nextGradeUp, topGrade as topGradeFor } from '@/lib/ai/gradeScales';
 import { getExamBoardLabel, getExamTypeLabel, getSpecTier } from '@/lib/ai/qualifications';
@@ -31,7 +33,7 @@ import {
 } from '@/lib/ai/validation';
 import { markPlotAnswer } from '@/lib/plotMarking';
 import { markDiagramAnswer } from '@/lib/diagramMarking';
-import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
+import type { DiagramSpec, DiagramTemplateSelection, PaperQuestion, PaperTranscriptEntry, PlotSpec } from '@/types';
 
 type MarkingQuestion = {
   questionType: 'open' | 'mcq' | 'plot' | 'diagram';
@@ -73,6 +75,10 @@ type AIMarkingReport = {
 
 interface MarkAnswersPayload {
   assignmentId?: string;
+  /** Printed paper being marked from a photographed, transcribed attempt. */
+  paperId?: string;
+  /** Student-confirmed transcript for that paper. */
+  transcript?: unknown;
   /** 'mock' | 'practice'. Only used to weight Learning Spine evidence. */
   attemptMode?: string;
   topic?: string;
@@ -633,11 +639,51 @@ export async function POST(request: Request) {
     // writes directly. Deliberately not part of normalizePayload -- it is not
     // marking-prompt input, and assignment mode ignores it entirely.
     const attemptMode = rawBody.attemptMode === 'mock' ? 'mock' : 'practice';
+    const paperId = typeof rawBody.paperId === 'string' ? txt(rawBody.paperId, 64) : '';
+
+    if (assignmentId && paperId) {
+      return NextResponse.json({ error: 'An attempt is either an assignment or a paper, not both.' }, { status: 400 });
+    }
 
     let payload: ReturnType<typeof normalizePayload>;
     let adminClient: ReturnType<typeof createAdminClient> | null = null;
+    let paperTranscript: PaperTranscriptEntry[] = [];
+    let paperAttemptId = '';
 
-    if (assignmentId) {
+    if (paperId) {
+      // Paper mode: the same shape of trust as assignment mode. Questions and
+      // curriculum details come from the stored paper, never from the client --
+      // which also means the mark scheme the browser was never allowed to see
+      // (src/lib/papers/studentSafePaper.ts) does not have to come back from it.
+      // Only the transcribed answers are the client's to send, because the
+      // student is allowed to correct what the vision model misread.
+      adminClient = createAdminClient();
+
+      const paper = await loadOwnedPaper(adminClient, paperId, authData.user.id);
+      if (!paper) return NextResponse.json({ error: 'Paper not found.' }, { status: 404 });
+      if (paper.status === 'marked') {
+        return NextResponse.json({ error: 'This paper has already been marked.' }, { status: 409 });
+      }
+
+      const paperQuestions = (paper.questions_payload ?? []) as PaperQuestion[];
+      // A transcript posted with the request is the corrected one; fall back to
+      // what transcription stored if the client sent nothing.
+      paperTranscript = coerceTranscript(
+        rawBody.transcript ?? paper.transcript_payload,
+        paperQuestions.length
+      );
+
+      payload = normalizePayload({
+        topic: paper.topic,
+        subject: paper.subject,
+        examBoard: paper.exam_board,
+        examType: paper.exam_type,
+        specification: paper.specification || '',
+        sourceMaterial: paper.source_material || '',
+        questions: paperQuestions,
+        answers: transcriptToAnswers(paperTranscript, paperQuestions.length),
+      });
+    } else if (assignmentId) {
       // Assignment mode: questions and curriculum details come from the stored
       // assignment, never from the client, and the graded attempt is persisted
       // here with the service-role client (students have no write access to
@@ -749,6 +795,56 @@ export async function POST(request: Request) {
       }
     }
 
+    if (paperId && adminClient) {
+      // Unlike a typed attempt -- which the browser inserts itself after
+      // marking returns -- a paper attempt is persisted here, so the row cannot
+      // disappear because a phone locked on the walk back from the printer.
+      const weaknessTags = report.markedAnswers.flatMap((answer) => answer.weaknessTags ?? []);
+      const { data: attemptRow, error: saveError } = await adminClient
+        .from('exam_practice_attempts')
+        .insert({
+          user_id: authData.user.id,
+          subject: payload.subject,
+          exam_board: payload.examBoard,
+          exam_type: payload.examType,
+          topic: payload.topic,
+          total_marks_awarded: Math.round(report.totalMarksAwarded),
+          total_available_marks: Math.round(report.totalAvailableMarks),
+          percentage: Math.round(report.percentage),
+          predicted_grade: report.predictedGrade,
+          weakness_tags: weaknessTags,
+          weakness_analysis: report.weaknessAnalysis,
+          questions_payload: payload.questions,
+          answers_payload: payload.answers,
+          marking_report: report,
+          attempt_mode: attemptMode,
+          answer_medium: 'paper',
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (saveError || !attemptRow) {
+        console.error('[mark-answers] Failed to save paper attempt', saveError);
+        return NextResponse.json(
+          { error: 'Marking succeeded but saving your attempt failed. Please resubmit.' },
+          { status: 500 }
+        );
+      }
+
+      const { error: paperError } = await adminClient
+        .from('printed_papers')
+        .update({
+          status: 'marked',
+          attempt_id: attemptRow.id,
+          transcript_payload: paperTranscript,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', paperId);
+      if (paperError) console.error('[mark-answers] Failed to close paper', paperError);
+
+      paperAttemptId = attemptRow.id as string;
+    }
+
     // Dual-write to the Learning Spine: resolve each marked question onto a
     // curriculum subtopic and log it as evidence. Deferred with after() because
     // it makes a classification model call -- the student's marking must not
@@ -769,8 +865,18 @@ export async function POST(request: Request) {
           examBoard: examBoard ?? '',
           examType: examType ?? '',
           topic,
-          source: assignmentId ? 'assignment' : attemptMode === 'mock' ? 'mock' : 'exam_practice',
-          sourceId: assignmentId ?? null,
+          // A scanned paper is discounted against a typed attempt (1.0 vs 1.2)
+          // because transcription can misread it, not because writing it by
+          // hand made it weaker evidence -- which is why a scanned mock is
+          // discounted too rather than keeping the mock weighting.
+          source: paperId
+            ? 'homework_scan'
+            : assignmentId
+              ? 'assignment'
+              : attemptMode === 'mock'
+                ? 'mock'
+                : 'exam_practice',
+          sourceId: paperId || assignmentId || null,
           questions: payload.questions,
           markedAnswers: report.markedAnswers,
         })
@@ -780,6 +886,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       report,
+      // Paper attempts are persisted here rather than by the browser, so the
+      // client needs the row id back to link to the marked attempt.
+      ...(paperAttemptId ? { attemptId: paperAttemptId } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to mark answers.';

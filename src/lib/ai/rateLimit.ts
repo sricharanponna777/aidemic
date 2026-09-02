@@ -13,6 +13,7 @@ export const AI_DAILY_LIMITS = {
   classSummary: 20,
   examCoach: 15,
   blurtReview: 20,
+  transcribeScan: 30,
 } as const;
 
 // What to do when the rate-limit RPC itself errors. Failing OPEN turns a database
