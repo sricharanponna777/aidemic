@@ -63,7 +63,11 @@ function OnboardingContent() {
       return;
     }
 
-    router.push(role === 'teacher' ? '/onboarding/teacher' : role === 'parent' ? '/onboarding/parent' : '/dashboard');
+    // Students go straight to the tour; teachers and parents pick theirs up
+    // after the step that still needs an answer from them.
+    router.push(
+      role === 'teacher' ? '/onboarding/teacher' : role === 'parent' ? '/onboarding/parent' : '/onboarding/welcome'
+    );
   };
 
   if (isLoading || (session && isProfileLoading)) {
@@ -81,8 +85,8 @@ function OnboardingContent() {
   if (!session) return null;
 
   const HEADINGS: Record<Role, { title: string; next: string }> = {
-    student: { title: 'Let’s set up your studies.', next: 'Tell us where you study so we can load the right exam boards and specifications.' },
-    teacher: { title: 'Let’s set up your account.', next: 'Next, we’ll ask for your school so we can verify you.' },
+    student: { title: 'Let’s set up your studies.', next: 'Tell us where you study so we can load the right exam boards and specifications. Then we’ll show you around.' },
+    teacher: { title: 'Let’s set up your account.', next: 'Next, we’ll ask for your school so we can verify you, then show you around.' },
     parent: { title: 'Let’s set up your account.', next: 'Next, you can link your child’s account to follow their progress.' },
   };
   const heading = role ? HEADINGS[role] : null;

@@ -29,6 +29,8 @@ import { DEFAULT_STUDY_GOALS, fetchStudyGoals } from "@/lib/studyGoals";
 import { BarChart } from "@/components/ui/charts";
 import { countLeeches } from "@/lib/leeches";
 import { rankWeaknesses, trendLabel, type RankedWeakness } from "@/lib/weaknesses";
+import { GetStartedChecklist } from "@/components/GetStartedChecklist";
+import { loadStudentChecklist, type ChecklistItem } from "@/lib/onboarding/checklist";
 
 type RecentSession = {
   id: string;
@@ -253,6 +255,8 @@ export default function Dashboard() {
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [isChecklistLoading, setIsChecklistLoading] = useState(true);
   const isTeacher = profile?.role === "teacher";
   const isParent = profile?.role === "parent";
 
@@ -260,6 +264,24 @@ export default function Dashboard() {
     if (isTeacher) router.replace("/dashboard/teacher");
     else if (isParent) router.replace("/dashboard/parent");
   }, [isTeacher, isParent, router]);
+
+  // Kept out of the main dashboard load: five head-only counts are cheap, and
+  // folding them in would delay every metric behind them.
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || isTeacher || isParent) return;
+    let cancelled = false;
+    const load = async () => {
+      const items = await loadStudentChecklist(createClient(), userId);
+      if (cancelled) return;
+      setChecklist(items);
+      setIsChecklistLoading(false);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id, isTeacher, isParent]);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -584,6 +606,8 @@ export default function Dashboard() {
           </p>
         )}
       </PageHero>
+
+      <GetStartedChecklist items={checklist} loading={isChecklistLoading} />
 
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

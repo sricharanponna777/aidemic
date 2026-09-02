@@ -16,6 +16,10 @@ export interface UserProfile {
   notifications_enabled?: boolean;
   role?: 'student' | 'teacher' | 'parent';
   welcome_email_sent_at?: string | null;
+  /** Set when the welcome tour is finished or skipped. */
+  onboarding_completed_at?: string | null;
+  /** Set when the dashboard get-started checklist is closed by hand. */
+  onboarding_checklist_dismissed_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }

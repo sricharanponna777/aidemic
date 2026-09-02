@@ -98,7 +98,7 @@ export default function TeacherOnboardingPage() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push('/onboarding/welcome');
   };
 
   const visibleSearchResults = selectedSchool || schoolQuery.trim().length < 2 ? [] : searchResults;

@@ -9,6 +9,8 @@ import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import { atRiskStudents, average, buildClassStats, buildStudentStats } from '@/lib/teacherAnalytics';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
 import { PageLoader } from '@/components/PageLoader';
+import { GetStartedChecklist } from '@/components/GetStartedChecklist';
+import { buildTeacherChecklist } from '@/lib/onboarding/checklist';
 
 function isToday(date: Date) {
   const now = new Date();
@@ -55,6 +57,13 @@ export default function TeacherDashboardPage() {
     return <PageLoader text="Loading your dashboard..." />;
   }
 
+  const checklist = buildTeacherChecklist({
+    classCount: activeClassStats.length,
+    studentCount,
+    assignmentCount,
+    markedAttemptCount: attempts.filter((a) => a.status === 'completed').length,
+  });
+
   const stats = [
     { label: 'Classes', value: String(activeClassStats.length), icon: GraduationCap, from: 'from-indigo-500', to: 'to-purple-600' },
     { label: 'Students', value: String(studentCount), icon: Users, from: 'from-blue-500', to: 'to-cyan-500' },
@@ -71,6 +80,8 @@ export default function TeacherDashboardPage() {
         title="Dashboard"
         description="Your at-a-glance overview across every class."
       />
+
+      <GetStartedChecklist items={checklist} />
 
       {classes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-subtle dark:bg-surface/3">

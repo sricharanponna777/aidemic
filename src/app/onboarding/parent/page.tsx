@@ -104,11 +104,11 @@ export default function ParentOnboardingPage() {
               <div className="flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => router.push('/dashboard/parent')}
+                  onClick={() => router.push('/onboarding/welcome')}
                   className={buttonStyles({ variant: 'primary', size: 'lg', className: 'flex-1' })}
                 >
                   <LogIn className="h-4 w-4" />
-                  Go to dashboard
+                  Continue
                 </button>
                 <button
                   type="button"
@@ -153,7 +153,7 @@ export default function ParentOnboardingPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => router.push('/dashboard/parent')}
+                  onClick={() => router.push('/onboarding/welcome')}
                   className={buttonStyles({ variant: 'secondary', size: 'lg' })}
                 >
                   Skip for now

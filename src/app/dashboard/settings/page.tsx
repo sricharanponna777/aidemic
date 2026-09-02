@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, hasChosenTheme, useTheme } from "@/hooks/useTheme";
 import { useRouter } from "next/navigation";
-import { BookOpen, LogOut, Moon, Settings as SettingsIcon, Sun, Target } from "lucide-react";
+import { BookOpen, Compass, ListChecks, LogOut, Moon, Settings as SettingsIcon, Sun, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
 import { Alert, Label, fieldStyles } from "@/components/ui/field";
@@ -55,6 +55,9 @@ export default function Settings() {
   const [profileError, setProfileError] = useState("");
   const [profileSaved, setProfileSaved] = useState(false);
   const [loadedProfileId, setLoadedProfileId] = useState<string | null>(null);
+
+  const [isChecklistRestoring, setIsChecklistRestoring] = useState(false);
+  const [checklistRestored, setChecklistRestored] = useState(false);
 
   const [dailyTarget, setDailyTarget] = useState(DEFAULT_STUDY_GOALS.daily_card_target);
   const [weeklyTarget, setWeeklyTarget] = useState(DEFAULT_STUDY_GOALS.weekly_minute_target);
@@ -153,6 +156,23 @@ export default function Settings() {
       .eq("id", session.user.id);
     if (error) console.error("Failed to save theme preference:", error.message);
     setIsThemeSaving(false);
+  };
+
+  // Clearing the dismissal is all that is needed: the checklist hides itself
+  // again the moment every step is actually done.
+  const handleRestoreChecklist = async () => {
+    if (!session?.user.id) return;
+    setIsChecklistRestoring(true);
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({ onboarding_checklist_dismissed_at: null })
+      .eq("id", session.user.id);
+    setIsChecklistRestoring(false);
+    if (error) {
+      console.error("Failed to restore the get-started checklist:", error.message);
+      return;
+    }
+    setChecklistRestored(true);
   };
 
   // Requires a loaded profile: the `!==` checks alone read a still-null profile
@@ -322,6 +342,55 @@ export default function Settings() {
         <p className="mt-3 text-caption text-content-subtle">
           {isThemeSaving ? "Saving preference…" : "Preference is saved to your profile."}
         </p>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Getting started"
+        description="Take the welcome tour again, or bring back the checklist on your dashboard."
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Link
+            href="/onboarding/welcome"
+            className={buttonStyles({
+              variant: "plain",
+              size: "none",
+              className:
+                "flex-col items-start rounded-field border border-subtle bg-surface-sunken p-4 text-left transition-colors hover:border-strong",
+            })}
+          >
+            <span className="flex items-center gap-2 font-semibold text-content">
+              <Compass className="h-4 w-4 text-accent" />
+              Replay the welcome tour
+            </span>
+            <p className="mt-1 text-caption text-content-subtle">
+              A five-minute walk through everything AIDemic can do for you.
+            </p>
+          </Link>
+
+          {loadedProfile?.role !== "parent" && (
+            <button
+              type="button"
+              onClick={handleRestoreChecklist}
+              disabled={isChecklistRestoring}
+              className={buttonStyles({
+                variant: "plain",
+                size: "none",
+                className:
+                  "flex-col items-start rounded-field border border-subtle bg-surface-sunken p-4 text-left transition-colors hover:border-strong",
+              })}
+            >
+              <span className="flex items-center gap-2 font-semibold text-content">
+                <ListChecks className="h-4 w-4 text-accent" />
+                {checklistRestored ? "Checklist restored" : "Show the get-started checklist"}
+              </span>
+              <p className="mt-1 text-caption text-content-subtle">
+                {checklistRestored
+                  ? "It is back on your dashboard, and hides itself once every step is done."
+                  : "Bring back the setup steps you dismissed. It disappears again once they are all done."}
+              </p>
+            </button>
+          )}
+        </div>
       </SettingsCard>
 
       <section className="rounded-card border border-subtle bg-danger-muted p-6 sm:p-8">

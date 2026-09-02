@@ -19,6 +19,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase-client';
 import { useAuth } from '@/hooks/useAuth';
 import { downscaleToJpeg } from '@/lib/papers/downscale';
+import { isPdf, pdfToJpegPages } from '@/lib/papers/pdfPages';
 import { MAX_PAPER_PAGES, PAPER_SCANS_BUCKET } from '@/lib/papers/constants';
 import { LOW_CONFIDENCE } from '@/lib/papers/transcript';
 import type { PaperTranscriptEntry, StudentSafePaper } from '@/types';
@@ -107,21 +108,45 @@ export default function PaperPage() {
     // page from the middle leaves a gap, and counting would upsert straight
     // over a page the student still has.
     const nextIndex = paper.pages.reduce((highest, page) => Math.max(highest, page.pageIndex + 1), 0);
-    if (paper.pages.length + files.length > MAX_PAPER_PAGES || nextIndex + files.length > MAX_PAPER_PAGES) {
+    const room = Math.min(MAX_PAPER_PAGES - paper.pages.length, MAX_PAPER_PAGES - nextIndex);
+    if (room <= 0) {
       setStatus({ tone: 'error', text: `A paper can hold at most ${MAX_PAPER_PAGES} pages.` });
       return;
     }
 
     setIsUploading(true);
-    setStatus({ tone: 'info', text: 'Uploading your pages...' });
+    setStatus({ tone: 'info', text: 'Preparing your pages...' });
     const supabase = createClient();
 
     try {
-      for (let offset = 0; offset < files.length; offset += 1) {
-        const file = files[offset];
+      // Expanded before anything is uploaded: one selected file is one page
+      // only when it is a photo, and a PDF's page count is not knowable until
+      // it has been opened. Doing it up front also means a PDF that overruns
+      // the limit is refused before half of it is in the bucket.
+      const blobs: Blob[] = [];
+      const blankPages: number[] = [];
+      for (const file of Array.from(files)) {
+        if (!isPdf(file)) {
+          blobs.push(await downscaleToJpeg(file));
+          continue;
+        }
+        const rendered = await pdfToJpegPages(file, room - blobs.length);
+        // Renumbered onto the paper: the student is told "page 3 is blank",
+        // and page 3 of the paper is not page 3 of their second PDF.
+        for (const pageNumber of rendered.blankPageNumbers) {
+          blankPages.push(nextIndex + blobs.length + pageNumber);
+        }
+        blobs.push(...rendered.pages);
+      }
+      if (blobs.length > room) {
+        throw new Error(`A paper can hold at most ${MAX_PAPER_PAGES} pages.`);
+      }
+
+      setStatus({ tone: 'info', text: 'Uploading your pages...' });
+      for (let offset = 0; offset < blobs.length; offset += 1) {
+        const blob = blobs[offset];
         const pageIndex = nextIndex + offset;
         const storagePath = `${session.user.id}/${paper.id}/${pageIndex}.jpg`;
-        const blob = await downscaleToJpeg(file);
 
         const { error: uploadError } = await supabase.storage
           .from(PAPER_SCANS_BUCKET)
@@ -141,7 +166,16 @@ export default function PaperPage() {
 
       setTranscript([]);
       await reload();
-      setStatus({ tone: 'success', text: 'Pages uploaded. Read them next.' });
+      setStatus(
+        blankPages.length > 0
+          ? {
+              tone: 'error',
+              text: `${blankPages.length === 1 ? 'Page' : 'Pages'} ${blankPages.join(', ')} came out blank. If ${
+                blankPages.length === 1 ? 'it has' : 'they have'
+              } writing on ${blankPages.length === 1 ? 'it' : 'them'}, delete and photograph instead.`,
+            }
+          : { tone: 'success', text: 'Pages uploaded. Read them next.' }
+      );
     } catch (err) {
       setStatus({ tone: 'error', text: err instanceof Error ? err.message : 'Upload failed.' });
     } finally {
@@ -375,7 +409,8 @@ export default function PaperPage() {
             Your written pages
           </h2>
           <p className="mt-1 text-caption text-content-subtle">
-            Photograph each page in order, in good light, with the whole sheet in frame.
+            Photograph each page in order, in good light, with the whole sheet in frame — or upload a PDF
+            straight from a scanner app.
           </p>
 
           {paper.pages.length > 0 ? (
@@ -409,11 +444,14 @@ export default function PaperPage() {
           ) : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
+            {/* No `capture`: it opens the camera directly on Android rather
+                than a picker, which would leave a scanner app's PDF -- the
+                whole point of accepting one -- unreachable on a phone. The
+                picker still offers the camera as a source. */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
-              capture="environment"
+              accept="image/*,application/pdf"
               multiple
               disabled={isUploading}
               onChange={(event) => handleUpload(event.target.files)}
