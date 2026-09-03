@@ -133,6 +133,16 @@ Scans live in the **private** `paper-scans` bucket (`<user_id>/<paper_id>/<page_
 
 A **PDF** is accepted at that upload too — a school photocopier hands out a PDF, not a camera roll — but it never reaches storage as one. [src/lib/papers/pdfPages.ts](src/lib/papers/pdfPages.ts) renders each page to the same 1600px JPEG in the browser, so the bucket's mime allow-list, the `.jpg` path the attach route insists on, and the `data:image/...` part transcription inlines all stay exactly as they were. Two consequences: the file input carries no `capture` attribute, because that opens the camera directly on Android and would put a scanner app's PDF out of reach; and pdf.js decodes JBIG2 and JPEG 2000 through WebAssembly, which the CSP does not allow, so a page using those codecs renders white. `pdfToJpegPages` samples the canvas and reports which pages came back blank rather than letting a blank transcript be marked as zero — supporting those codecs would mean serving `pdfjs-dist/wasm/` and adding `'wasm-unsafe-eval'` to `script-src`.
 
+## Assignment draft → publish
+
+An assignment is created as a **draft** (migration `20260903030000`): `assignments.status` defaults to `'draft'`, and the student and parent SELECT policies both require `status = 'published'`, so a draft is visible to its teacher and nobody else. The teacher reviews and edits it on [classes/[classId]/assignments/[assignmentId]/page.tsx](src/app/dashboard/teacher/classes/[classId]/assignments/[assignmentId]/page.tsx), then publishes. Three things follow:
+
+- **Publishing is one-way and freezes the row.** `freeze_published_assignments()` is a `BEFORE UPDATE` trigger that raises on *any* update to a row whose `OLD.status` is `'published'` — edits and un-publishing alike. Students may already have answered, and their marks live in `assignment_attempts.ai_feedback` against the mark scheme as it was; editing afterwards would leave the two disagreeing forever. Nothing in the app updated `assignments` before this, so the blanket rule costs nothing — but any future write to that table has to happen while the row is still a draft.
+- **It's a trigger, not an RLS `WITH CHECK`.** `WITH CHECK` only sees the NEW row, so it cannot distinguish an edit of a published assignment from the draft → published transition that must stay allowed.
+- **`verifyQuestions` gates publishing**, not saving. A draft may be saved half-finished; publishing requires every question to have text, positive whole marks, an MCQ correct option pointing at a non-blank option, and — for `open` questions only — at least one mark scheme point. Plot and diagram questions are marked against their spec, so they carry no written scheme.
+
+The backfill matters: the column was added with `DEFAULT 'published'` and only then flipped to `'draft'`, so rows that predate the migration — all of them live with students — stayed visible.
+
 ## Assignment answer keys
 
 [src/lib/assignments/studentSafeSpecs.ts](src/lib/assignments/studentSafeSpecs.ts) projects `PlotSpec` and `DiagramSpec` down to what a student may see, and [src/app/api/assignments/[assignmentId]/route.ts](src/app/api/assignments/[assignmentId]/route.ts) applies it to every question of an **in-progress** attempt. A completed attempt still gets the full spec, because review has to show the right answer.

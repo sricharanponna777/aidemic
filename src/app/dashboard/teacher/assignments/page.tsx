@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase-client';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
 import { PageLoader } from '@/components/PageLoader';
 import { AssignmentForm, type CreatedAssignment } from '@/components/teacher/AssignmentForm';
+import { AssignmentStatusBadge } from '@/components/teacher/AssignmentStatusBadge';
 import { buildAssignmentStats } from '@/lib/teacherAnalytics';
 
 const selectClass =
@@ -36,6 +37,7 @@ type AssignmentRow = {
   id: string;
   title: string;
   assignment_type: string;
+  status: 'draft' | 'published';
   due_date: string | null;
   created_at: string | null;
   class_id: string;
@@ -110,7 +112,7 @@ export default function TeacherAssignmentsPage() {
 
       const { data: assignmentRows } = await supabase
         .from('assignments')
-        .select('id, title, assignment_type, due_date, created_at, class_id, topic_id, topics ( name )')
+        .select('id, title, assignment_type, status, due_date, created_at, class_id, topic_id, topics ( name )')
         .in('class_id', classIds)
         .order('created_at', { ascending: false });
       if (cancelled) return;
@@ -271,7 +273,10 @@ export default function TeacherAssignmentsPage() {
                         className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-left text-sm"
                       >
                         <div>
-                          <p className="font-medium text-content">{assignment.title}</p>
+                          <p className="flex items-center gap-2 font-medium text-content">
+                            {assignment.title}
+                            <AssignmentStatusBadge status={assignment.status} />
+                          </p>
                           <p className="text-xs text-content-subtle capitalize">
                             {cls?.name ?? 'Unknown class'}
                             {assignment.topics?.name ? ` · ${assignment.topics.name}` : ''}
@@ -295,6 +300,12 @@ export default function TeacherAssignmentsPage() {
                       )}
                       {isExpanded && (
                         <div className="border-t border-subtle px-4 py-3">
+                          <Link
+                            href={`/dashboard/teacher/classes/${assignment.class_id}/assignments/${assignment.id}`}
+                            className="mb-2 inline-block text-xs font-medium text-accent hover:underline"
+                          >
+                            {assignment.status === 'draft' ? 'Review, edit & publish' : 'View questions & mark scheme'}
+                          </Link>
                           {classRoster.length === 0 ? (
                             <p className="text-xs text-content-subtle">No students in this class yet.</p>
                           ) : (

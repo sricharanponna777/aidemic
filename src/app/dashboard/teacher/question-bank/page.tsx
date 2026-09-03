@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, Layers, Sparkles } from 'lucide-react';
 import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
 import { MathContent } from '@/components/MathContent';
+import { AssignmentStatusBadge } from '@/components/teacher/AssignmentStatusBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
@@ -44,7 +45,7 @@ type ClassOption = {
 type Topic = { id: string; name: string };
 type Subtopic = { id: string; name: string; topic_id: string };
 type Objective = { id: string; objective: string };
-type SavedAssignment = { id: string; title: string; class_id: string; assignment_type: string; created_at: string | null; topics: { name: string } | null };
+type SavedAssignment = { id: string; title: string; class_id: string; assignment_type: string; status: 'draft' | 'published'; created_at: string | null; topics: { name: string } | null };
 
 export default function TeacherQuestionBankPage() {
   const router = useRouter();
@@ -76,7 +77,7 @@ export default function TeacherQuestionBankPage() {
   const [assignDueDate, setAssignDueDate] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [savedInfo, setSavedInfo] = useState<{ classId: string; title: string } | null>(null);
+  const [savedInfo, setSavedInfo] = useState<{ id: string; classId: string; title: string } | null>(null);
 
   useEffect(() => {
     if (isLoading || !session) return;
@@ -110,7 +111,7 @@ export default function TeacherQuestionBankPage() {
       if (classIds.length > 0) {
         const { data: assignmentRows } = await supabase
           .from('assignments')
-          .select('id, title, class_id, assignment_type, created_at, topics ( name )')
+          .select('id, title, class_id, assignment_type, status, created_at, topics ( name )')
           .in('class_id', classIds)
           .order('created_at', { ascending: false });
         if (!cancelled) setSavedAssignments((assignmentRows as unknown as SavedAssignment[]) ?? []);
@@ -265,7 +266,7 @@ export default function TeacherQuestionBankPage() {
           source_material: sourceMaterial || null,
           allow_reattempts: false,
         })
-        .select('id, title, class_id, assignment_type, created_at, topics ( name )')
+        .select('id, title, class_id, assignment_type, status, created_at, topics ( name )')
         .single();
       if (error) {
         setSaveError(error.message);
@@ -273,7 +274,7 @@ export default function TeacherQuestionBankPage() {
       }
       const saved = data as unknown as SavedAssignment;
       setSavedAssignments((prev) => [saved, ...prev]);
-      setSavedInfo({ classId: saved.class_id, title: saved.title });
+      setSavedInfo({ id: saved.id, classId: saved.class_id, title: saved.title });
       setAssignTitle('');
       setAssignDueDate('');
     } catch (err) {
@@ -462,9 +463,9 @@ export default function TeacherQuestionBankPage() {
 
               {preview.length > 0 && (
                 <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-500/20 dark:bg-indigo-500/5">
-                  <h3 className="text-sm font-semibold text-content">Save these {preview.length} question{preview.length === 1 ? '' : 's'} as an assignment</h3>
+                  <h3 className="text-sm font-semibold text-content">Save these {preview.length} question{preview.length === 1 ? '' : 's'} as a draft assignment</h3>
                   <p className="mt-1 text-xs text-content-subtle">
-                    Sets this exact preview for <span className="font-medium">{selectedClass?.name}</span> — no regeneration.
+                    Sets this exact preview for <span className="font-medium">{selectedClass?.name}</span> — no regeneration. It stays a draft your students can&apos;t see until you publish it.
                   </p>
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
                     <input
@@ -482,15 +483,18 @@ export default function TeacherQuestionBankPage() {
                       aria-label="Due date (optional)"
                     />
                     <button type="button" onClick={handleSaveAssignment} disabled={isSaving} className={buttonStyles({ variant: 'primary' })}>
-                      {isSaving ? 'Saving...' : 'Save as assignment'}
+                      {isSaving ? 'Saving...' : 'Save as draft'}
                     </button>
                   </div>
                   {saveError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{saveError}</p> : null}
                   {savedInfo ? (
                     <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
-                      Saved “{savedInfo.title}”.{' '}
-                      <Link href={`/dashboard/teacher/classes/${savedInfo.classId}`} className="font-medium underline">
-                        View in class
+                      Saved “{savedInfo.title}” as a draft.{' '}
+                      <Link
+                        href={`/dashboard/teacher/classes/${savedInfo.classId}/assignments/${savedInfo.id}`}
+                        className="font-medium underline"
+                      >
+                        Review &amp; publish
                       </Link>
                     </p>
                   ) : null}
@@ -561,11 +565,14 @@ export default function TeacherQuestionBankPage() {
                   {savedAssignments.map((a) => (
                     <Link
                       key={a.id}
-                      href={`/dashboard/teacher/classes/${a.class_id}`}
+                      href={`/dashboard/teacher/classes/${a.class_id}/assignments/${a.id}`}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-subtle px-4 py-2.5 text-sm transition hover:border-indigo-300 dark:hover:border-indigo-500/40"
                     >
                       <div>
-                        <p className="font-medium text-content">{a.title}</p>
+                        <p className="flex items-center gap-2 font-medium text-content">
+                          {a.title}
+                          <AssignmentStatusBadge status={a.status} />
+                        </p>
                         <p className="text-xs text-content-subtle capitalize">
                           {classNameById.get(a.class_id) ?? 'Class'}
                           {a.topics?.name ? ` · ${a.topics.name}` : ''}

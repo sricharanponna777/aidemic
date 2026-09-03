@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   AlertTriangle,
   Archive,
@@ -32,6 +33,7 @@ import { specChainParts } from '@/lib/specLabel';
 import { AssignmentForm, type CreatedAssignment } from '@/components/teacher/AssignmentForm';
 import { buildStudentStats, buildClassStats, buildTopicStats, buildAssignmentStats } from '@/lib/teacherAnalytics';
 import { ParentLinksPanel } from '@/components/teacher/ParentLinksPanel';
+import { AssignmentStatusBadge } from '@/components/teacher/AssignmentStatusBadge';
 import type { TeacherClass, TeacherAssignment, TeacherAttempt, TeacherStudent } from '@/hooks/useTeacherClassData';
 
 type ClassInfo = {
@@ -63,6 +65,7 @@ type AssignmentRow = {
   id: string;
   title: string;
   assignment_type: string;
+  status: 'draft' | 'published';
   due_date: string | null;
   created_at: string | null;
   topic_id: string | null;
@@ -173,7 +176,7 @@ export default function TeacherClassPage() {
 
       const { data: assignmentRows } = await supabase
         .from('assignments')
-        .select('id, title, assignment_type, due_date, created_at, topic_id, topics ( name ), assignment_attempts ( count )')
+        .select('id, title, assignment_type, status, due_date, created_at, topic_id, topics ( name ), assignment_attempts ( count )')
         .eq('class_id', classId)
         .order('created_at', { ascending: false });
       if (cancelled) return;
@@ -594,10 +597,17 @@ export default function TeacherClassPage() {
             {assignments.map((assignment) => {
               const analytics = assignmentStats.get(assignment.id);
               return (
-                <div key={assignment.id} className="rounded-lg border border-subtle px-4 py-2.5 text-sm">
+                <Link
+                  key={assignment.id}
+                  href={`/dashboard/teacher/classes/${classId}/assignments/${assignment.id}`}
+                  className="block rounded-lg border border-subtle px-4 py-2.5 text-sm transition hover:border-indigo-300 dark:hover:border-indigo-500/40"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="font-medium text-content">{assignment.title}</p>
+                      <p className="flex items-center gap-2 font-medium text-content">
+                        {assignment.title}
+                        <AssignmentStatusBadge status={assignment.status} />
+                      </p>
                       <p className="text-xs text-content-subtle capitalize">
                         {assignment.assignment_type}
                         {assignment.topics?.name ? ` · ${assignment.topics.name}` : ''}
@@ -616,7 +626,7 @@ export default function TeacherClassPage() {
                       <div className={`h-full rounded-full ${scoreBarTone(analytics.completionRate)}`} style={{ width: `${analytics.completionRate}%` }} />
                     </div>
                   )}
-                </div>
+                </Link>
               );
             })}
           </div>

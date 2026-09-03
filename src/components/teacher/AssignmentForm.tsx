@@ -49,6 +49,7 @@ export type CreatedAssignment = {
   topics: { name: string } | null;
   assignment_attempts: { count: number }[];
   allow_reattempts: boolean;
+  status: 'draft' | 'published';
 };
 
 type TopicOption = { id: string; name: string };
@@ -209,7 +210,7 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
 
       const { data, error } = await supabase
         .from('assignments')
-        .select('id, title, assignment_type, due_date, created_at, class_id, topic_id, topics ( name ), assignment_attempts ( count ), allow_reattempts')
+        .select('id, title, assignment_type, status, due_date, created_at, class_id, topic_id, topics ( name ), assignment_attempts ( count ), allow_reattempts')
         .eq('id', settled.assignment_id)
         .single();
 
@@ -230,8 +231,9 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
   return (
     <>
       <p className="text-sm text-content-muted">
-        AIDemic will write a set of practice questions for your students based on what you pick below. Mock tests and flashcard
-        assignments are coming in a future update.
+        AIDemic will write a set of practice questions based on what you pick below. They arrive as a draft your students
+        can&apos;t see — check the questions and mark scheme, edit anything that&apos;s wrong, then publish. Mock tests and
+        flashcard assignments are coming in a future update.
       </p>
 
       {!fixedClassId && (
@@ -385,7 +387,7 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
           Cancel
         </button>
         <button type="button" onClick={() => void handleCreateAssignment()} disabled={isGenerating} className={buttonStyles({ variant: 'primary' })}>
-          {isGenerating ? 'Generating questions...' : 'Generate & assign'}
+          {isGenerating ? 'Generating questions...' : 'Generate draft'}
         </button>
       </div>
     </>
