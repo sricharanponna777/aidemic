@@ -7,7 +7,7 @@ import { MarkdownContent } from '@/components/MarkdownContent';
 import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
-import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { getExamBoardLabel, getExamTypeLabel, getSubjectLabel, hasSourceExtract } from '@/lib/ai/subjectConfig';
 import { gcseTierLabelForGrade } from '@/lib/gradeTone';
 import { findSavedTierForSubject } from '@/lib/ai/studentSubjects';
 
@@ -207,7 +207,7 @@ export default function AttemptDetailPage() {
 
           <section className="grid gap-5 lg:grid-cols-[1fr_0.55fr]">
             <div className="space-y-4">
-              {detail.report?.sourceMaterial ? (
+              {detail.report?.sourceMaterial && hasSourceExtract(attempt.subject) ? (
                 <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-500/25 dark:bg-indigo-500/10">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">
                     Source Extract

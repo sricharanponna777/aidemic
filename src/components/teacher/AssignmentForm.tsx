@@ -163,7 +163,7 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
     }
 
     setIsGenerating(true);
-    job.begin();
+    job.begin({ questionCount });
     try {
       // The server writes the assignment itself once generation finishes, so a
       // teacher who closes this tab still gets the assignment.

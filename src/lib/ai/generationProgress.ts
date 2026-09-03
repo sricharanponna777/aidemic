@@ -34,6 +34,23 @@ export const STAGE_ORDER: GenerationJobStatus[] = [
 ];
 
 /**
+ * Where the checklist sits, for deciding which rows are ticked.
+ *
+ * `completed` is deliberately *past the end* rather than the -1 that
+ * `indexOf` returns for it. The last stages are sub-second -- `finalising` is
+ * synchronous work and `saving` is a single insert -- so a poll will usually
+ * jump straight from `generating` to `completed` without ever sampling them.
+ * They ran, so they tick. Returning -1 there left every row un-ticked at the
+ * moment the job finished, which read as the run having skipped them.
+ *
+ * `failed` stays at -1: the row is overwritten with the error, and how far it
+ * had got is not something we can honestly claim after the fact.
+ */
+export function stageIndex(status: GenerationJobStatus): number {
+  return status === 'completed' ? STAGE_ORDER.length : STAGE_ORDER.indexOf(status);
+}
+
+/**
  * Labels shared by both flows. The `saving` step differs -- one saves an
  * assignment, the other a practice set -- so callers override that one.
  */
@@ -87,11 +104,18 @@ export const JOB_TIMEOUT_MS = 5 * 60 * 1000;
  */
 export const STALE_AFTER_MS = 3 * 60 * 1000;
 /**
- * Used only until this user has finished a job we can measure. Every later run
- * is paced by their own history instead -- a subject that makes the model slow
- * should not be told the same number as one where it is fast.
+ * Rough split of a run into the part that does not depend on how many questions
+ * were asked for -- spec validation, the difficulty note, the final insert --
+ * and the part that does, which is the model writing them.
+ *
+ * Used two ways: to scale a past run of a different size onto the size being
+ * asked for now, and as the estimate when there is no history at all. Both are
+ * approximations and both are superseded the moment a same-size run exists to
+ * measure.
  */
-export const FALLBACK_ESTIMATE_MS = 90 * 1000;
+const FIXED_OVERHEAD_MS = 5000;
+const PER_QUESTION_MS = 12000;
+
 /** Redraw cadence for the elapsed clock and the within-stage creep. */
 export const TICK_MS = 500;
 /**
@@ -108,17 +132,48 @@ export const formatDuration = (ms: number) => {
   return minutes > 0 ? `${minutes}m ${String(seconds).padStart(2, '0')}s` : `${seconds}s`;
 };
 
+/** Median rather than mean, so one outlier cannot stretch every later estimate. */
+const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+export type CompletedRun = { created_at: string; updated_at: string; question_count: number | null };
+
 /**
- * How long this user's generations actually take, from their own finished jobs.
- * The median rather than the mean, so one five-minute outlier does not stretch
- * every later estimate.
+ * How long a run of `questionCount` questions is likely to take, from this
+ * user's own finished jobs.
+ *
+ * Conditioned on size, because size is the first-order driver of how long the
+ * model call takes and ignoring it gets the answer backwards: a median blind to
+ * question count quoted a one-question run the 71 seconds its six-question
+ * predecessor took, then quoted the next six-question run the 15 seconds the
+ * one-question run took.
+ *
+ * Three tiers, most direct evidence first:
+ *   1. runs of exactly this size -- what actually happened, last few times;
+ *   2. runs of another size, scaled -- fixed cost held fixed, the rest scaled
+ *      by the ratio of question counts;
+ *   3. no usable history -- the fixed/per-question model alone.
  */
-export function medianDurationMs(rows: { created_at: string; updated_at: string }[]): number {
-  const durations = rows
-    .map((row) => new Date(row.updated_at).getTime() - new Date(row.created_at).getTime())
-    .filter((ms) => Number.isFinite(ms) && ms > MIN_CREDIBLE_RUN_MS && ms < JOB_TIMEOUT_MS)
-    .sort((a, b) => a - b);
-  return durations.length === 0 ? FALLBACK_ESTIMATE_MS : durations[Math.floor(durations.length / 2)];
+export function estimateDurationMs(rows: CompletedRun[], questionCount: number): number {
+  const size = Math.max(1, questionCount);
+  const runs = rows
+    .map((row) => ({
+      ms: new Date(row.updated_at).getTime() - new Date(row.created_at).getTime(),
+      // Rows written before question_count existed carry no size, so they can
+      // be neither matched nor scaled. Skipped rather than guessed at.
+      count: row.question_count ?? 0,
+    }))
+    .filter((run) => Number.isFinite(run.ms) && run.ms > MIN_CREDIBLE_RUN_MS && run.ms < JOB_TIMEOUT_MS && run.count > 0);
+
+  const sameSize = runs.filter((run) => run.count === size).map((run) => run.ms);
+  if (sameSize.length > 0) return median(sameSize);
+
+  if (runs.length > 0) {
+    return median(
+      runs.map((run) => FIXED_OVERHEAD_MS + Math.max(0, run.ms - FIXED_OVERHEAD_MS) * (size / run.count))
+    );
+  }
+
+  return FIXED_OVERHEAD_MS + PER_QUESTION_MS * size;
 }
 
 /**

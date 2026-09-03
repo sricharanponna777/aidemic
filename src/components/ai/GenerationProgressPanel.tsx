@@ -5,6 +5,7 @@ import {
   DEFAULT_STAGE_LABELS,
   STAGE_ORDER,
   formatDuration,
+  stageIndex,
   type GenerationJobStatus,
 } from '@/lib/ai/generationProgress';
 
@@ -41,7 +42,7 @@ export function GenerationProgressPanel({
   className = '',
 }: GenerationProgressPanelProps) {
   const stageLabel = { ...DEFAULT_STAGE_LABELS, ...labels };
-  const currentIndex = STAGE_ORDER.indexOf(status);
+  const currentIndex = stageIndex(status);
 
   return (
     <div className={`rounded-xl border border-subtle bg-surface-sunken p-4 dark:bg-surface/3 ${className}`}>

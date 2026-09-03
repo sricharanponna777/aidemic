@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase-client';
 import {
-  FALLBACK_ESTIMATE_MS,
   JOB_TIMEOUT_MS,
   POLL_INTERVAL_MS,
   STALE_AFTER_MS,
   TICK_MS,
   deriveProgress,
-  medianDurationMs,
+  estimateDurationMs,
+  type CompletedRun,
   type GenerationJobStatus,
 } from '@/lib/ai/generationProgress';
 
@@ -49,7 +49,7 @@ export function useGenerationJob<Row extends GenerationJobRow>({
   const [startedAt, setStartedAt] = useState(0);
   const [stageStartedAt, setStageStartedAt] = useState(0);
   const [now, setNow] = useState(0);
-  const [estimateMs, setEstimateMs] = useState(FALLBACK_ESTIMATE_MS);
+  const [estimateMs, setEstimateMs] = useState(() => estimateDurationMs([], 1));
 
   // The clock the panel reads. Only runs while a job is being tracked.
   const isTracking = status !== null;
@@ -75,15 +75,18 @@ export function useGenerationJob<Row extends GenerationJobRow>({
     setStatus(next);
   }, []);
 
-  const fetchEstimate = useCallback(async () => {
-    const { data } = await supabase
-      .from(table)
-      .select('created_at, updated_at')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(5);
-    return medianDurationMs((data ?? []) as { created_at: string; updated_at: string }[]);
-  }, [supabase, table]);
+  const fetchEstimate = useCallback(
+    async (questionCount: number) => {
+      const { data } = await supabase
+        .from(table)
+        .select('created_at, updated_at, question_count')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      return estimateDurationMs((data ?? []) as CompletedRun[], questionCount);
+    },
+    [supabase, table]
+  );
 
   /**
    * Start showing progress. Call before the request that creates the job, so the
@@ -94,17 +97,19 @@ export function useGenerationJob<Row extends GenerationJobRow>({
    * instead of restarting it from zero.
    */
   const begin = useCallback(
-    (startedAtMs: number = Date.now()) => {
+    ({ questionCount, startedAt: startedAtMs = Date.now() }: { questionCount: number; startedAt?: number }) => {
       const nowMs = Date.now();
       lastStageRef.current = 'queued';
       setStartedAt(Math.min(startedAtMs, nowMs));
       setStageStartedAt(nowMs);
       setNow(nowMs);
-      setEstimateMs(FALLBACK_ESTIMATE_MS);
+      // Size-only estimate until history arrives, so the first paint is already
+      // scaled to what was asked for rather than to whatever ran last.
+      setEstimateMs(estimateDurationMs([], questionCount));
       setStatus('queued');
       // Runs alongside the caller's request rather than before it, so pacing the
       // display never delays the work it is pacing.
-      void fetchEstimate().then(setEstimateMs, () => {});
+      void fetchEstimate(questionCount).then(setEstimateMs, () => {});
     },
     [fetchEstimate]
   );

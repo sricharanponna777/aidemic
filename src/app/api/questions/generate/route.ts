@@ -60,7 +60,14 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: jobRow, error: jobError } = await admin
       .from('question_generation_jobs')
-      .insert({ user_id: authData.user.id, status: 'queued', request: body })
+      .insert({
+        user_id: authData.user.id,
+        status: 'queued',
+        request: body,
+        // Lets the browser pace the progress bar against past runs of the same
+        // size rather than against whatever ran last.
+        question_count: body.questionCount ?? null,
+      })
       .select('id')
       .single();
 

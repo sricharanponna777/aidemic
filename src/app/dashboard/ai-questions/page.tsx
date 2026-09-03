@@ -42,7 +42,7 @@ import {
   isPoetryCluster,
 } from '@/lib/ai/majorTopics';
 import { createClient } from '@/lib/supabase-client';
-import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
+import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, hasSourceExtract, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 import { isDiagramCompletionTopic } from '@/lib/ai/text';
@@ -186,6 +186,7 @@ const SS_JOB = 'exam-generation-job';
 
 const MOCK_DURATION_OPTIONS = [30, 45, 60, 90] as const;
 
+
 const STAGE_LABELS = { saving: 'Saving your question set' };
 const JOB_COLUMNS = 'id, status, result, error, updated_at';
 
@@ -209,6 +210,7 @@ type SessionMeta = {
 type PendingJob = {
   id: string;
   startedAt: number;
+  questionCount: number;
   meta: SessionMeta;
   isPaperMode: boolean;
   isMockExam: boolean;
@@ -485,6 +487,10 @@ export default function AIQuestionsPage() {
   const topicIsReady = form.topic.trim().length === 0 || form.topic.trim().length >= 3;
   const isGenerationValid = isEnglishLanguagePractice || (topicIsReady && topicIsAllowed && !topicsLoading && poetrySelectionComplete);
   const inPractice = questions.length > 0;
+  // Read from the run's own metadata, not the form: the generator is still
+  // editable during practice, so the currently selected subject may no longer
+  // be the one these questions were written for.
+  const showSourceExtract = !!sourceMaterial && hasSourceExtract(sessionMeta?.subject ?? selectedSubject?.subject);
   const answeredCount = useMemo(() => answers.filter((answer) => answer.trim().length > 0).length, [answers]);
   const totalAvailableMarks = useMemo(() => questions.reduce((sum, question) => sum + question.marks, 0), [questions]);
   const setupValidationMessage = subjectsError
@@ -644,6 +650,7 @@ export default function AIQuestionsPage() {
     const pending: PendingJob = {
       id: '',
       startedAt: Date.now(),
+      questionCount: fixedQuestionCount,
       meta: {
         topic: payload.topic || 'General revision',
         subject: selectedSubject.subject,
@@ -661,7 +668,7 @@ export default function AIQuestionsPage() {
     // The progress panel says what the old status banner said, and says it with
     // a stage rather than a guess, so there is nothing left for the banner here.
     setStatus(null);
-    job.begin(pending.startedAt);
+    job.begin({ questionCount: pending.questionCount, startedAt: pending.startedAt });
 
     try {
       // Generation runs as a background job: this returns a job id as soon as
@@ -709,7 +716,7 @@ export default function AIQuestionsPage() {
         return;
       }
       setIsGenerating(true);
-      job.begin(pending.startedAt);
+      job.begin({ questionCount: pending.questionCount, startedAt: pending.startedAt });
       try {
         const settled = await job.track(pending.id);
         if (!cancelled) await settleJob(settled, pending);
@@ -1280,7 +1287,7 @@ export default function AIQuestionsPage() {
             </div>
           </div>
 
-          {sourceMaterial ? (
+          {showSourceExtract ? (
             <section className="mt-5 rounded-lg border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-500/25 dark:bg-indigo-500/10">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">
                 Source Extract

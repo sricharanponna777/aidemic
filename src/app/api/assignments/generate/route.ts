@@ -92,6 +92,10 @@ export async function POST(request: Request) {
         requested_by: authData.user.id,
         status: 'queued',
         request: body,
+        // Stored alongside the request so the browser can pace the progress bar
+        // against past runs of the same size; `request` itself is not readable
+        // from there.
+        question_count: body.generation.questionCount ?? null,
       })
       .select('id')
       .single();
