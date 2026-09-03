@@ -120,16 +120,3 @@ export const isSubjectSpecComplete = (subject: UserSubject | null) => {
   if (entries.length > 1 && !subject?.spec_name) return false;
   return !requiresTierSelection(subject, getSavedSpecName(subject)) || !!subject?.spec_tier;
 };
-
-/**
- * Whether a subject's questions are written *about* a passage, so the source
- * extract belongs on screen.
- *
- * An AQA English Language set asks you to list four things from the source and
- * is unanswerable without it. Everywhere else the model occasionally emits a
- * stray `sourceMaterial` that no question refers to, which rendered an
- * authoritative "Source Extract" panel above a maths paper for no reason --
- * so this gates on the subject rather than on the text being non-empty.
- */
-export const hasSourceExtract = (subject: string | null | undefined) =>
-  ['english language', 'english literature', 'english'].includes((subject ?? '').trim().toLowerCase());

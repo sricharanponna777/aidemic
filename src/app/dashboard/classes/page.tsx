@@ -8,6 +8,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
+import { specChainParts } from '@/lib/specLabel';
 import { PageLoader } from '@/components/PageLoader';
 
 type JoinedClass = {
@@ -18,6 +19,8 @@ type JoinedClass = {
     description: string | null;
     academic_year: string | null;
     specifications: {
+      name: string;
+      tier: string | null;
       subjects: {
         name: string;
         exam_boards: { name: string; qualifications: { name: string } | null } | null;
@@ -41,7 +44,7 @@ export default function StudentClassesPage() {
     const { data, error } = await supabase
       .from('class_students')
       .select(
-        'class_id, classes ( id, name, description, academic_year, specifications ( subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
+        'class_id, classes ( id, name, description, academic_year, specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
       )
       .eq('student_id', studentId)
       .eq('status', 'active');
@@ -148,9 +151,7 @@ export default function StudentClassesPage() {
           {classes.map((entry) => {
             const cls = entry.classes;
             if (!cls) return null;
-            const subjectChain = cls.specifications?.subjects;
-            const board = subjectChain?.exam_boards;
-            const qualification = board?.qualifications;
+            const specParts = specChainParts(cls.specifications);
             return (
               <Link
                 key={cls.id}
@@ -162,9 +163,9 @@ export default function StudentClassesPage() {
                   <h3 className="font-semibold text-content">{cls.name}</h3>
                 </div>
                 <p className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-content-subtle">
-                  {qualification ? <span>{qualification.name}</span> : null}
-                  {board ? <span>· {board.name}</span> : null}
-                  {subjectChain ? <span>· {subjectChain.name}</span> : null}
+                  {specParts.map((part, i) => (
+                    <span key={i}>{i > 0 ? '· ' : ''}{part}</span>
+                  ))}
                 </p>
               </Link>
             );

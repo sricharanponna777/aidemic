@@ -28,6 +28,7 @@ import { useToast } from '@/components/ToastProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
+import { specChainParts } from '@/lib/specLabel';
 import { AssignmentForm, type CreatedAssignment } from '@/components/teacher/AssignmentForm';
 import { buildStudentStats, buildClassStats, buildTopicStats, buildAssignmentStats } from '@/lib/teacherAnalytics';
 import { ParentLinksPanel } from '@/components/teacher/ParentLinksPanel';
@@ -338,7 +339,7 @@ export default function TeacherClassPage() {
         icon={Users}
         backHref="/dashboard/teacher/classes"
         backLabel="My Classes"
-        description={`${roster.length} student${roster.length === 1 ? '' : 's'}`}
+        description={[`${roster.length} student${roster.length === 1 ? '' : 's'}`, ...specChainParts(classInfo.specifications)].join(' · ')}
         title={
           isEditingName ? (
             <span className="flex items-center gap-1.5">

@@ -627,7 +627,7 @@ const getEnglishLanguageInstructions = (payload: ReturnType<typeof normalizePayl
   if (paper === 'paper1') {
     return [
       'AQA GCSE English Language Paper 1 only. Generate exactly 8 questions; ignore requested count.',
-      'Create one original fiction extract of 550-750 words. Put the full extract only in top-level sourceMaterial under "Source A". Do not include the extract inside any question. Do not use copyrighted text.',
+      'Create one original fiction extract of 550-750 words. Put the full extract only in top-level sourceMaterial under "Source A". Do not include the extract inside any question. Never reproduce, quote or closely paraphrase real published text, and never attribute it to a real author, publication or work — invent the passage and any attribution.',
       'Questions 1-4: each is questionType="mcq", 1 mark, exactly 3 options A-C, based only on the first paragraph of Source A.',
       'Question 5: open, 8 marks, analyse how language devices in the second paragraph create one named effect.',
       'Question 6: open, 8 marks, analyse how structural devices across the whole extract create one named effect.',
@@ -640,7 +640,7 @@ const getEnglishLanguageInstructions = (payload: ReturnType<typeof normalizePayl
 
   return [
     'AQA GCSE English Language Paper 2 only. Generate exactly 5 questions; ignore requested count.',
-    'Create two original linked unseen sources of 350-500 words each: one 20th/21st century non-fiction and one 19th century..... non-fiction with contrasting viewpoints on the same issue. Put both full sources only in top-level sourceMaterial under "Source A" and "Source B". Do not include the sources inside any question. Do not use copyrighted text.',
+    'Create two original linked unseen sources of 350-500 words each: one 20th/21st century non-fiction and one 19th century..... non-fiction with contrasting viewpoints on the same issue. Put both full sources only in top-level sourceMaterial under "Source A" and "Source B". Do not include the sources inside any question. Never reproduce, quote or closely paraphrase real published text, and never attribute it to a real author, publication or work — invent the passage and any attribution.',
     'Question 1: open, 4 marks, short retrieval/inference about Source A.',
     'Question 2: open, 8 marks, write a summary comparing differences between Source A and Source B.',
     'Question 3: open, 12 marks, analyse how the writer uses language in a named section of one source.',
@@ -724,7 +724,7 @@ const buildPrompt = (
     difficultyNote,
     'Use GFM Markdown in strings. No raw HTML.',
     'Math: inline \\\\(...\\\\), display \\\\[...\\\\]. Double-escape backslashes in JSON. Always group: x^{2} not x^2.',
-    'sourceMaterial: use only for separate extracts/sources needed to answer the questions. Empty string for ordinary practice.',
+    'sourceMaterial: use only for separate extracts/sources needed to answer the questions. Empty string for ordinary practice. Any extract must be original writing composed for this paper. Never reproduce, quote or closely paraphrase real published text (novels, poems, lyrics, speeches, articles, scripture), and never attribute it to a real author, publication or work — invent the passage and any attribution.',
     'When a question involves a data set, present it as a markdown table (| col | col |) inside the question text so it renders correctly.',
     'Keep all text fields concise: question≤2 sentences, markScheme items≤15 words each, modelAnswer≤40 words, skillsAssessed≤1 item.',
     'Return JSON only. Match schema exactly.',

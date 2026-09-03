@@ -10,6 +10,7 @@ import { VerificationBanner } from '@/components/VerificationBanner';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { scoreBarTone, scoreTextTone } from '@/lib/scoreTone';
+import { specChainParts } from '@/lib/specLabel';
 import { PageLoader } from '@/components/PageLoader';
 import { useToast } from '@/components/ToastProvider';
 import {
@@ -579,9 +580,7 @@ export default function TeacherDashboardPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visibleClasses.map((cls) => {
-            const subjectChain = cls.specifications?.subjects;
-            const board = subjectChain?.exam_boards;
-            const qualification = board?.qualifications;
+            const specParts = specChainParts(cls.specifications);
             const analytics = classAnalytics[cls.id];
             const needsAttention = analytics?.completionRate !== null && analytics?.completionRate !== undefined && analytics.completionRate < 40;
             const isArchived = cls.status === 'archived';
@@ -645,9 +644,9 @@ export default function TeacherDashboardPage() {
                   )}
                 </div>
                 <p className="mt-1 flex flex-wrap gap-1.5 text-xs text-content-subtle">
-                  {qualification ? <span>{qualification.name}</span> : null}
-                  {board ? <span>· {board.name}</span> : null}
-                  {subjectChain ? <span>· {subjectChain.name}</span> : null}
+                  {specParts.map((part, i) => (
+                    <span key={i}>{i > 0 ? '· ' : ''}{part}</span>
+                  ))}
                 </p>
                 <div className="mt-3 flex items-center gap-1.5 text-sm text-content-muted">
                   <Users className="h-4 w-4" />

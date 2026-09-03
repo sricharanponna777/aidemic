@@ -42,7 +42,7 @@ import {
   isPoetryCluster,
 } from '@/lib/ai/majorTopics';
 import { createClient } from '@/lib/supabase-client';
-import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, hasSourceExtract, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
+import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 import { isDiagramCompletionTopic } from '@/lib/ai/text';
@@ -487,10 +487,6 @@ export default function AIQuestionsPage() {
   const topicIsReady = form.topic.trim().length === 0 || form.topic.trim().length >= 3;
   const isGenerationValid = isEnglishLanguagePractice || (topicIsReady && topicIsAllowed && !topicsLoading && poetrySelectionComplete);
   const inPractice = questions.length > 0;
-  // Read from the run's own metadata, not the form: the generator is still
-  // editable during practice, so the currently selected subject may no longer
-  // be the one these questions were written for.
-  const showSourceExtract = !!sourceMaterial && hasSourceExtract(sessionMeta?.subject ?? selectedSubject?.subject);
   const answeredCount = useMemo(() => answers.filter((answer) => answer.trim().length > 0).length, [answers]);
   const totalAvailableMarks = useMemo(() => questions.reduce((sum, question) => sum + question.marks, 0), [questions]);
   const setupValidationMessage = subjectsError
@@ -1287,11 +1283,12 @@ export default function AIQuestionsPage() {
             </div>
           </div>
 
-          {showSourceExtract ? (
+          {sourceMaterial ? (
             <section className="mt-5 rounded-lg border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-500/25 dark:bg-indigo-500/10">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">
                 Source Extract
               </p>
+              <p className="mt-1 text-xs text-indigo-700/70 dark:text-indigo-300/70">Written for this practice paper. Not an extract from a real publication.</p>
               <MarkdownContent className="mt-3 max-h-136 overflow-y-auto pr-2 text-sm leading-7 text-content" content={sourceMaterial} />
             </section>
           ) : null}
