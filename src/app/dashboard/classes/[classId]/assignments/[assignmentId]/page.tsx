@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, Loader2 } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { MarkdownContent } from '@/components/MarkdownContent';
@@ -67,6 +67,7 @@ export default function TakeAssignmentPage() {
   const [report, setReport] = useState<MarkingReport | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -120,6 +121,7 @@ export default function TakeAssignmentPage() {
       return;
     }
 
+    setElapsedSeconds(0);
     setIsSubmitting(true);
     try {
       // The server fetches the stored questions and curriculum details for
@@ -150,6 +152,22 @@ export default function TakeAssignmentPage() {
     }
   };
 
+  // Marking is a single model call, so there are no honest intermediate stages
+  // to report. What IS real is how long it has been running and how many answers
+  // the model was actually given, so show those rather than inventing a
+  // progress bar that does not correspond to anything.
+  useEffect(() => {
+    if (!isSubmitting) return;
+    const id = setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
+    return () => clearInterval(id);
+  }, [isSubmitting]);
+
+  // MCQ, plot and diagram questions are marked by code the moment they arrive;
+  // only written answers wait on the model.
+  const writtenAnswerCount = (assignment?.questions_payload ?? []).filter(
+    (question) => !['mcq', 'plot', 'diagram'].includes(question.questionType)
+  ).length;
+
   if (isLoading || pageLoading || !assignment) {
     return <PageLoader text="Loading assignment..." />;
   }
@@ -177,7 +195,7 @@ export default function TakeAssignmentPage() {
         <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-6 dark:border-indigo-500/30 dark:bg-indigo-500/10">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="text-lg font-semibold text-content">
-              {Math.round(report.totalMarksAwarded)}/{Math.round(report.totalAvailableMarks)} marks · {Math.round(report.percentage)}% · Predicted grade {report.predictedGrade}
+              {Math.round(report.totalMarksAwarded)}/{Math.round(report.totalAvailableMarks)} marks · {Math.round(report.percentage)}% · Grade equivalent {report.predictedGrade}
             </h2>
             {assignment.allow_reattempts && (
               <button type="button" onClick={() => setReport(null)} className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
@@ -185,6 +203,10 @@ export default function TakeAssignmentPage() {
               </button>
             )}
           </div>
+          <p className="mt-1 text-xs text-content-subtle">
+            What this score alone would be worth. Your predicted grade on the dashboard is separate — it builds up
+            from every attempt across the specification.
+          </p>
           <p className="mt-2 text-sm text-content-muted dark:text-slate-300">{report.summary}</p>
         </div>
       ) : null}
@@ -263,6 +285,23 @@ export default function TakeAssignmentPage() {
       </div>
 
       {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+
+      {isSubmitting && (
+        <div className="flex items-start gap-3 rounded-xl border border-subtle bg-surface-sunken p-4 dark:bg-surface/3">
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-accent" />
+          <div>
+            <p className="text-sm font-medium text-content">
+              {writtenAnswerCount > 0
+                ? `Marking ${writtenAnswerCount} written answer${writtenAnswerCount === 1 ? '' : 's'} against the mark scheme`
+                : 'Marking your answers'}
+            </p>
+            <p className="mt-0.5 text-xs text-content-subtle">
+              {elapsedSeconds}s elapsed · usually under a minute. Your attempt is saved as soon as marking finishes, so
+              this will not be lost.
+            </p>
+          </div>
+        </div>
+      )}
 
       {!isReview && (
         <button type="button" onClick={handleSubmit} disabled={isSubmitting} className={buttonStyles({ variant: 'primary', size: 'lg' })}>

@@ -443,7 +443,7 @@ export default function TeacherReportsPage() {
                     </div>
                     <div className="rounded-xl border border-subtle px-4 py-3">
                       <p className="text-2xl font-bold text-content dark:text-white">{selectedStudent.predictedGrade ?? '—'}</p>
-                      <p className="text-xs text-content-subtle">Predicted grade</p>
+                      <p className="text-xs text-content-subtle">Latest grade equivalent</p>
                     </div>
                     <div className="rounded-xl border border-subtle px-4 py-3">
                       <p className="text-sm font-semibold text-content dark:text-white">
@@ -510,9 +510,10 @@ export default function TeacherReportsPage() {
           {/* Grade predictions */}
           {tab === 'predictions' && (
             <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-content">Grade predictions</h2>
+              <h2 className="text-lg font-semibold text-content">Grade equivalents</h2>
               <p className="mt-1 text-sm text-content-subtle">
-                Most recent predicted grade per student, from their completed assignments.
+                What each student&apos;s most recent completed assignment alone was worth. This is not their predicted
+                grade, which builds up from every attempt across the specification.
               </p>
               {studentStats.length === 0 ? (
                 <p className="mt-4 text-sm text-content-subtle">No students have joined your classes yet.</p>
@@ -525,7 +526,7 @@ export default function TeacherReportsPage() {
                         <th className="pb-2 pr-4 font-medium">Class</th>
                         <th className="pb-2 pr-4 font-medium">Completed</th>
                         <th className="pb-2 pr-4 font-medium">Avg. score</th>
-                        <th className="pb-2 font-medium">Predicted grade</th>
+                        <th className="pb-2 font-medium">Grade equivalent</th>
                       </tr>
                     </thead>
                     <tbody>

@@ -141,7 +141,7 @@ export default function TeacherOnboardingPage() {
 
           <div className="mt-8 space-y-4">
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-semibold text-content-muted text-content">
+              <label className="flex items-center gap-2 text-sm font-semibold text-content-muted">
                 <SchoolIcon className="h-4 w-4 text-accent" />
                 School
               </label>
@@ -223,7 +223,7 @@ export default function TeacherOnboardingPage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="department" className="text-sm font-semibold text-content-muted text-content">
+              <label htmlFor="department" className="text-sm font-semibold text-content-muted">
                 Department
               </label>
               <input
@@ -237,7 +237,7 @@ export default function TeacherOnboardingPage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="qualificationLevel" className="text-sm font-semibold text-content-muted text-content">
+              <label htmlFor="qualificationLevel" className="text-sm font-semibold text-content-muted">
                 Qualification level you teach
               </label>
               <input

@@ -140,3 +140,23 @@ export function attributeQuestions(
 ): (string | null)[] {
   return questionTexts.map((text) => pickBestSubtopic(subtopics, text)?.id ?? null);
 }
+
+/**
+ * Load the subtopics under a topic that is already known by id.
+ *
+ * `resolveTopic` exists because `exam_practice_attempts` only stores free text.
+ * Assignments are different: `assignments.topic_id` / `.subtopic_id` are real
+ * foreign keys chosen by the teacher when the assignment was created, so
+ * matching the assignment *title* against `topics.name` — which is what the
+ * free-text path does — throws away an exact answer in order to guess, and the
+ * guess never lands ("Cell Biology - Assignment - 01" is nobody's topic name).
+ */
+export async function loadTopicSubtopics(db: SupabaseClient, topicId: string): Promise<SubtopicCandidate[]> {
+  if (!topicId) return [];
+  const { data } = await db
+    .from('subtopics')
+    .select('id, name')
+    .eq('topic_id', topicId)
+    .order('order_index');
+  return (data ?? []) as SubtopicCandidate[];
+}

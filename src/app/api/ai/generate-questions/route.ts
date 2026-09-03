@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-server';
 import { getOrSetCache } from '@/lib/redis';
 import { OPENAI_DEFAULT_BASE_URL, buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
+import { createStageTimer, type StageTimer } from '@/lib/ai/timing';
 import {
   extractFromResponsesBody,
   extractJsonWithCoercer,
@@ -34,7 +35,7 @@ import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
 type QuestionType = 'open' | 'mcq' | 'plot' | 'diagram';
 type CorrectOption = '' | 'A' | 'B' | 'C' | 'D';
 
-interface GenerateQuestionsPayload {
+export interface GenerateQuestionsPayload {
   topic?: string;
   subtopic?: string;
   learningObjective?: string;
@@ -1096,171 +1097,232 @@ const cachedValidateTopicWithAI = (
   return getOrSetCache(key, 60 * 60 * 24 * 7, () => validateTopicWithAI(fields, getAIConfig()));
 };
 
+/**
+ * The stages a generation run passes through, in order.
+ *
+ * Exposed because generation is also driven as a background job
+ * (`/api/assignments/generate`), which reports the current stage to a polling
+ * teacher. A 74-second wait behind one spinner is indistinguishable from a hang.
+ */
+export type GenerationStage = 'validating' | 'generating' | 'backfilling' | 'finalising';
+
+export type GenerationSuccess = {
+  questionCount: number;
+  questions: ExamQuestion[];
+  sourceMaterial: string;
+  sources: ReturnType<typeof getSources>;
+  usedOnlineResources: boolean;
+  warnings: string[];
+};
+
+export type GenerationFailure = { error: string; status: number };
+
+export const isGenerationFailure = (
+  result: GenerationSuccess | GenerationFailure
+): result is GenerationFailure => 'error' in result;
+
+/**
+ * Generate a validated question set.
+ *
+ * Split out of `POST` so the background job route can run exactly the same
+ * pipeline without an internal HTTP hop (which would have to forward the
+ * caller's session cookie). `POST` keeps ownership of auth and rate limiting;
+ * everything after that lives here.
+ */
+export async function generateQuestionSet(
+  rawBody: GenerateQuestionsPayload,
+  ctx: {
+    supabase: Awaited<ReturnType<typeof createClient>>;
+    userId: string;
+    timer: StageTimer;
+    onStage?: (stage: GenerationStage) => void;
+  }
+): Promise<GenerationSuccess | GenerationFailure> {
+  const { supabase, userId, timer } = ctx;
+  const onStage = ctx.onStage ?? (() => {});
+  const payload = normalizePayload(rawBody);
+
+  if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
+    return { error: `Exam board must be one of: ${SUPPORTED_EXAM_BOARDS_LABEL}.`, status: 400 };
+  }
+  if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
+    return { error: `Qualification must be one of: ${SUPPORTED_EXAM_TYPES_LABEL}.`, status: 400 };
+  }
+  if (!payload.subject || !SUPPORTED_SUBJECTS.includes(payload.subject as SupportedSubject)) {
+    return { error: `Subject must be one of: ${SUPPORTED_SUBJECTS.join(', ')}.`, status: 400 };
+  }
+  // UK English Language practice is built around the AQA papers. Other countries have a
+  // single board of their own, so the restriction must not apply to them.
+  if (payload.subject === 'english language' && isUkQualification(payload.examType) && payload.examBoard !== 'aqa') {
+    return { error: 'UK English Language practice currently supports AQA only.', status: 400 };
+  }
+  const englishLanguagePaper = getEnglishLanguagePaper(payload);
+  if (!englishLanguagePaper && payload.topic) {
+    const allowedTopics = getMajorTopicsForQualification({
+      subject: payload.subject,
+      examBoard: payload.examBoard,
+      examType: payload.examType,
+      specification: payload.specification,
+    });
+    const topicError = getQualificationTopicError(payload.topic, allowedTopics);
+    if (topicError) {
+      return { error: topicError, status: 400 };
+    }
+    const relevanceError = getTopicRelevanceError({
+      topic: payload.topic,
+      subject: payload.subject,
+      examBoard: payload.examBoard,
+      examType: payload.examType,
+      specification: payload.specification,
+    });
+    if (relevanceError) {
+      return { error: relevanceError, status: 400 };
+    }
+  }
+  if (englishLanguagePaper) {
+    payload.questionCount = englishLanguagePaper === 'paper1' ? 8 : 5;
+    payload.allowMcq = englishLanguagePaper === 'paper1';
+    payload.allowCalculation = false;
+  }
+
+  const config = getAIConfig();
+  const missingKeyError = getMissingHostedKeyError(config);
+  if (missingKeyError) {
+    return { error: missingKeyError, status: 500 };
+  }
+
+  // AI spec validation — skip for English Language (fixed paper formats have their own logic)
+  if (!englishLanguagePaper) {
+    onStage('validating');
+    const specCheck = await timer.step('specValidationMs', () =>
+      cachedValidateTopicWithAI({
+        topic: payload.topic,
+        subject: payload.subject,
+        examBoard: payload.examBoard,
+        examType: payload.examType,
+        specification: payload.specification,
+      })
+    );
+    if (!specCheck.valid) {
+      return { error: specCheck.reason, status: 400 };
+    }
+  }
+
+  const figureUrls = dedupe([payload.figureUrl, ...extractFigureUrls(payload.prompt)].filter(Boolean)).slice(0, 8);
+  const warnings: string[] = [];
+
+  const difficultyNote = await timer.step('difficultyNoteMs', () => getDifficultyNote(supabase, userId, payload));
+
+  onStage('generating');
+  const aiResult = await timer.step('aiGenerateMs', () => aiGenerate(payload, figureUrls, difficultyNote));
+  if (aiResult.onlineLookupFailed) {
+    warnings.push(
+      `Online resource lookup was unavailable, so marks were chosen without live source lookup.${aiResult.onlineLookupReason ? ` ${aiResult.onlineLookupReason}` : ''}`
+    );
+  }
+
+  const uniqueQuestions: ExamQuestion[] = [];
+  const seen = new Set<string>();
+  const rawQuestions = Array.isArray(aiResult.generated.questions) ? aiResult.generated.questions : [];
+  const sourceMaterialItems: string[] = [];
+  let malformedCount = appendUniqueQuestions(uniqueQuestions, seen, rawQuestions, payload, sourceMaterialItems, figureUrls);
+  let totalRawQuestions = rawQuestions.length;
+
+  if (uniqueQuestions.length < payload.questionCount) {
+    try {
+      onStage('backfilling');
+      const missingCount = payload.questionCount - uniqueQuestions.length;
+      const backfillRaw = await timer.step('aiBackfillMs', () =>
+        aiBackfillQuestions(payload, figureUrls, uniqueQuestions, missingCount, difficultyNote)
+      );
+      const backfillQuestions = Array.isArray(backfillRaw.questions) ? backfillRaw.questions : [];
+      totalRawQuestions += backfillQuestions.length;
+      malformedCount += appendUniqueQuestions(uniqueQuestions, seen, backfillQuestions, payload, sourceMaterialItems, figureUrls);
+    } catch {
+      warnings.push('Replacement question generation could not complete.');
+    }
+  }
+
+  if (uniqueQuestions.length === 0) {
+    // Without the raw items this failure is undiagnosable: the message says only that
+    // everything was discarded, not which required field was missing.
+    console.error(
+      '[generate-questions] every returned item failed normalisation',
+      JSON.stringify(
+        {
+          subject: payload.subject,
+          examBoard: payload.examBoard,
+          examType: payload.examType,
+          specification: payload.specification,
+          topic: payload.topic,
+          totalRawQuestions,
+          rawQuestions: rawQuestions.slice(0, 3),
+        },
+        null,
+        2
+      ).slice(0, MAX_AI_RESPONSE_LOG_TEXT)
+    );
+    return {
+      error:
+        totalRawQuestions === 0
+          ? 'AI did not return any exam-practice questions.'
+          : `AI returned ${totalRawQuestions} question(s), but none included enough usable question text, marks, answer guidance, and MCQ option data.`,
+      status: 502,
+    };
+  }
+  if (malformedCount > 0) {
+    warnings.push(`Repaired the question set and discarded ${malformedCount} malformed item(s).`);
+  }
+  if (uniqueQuestions.length < payload.questionCount) {
+    warnings.push(`Generated ${uniqueQuestions.length} unique questions out of requested ${payload.questionCount}.`);
+  }
+
+  onStage('finalising');
+  const missingFigureReference = uniqueQuestions.some((question) => referencesFigure(question.question) && !question.figureUrl);
+  const withFigures = applyFigureReferences(uniqueQuestions, figureUrls).questions;
+  if (missingFigureReference && figureUrls.length === 0) {
+    warnings.push('Some questions reference a figure, but no figure URL was provided.');
+  }
+  const sourceMaterial = txt(
+    normalizeMathNotation(safe(aiResult.generated.sourceMaterial || sourceMaterialItems[0] || ''), payload.subject),
+    12000
+  );
+
+  return {
+    questionCount: withFigures.length,
+    questions: withFigures,
+    sourceMaterial,
+    sources: getSources(withFigures),
+    usedOnlineResources: aiResult.usedOnlineResources,
+    warnings,
+  };
+}
+
 export async function POST(request: Request) {
+  const timer = createStageTimer('generate-questions');
   try {
     const supabase = await createClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await timer.step('authMs', () => supabase.auth.getUser());
     if (authError || !authData.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.generateQuestions);
+    const { allowed } = await timer.step('rateLimitMs', () =>
+      checkAiRateLimit(supabase, AI_DAILY_LIMITS.generateQuestions)
+    );
     if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
 
     const rawBody = (await request.json()) as GenerateQuestionsPayload;
-    const payload = normalizePayload(rawBody);
+    const result = await generateQuestionSet(rawBody, { supabase, userId: authData.user.id, timer });
 
-    if (!payload.examBoard || !SUPPORTED_EXAM_BOARDS.includes(payload.examBoard)) {
-      return NextResponse.json({ error: `Exam board must be one of: ${SUPPORTED_EXAM_BOARDS_LABEL}.` }, { status: 400 });
-    }
-    if (!payload.examType || !SUPPORTED_EXAM_TYPES.includes(payload.examType)) {
-      return NextResponse.json({ error: `Qualification must be one of: ${SUPPORTED_EXAM_TYPES_LABEL}.` }, { status: 400 });
-    }
-    if (!payload.subject || !SUPPORTED_SUBJECTS.includes(payload.subject as SupportedSubject)) {
-      return NextResponse.json(
-        { error: `Subject must be one of: ${SUPPORTED_SUBJECTS.join(', ')}.` },
-        { status: 400 }
-      );
-    }
-    // UK English Language practice is built around the AQA papers. Other countries have a
-    // single board of their own, so the restriction must not apply to them.
-    if (payload.subject === 'english language' && isUkQualification(payload.examType) && payload.examBoard !== 'aqa') {
-      return NextResponse.json({ error: 'UK English Language practice currently supports AQA only.' }, { status: 400 });
-    }
-    const englishLanguagePaper = getEnglishLanguagePaper(payload);
-    if (!englishLanguagePaper && payload.topic) {
-      const allowedTopics = getMajorTopicsForQualification({
-        subject: payload.subject,
-        examBoard: payload.examBoard,
-        examType: payload.examType,
-        specification: payload.specification,
-      });
-      const topicError = getQualificationTopicError(payload.topic, allowedTopics);
-      if (topicError) {
-        return NextResponse.json({ error: topicError }, { status: 400 });
-      }
-      const relevanceError = getTopicRelevanceError({
-        topic: payload.topic,
-        subject: payload.subject,
-        examBoard: payload.examBoard,
-        examType: payload.examType,
-        specification: payload.specification,
-      });
-      if (relevanceError) {
-        return NextResponse.json({ error: relevanceError }, { status: 400 });
-      }
-    }
-    if (englishLanguagePaper) {
-      payload.questionCount = englishLanguagePaper === 'paper1' ? 8 : 5;
-      payload.allowMcq = englishLanguagePaper === 'paper1';
-      payload.allowCalculation = false;
+    if (isGenerationFailure(result)) {
+      timer.done({ failed: true, status: result.status, error: result.error.slice(0, 200) });
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    const config = getAIConfig();
-    const missingKeyError = getMissingHostedKeyError(config);
-    if (missingKeyError) {
-      return NextResponse.json({ error: missingKeyError }, { status: 500 });
-    }
-
-    // AI spec validation — skip for English Language (fixed paper formats have their own logic)
-    if (!englishLanguagePaper) {
-      const specCheck = await cachedValidateTopicWithAI({
-        topic: payload.topic,
-        subject: payload.subject,
-        examBoard: payload.examBoard,
-        examType: payload.examType,
-        specification: payload.specification,
-      });
-      if (!specCheck.valid) {
-        return NextResponse.json({ error: specCheck.reason }, { status: 400 });
-      }
-    }
-
-    const figureUrls = dedupe([payload.figureUrl, ...extractFigureUrls(payload.prompt)].filter(Boolean)).slice(0, 8);
-    const warnings: string[] = [];
-
-    const difficultyNote = await getDifficultyNote(supabase, authData.user.id, payload);
-    const aiResult = await aiGenerate(payload, figureUrls, difficultyNote);
-    if (aiResult.onlineLookupFailed) {
-      warnings.push(
-        `Online resource lookup was unavailable, so marks were chosen without live source lookup.${aiResult.onlineLookupReason ? ` ${aiResult.onlineLookupReason}` : ''}`
-      );
-    }
-
-    const uniqueQuestions: ExamQuestion[] = [];
-    const seen = new Set<string>();
-    const rawQuestions = Array.isArray(aiResult.generated.questions) ? aiResult.generated.questions : [];
-    const sourceMaterialItems: string[] = [];
-    let malformedCount = appendUniqueQuestions(uniqueQuestions, seen, rawQuestions, payload, sourceMaterialItems, figureUrls);
-    let totalRawQuestions = rawQuestions.length;
-
-    if (uniqueQuestions.length < payload.questionCount) {
-      try {
-        const missingCount = payload.questionCount - uniqueQuestions.length;
-        const backfillRaw = await aiBackfillQuestions(payload, figureUrls, uniqueQuestions, missingCount, difficultyNote);
-        const backfillQuestions = Array.isArray(backfillRaw.questions) ? backfillRaw.questions : [];
-        totalRawQuestions += backfillQuestions.length;
-        malformedCount += appendUniqueQuestions(uniqueQuestions, seen, backfillQuestions, payload, sourceMaterialItems, figureUrls);
-      } catch {
-        warnings.push('Replacement question generation could not complete.');
-      }
-    }
-
-    if (uniqueQuestions.length === 0) {
-      // Without the raw items this failure is undiagnosable: the message says only that
-      // everything was discarded, not which required field was missing.
-      console.error(
-        '[generate-questions] every returned item failed normalisation',
-        JSON.stringify(
-          {
-            subject: payload.subject,
-            examBoard: payload.examBoard,
-            examType: payload.examType,
-            specification: payload.specification,
-            topic: payload.topic,
-            totalRawQuestions,
-            rawQuestions: rawQuestions.slice(0, 3),
-          },
-          null,
-          2
-        ).slice(0, MAX_AI_RESPONSE_LOG_TEXT)
-      );
-      return NextResponse.json(
-        {
-          error:
-            totalRawQuestions === 0
-              ? 'AI did not return any exam-practice questions.'
-              : `AI returned ${totalRawQuestions} question(s), but none included enough usable question text, marks, answer guidance, and MCQ option data.`,
-        },
-        { status: 502 }
-      );
-    }
-    if (malformedCount > 0) {
-      warnings.push(`Repaired the question set and discarded ${malformedCount} malformed item(s).`);
-    }
-    if (uniqueQuestions.length < payload.questionCount) {
-      warnings.push(`Generated ${uniqueQuestions.length} unique questions out of requested ${payload.questionCount}.`);
-    }
-
-    const missingFigureReference = uniqueQuestions.some((question) => referencesFigure(question.question) && !question.figureUrl);
-    const withFigures = applyFigureReferences(uniqueQuestions, figureUrls).questions;
-    if (missingFigureReference && figureUrls.length === 0) {
-      warnings.push('Some questions reference a figure, but no figure URL was provided.');
-    }
-    const sourceMaterial = txt(
-      normalizeMathNotation(safe(aiResult.generated.sourceMaterial || sourceMaterialItems[0] || ''), payload.subject),
-      12000
-    );
-
-    return NextResponse.json({
-      success: true,
-      questionCount: withFigures.length,
-      questions: withFigures,
-      sourceMaterial,
-      sources: getSources(withFigures),
-      usedOnlineResources: aiResult.usedOnlineResources,
-      warnings,
-    });
+    timer.done({ requested: rawBody.questionCount, produced: result.questionCount, subject: rawBody.subject });
+    return NextResponse.json({ success: true, ...result });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to generate questions.';
+    timer.done({ failed: true, error: message.slice(0, 200) });
     return NextResponse.json({ error: txt(message, MAX_AI_ERROR_TEXT) }, { status: 500 });
   }
 }

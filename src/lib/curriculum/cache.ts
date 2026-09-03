@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseEnv } from '../supabase-env';
 import { getOrSetCache } from '../redis';
-import { resolveTopic, type CurriculumScope, type ResolvedTopic } from './resolve';
+import { loadTopicSubtopics, resolveTopic, type CurriculumScope, type ResolvedTopic } from './resolve';
+import type { SubtopicCandidate } from './subtopicMatch';
 
 const ONE_DAY_SECONDS = 60 * 60 * 24;
 
@@ -24,3 +25,15 @@ export const cachedResolveTopic = (scope: CurriculumScope, topicName: string): P
     return resolveTopic(db, scope, topicName);
   });
 };
+
+/**
+ * Cached `loadTopicSubtopics`. Same sharing argument as `cachedResolveTopic`:
+ * `subtopics` is RLS `USING (true)`, so one topic's subtopic list is identical
+ * for every user and the topic id alone is a sufficient cache key.
+ */
+export const cachedLoadTopicSubtopics = (topicId: string): Promise<SubtopicCandidate[]> =>
+  getOrSetCache(`curriculum:topic-subtopics:${topicId}`, ONE_DAY_SECONDS, async () => {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+    const db = createClient(supabaseUrl, supabaseAnonKey);
+    return loadTopicSubtopics(db, topicId);
+  });

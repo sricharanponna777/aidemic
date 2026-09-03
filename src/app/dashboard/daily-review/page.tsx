@@ -8,6 +8,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
 import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
+import { normalizeInsightLabel } from '@/lib/weaknesses';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useToast } from '@/components/ToastProvider';
@@ -73,14 +74,6 @@ type WeakTopicSummary = {
 };
 
 type Phase = 'idle' | 'loading' | 'reviewing' | 'summary';
-
-const normalizeInsightLabel = (value: string) =>
-  value
-    .replace(/^Main pattern to fix:\s*/i, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\.$/, '')
-    .trim()
-    .slice(0, 70);
 
 const parseDateTime = (value?: string | null) => {
   if (!value) return null;

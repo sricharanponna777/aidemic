@@ -578,7 +578,6 @@ export default function TeacherClassPage() {
         {showForm && teacherId && (
           <div className="mt-4 rounded-xl border border-subtle p-4">
             <AssignmentForm
-              teacherId={teacherId}
               classes={[classInfo]}
               fixedClassId={classInfo.id}
               onCreated={handleAssignmentCreated}

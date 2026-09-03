@@ -17,6 +17,33 @@ describe('normalizeInsightLabel', () => {
   it('truncates very long labels', () => {
     expect(normalizeInsightLabel('x'.repeat(200))).toHaveLength(70);
   });
+
+  // Marking writes these tags verbatim, so the stored set is a mix of prose and
+  // internal-looking identifiers. Parents must never be shown the latter.
+  it('turns a slug into readable words and drops the leading qualifier', () => {
+    expect(normalizeInsightLabel('confusion-osmosis-ions')).toBe('Osmosis ions');
+    expect(normalizeInsightLabel('missing-root-hair')).toBe('Root hair');
+    expect(normalizeInsightLabel('missing-cohesion-tension')).toBe('Cohesion tension');
+  });
+
+  it('keeps the qualifier when dropping it would leave a single bare word', () => {
+    expect(normalizeInsightLabel('missing_detail')).toBe('Missing detail');
+    expect(normalizeInsightLabel('incomplete_explanation')).toBe('Incomplete explanation');
+  });
+
+  it('reads through a coded prefix to the label behind it', () => {
+    expect(normalizeInsightLabel('missing_keyword:aerobic respiration')).toBe('Aerobic respiration');
+  });
+
+  it('leaves labels that are already prose alone apart from capitalisation', () => {
+    expect(normalizeInsightLabel('MCQ accuracy')).toBe('MCQ accuracy');
+    expect(normalizeInsightLabel('Evaluation depth')).toBe('Evaluation depth');
+  });
+
+  it('humanises a slug that carries no qualifier at all', () => {
+    expect(normalizeInsightLabel('linear_equations')).toBe('Linear equations');
+    expect(normalizeInsightLabel('interpreting_tables')).toBe('Interpreting tables');
+  });
 });
 
 describe('rankWeaknesses', () => {

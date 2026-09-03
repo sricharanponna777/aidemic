@@ -47,14 +47,58 @@ export interface RankedWeakness {
   trend: WeaknessTrend;
 }
 
+/**
+ * Leading words that classify a weakness rather than name it. `missing-root-hair`
+ * is about root hairs; "missing" is the marker's verdict, not the concept, and a
+ * parent reading "Root hair" understands it where "missing-root-hair" reads as a
+ * database key.
+ */
+const QUALIFIER_TOKENS = new Set([
+  'missing', 'confusion', 'confused', 'incomplete', 'partial', 'weak', 'lacking',
+  'lacks', 'misconception', 'error', 'wrong', 'no', 'poor', 'unclear',
+]);
+
+/** `missing_keyword:aerobic respiration` — a coded prefix before the real label. */
+const CODED_PREFIX = /^[a-z][a-z0-9_-]*:\s*/;
+
+/** No spaces but separators present: `confusion-osmosis-ions`, `linear_equations`. */
+const looksLikeIdentifier = (value: string) => !/\s/.test(value) && /[-_]/.test(value);
+
+/**
+ * Turn an internal-looking weakness tag into something a parent can read.
+ *
+ * Tags are written by the marking model and stored verbatim, so the table holds
+ * a mix: readable phrases ("MCQ accuracy"), whole sentences, and identifiers
+ * ("confusion-osmosis-ions", "missing_keyword:aerobic respiration"). Only the
+ * last group is rewritten; anything already written as prose is left alone.
+ *
+ * A qualifier is only dropped when at least two words remain, so
+ * `missing-root-hair` becomes "Root hair" while `missing_detail` stays "Missing
+ * detail" rather than collapsing to the uselessly bare "Detail".
+ *
+ * This cannot invent domain wording the tag never carried: it yields "Cohesion
+ * tension", not "Cohesion-tension transport". So the marking prompt also asks
+ * for plain language at source; this is what rescues the rows already stored.
+ */
+const humanizeIdentifier = (value: string) => {
+  const withoutPrefix = value.replace(CODED_PREFIX, '');
+  const body = withoutPrefix || value;
+  if (!looksLikeIdentifier(body)) return body;
+
+  const words = body.split(/[-_]+/).filter(Boolean);
+  const trimmed = QUALIFIER_TOKENS.has(words[0]?.toLowerCase()) && words.length > 2 ? words.slice(1) : words;
+  return trimmed.join(' ');
+};
+
 /** Tidies a raw tag/analysis string into a stable, displayable label. */
-export const normalizeInsightLabel = (value: string) =>
-  value
-    .replace(/^Main pattern to fix:\s*/i, '')
+export const normalizeInsightLabel = (value: string) => {
+  const cleaned = humanizeIdentifier(value.replace(/^Main pattern to fix:\s*/i, '').trim())
     .replace(/\s+/g, ' ')
     .replace(/\.$/, '')
     .trim()
     .slice(0, 70);
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+};
 
 const ageInDays = (createdAt: string | null, now: number): number | null => {
   if (!createdAt) return null;

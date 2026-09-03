@@ -118,17 +118,6 @@ export default function FamilyPage() {
     setLinks(await fetchLinks(session.user.id));
   };
 
-  const handleRequestRemoval = async (linkId: string) => {
-    if (!session) return;
-    const { error } = await supabase.rpc('request_parent_link_revocation', { p_link_id: linkId });
-    if (error) {
-      showToast('error', 'Could not request removal. Please try again.');
-      return;
-    }
-    showToast('success', 'Removal requested. Your teacher needs to approve it.');
-    setLinks(await fetchLinks(session.user.id));
-  };
-
   const handleCopy = async (link: LinkRow) => {
     if (!link.invite_code) return;
     await navigator.clipboard.writeText(link.invite_code);

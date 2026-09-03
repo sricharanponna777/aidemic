@@ -615,12 +615,17 @@ export default function Dashboard() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-emerald-500 to-teal-500">
               <Trophy className="h-4 w-4 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-content dark:text-white">Predicted Grades</h2>
+            <h2 className="text-xl font-bold text-content dark:text-white">Current predicted grades</h2>
           </div>
           <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
             Exam practice only
           </span>
         </div>
+
+        <p className="-mt-2 mb-4 text-sm text-content-subtle">
+          Built up from every attempt you have made and how much of the specification you have covered — so it moves
+          slower than any single result, and will differ from one assignment&apos;s grade equivalent.
+        </p>
 
         <div className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm">
           <div className="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-100 bg-surface-sunken px-5 py-3 text-xs font-bold uppercase tracking-wide text-content-subtle dark:border-white/6 dark:bg-surface/5 sm:grid-cols-[1.15fr_0.75fr_0.5fr_auto]">

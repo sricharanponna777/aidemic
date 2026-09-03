@@ -200,8 +200,12 @@ export default function ParentOverviewPage() {
       <div>
         <div className="mb-3 flex items-center gap-2.5">
           <Trophy className="h-5 w-5 text-emerald-500" />
-          <h2 className="text-lg font-bold text-content dark:text-white">Predicted grades</h2>
+          <h2 className="text-lg font-bold text-content dark:text-white">Current predicted grades</h2>
         </div>
+        <p className="mb-3 text-sm text-content-subtle">
+          Based on all of their work so far and how much of the course it covers. A single piece of homework can score
+          higher or lower than this without the predicted grade moving.
+        </p>
         {metrics.subjectGrades.length === 0 ? (
           <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-5 text-sm text-content-subtle dark:border-white/6 dark:bg-surface/3">
             No exam practice completed yet.

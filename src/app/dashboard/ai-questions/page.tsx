@@ -1303,7 +1303,7 @@ export default function AIQuestionsPage() {
         <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
             <div className="rounded-lg border border-subtle p-5 bg-surface">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Predicted Grade</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Grade Equivalent</p>
               <p className={`mt-3 inline-flex rounded-xl px-4 py-2 text-6xl font-black ${gradeBadgeTone({
                 grade: report.predictedGrade,
                 examType: selectedSubject?.exam_type,
@@ -1314,6 +1314,7 @@ export default function AIQuestionsPage() {
               <p className="mt-2 text-sm text-content-muted">
                 {report.totalMarksAwarded} / {report.totalAvailableMarks} marks - {report.percentage}%
               </p>
+              <p className="mt-1 text-xs text-content-subtle">This attempt only</p>
               {report.targetGrade ? (
                 <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-200">
                   <TrendingUp className="h-4 w-4" />

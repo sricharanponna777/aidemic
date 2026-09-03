@@ -231,7 +231,6 @@ export default function TeacherAssignmentsPage() {
           {showForm && teacherId && (
             <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
               <AssignmentForm
-                teacherId={teacherId}
                 classes={activeClasses}
                 onCreated={handleAssignmentCreated}
                 onCancel={() => setShowForm(false)}

@@ -227,7 +227,7 @@ export default function TeacherStudentAnswersPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h2 className="text-lg font-semibold text-content">
             {Math.round(displayedReport.totalMarksAwarded)}/{Math.round(displayedReport.totalAvailableMarks)} marks ·{' '}
-            <span className={scoreTextTone(displayedReport.percentage)}>{Math.round(displayedReport.percentage)}%</span> · Predicted grade{' '}
+            <span className={scoreTextTone(displayedReport.percentage)}>{Math.round(displayedReport.percentage)}%</span> · Grade equivalent{' '}
             {displayedReport.predictedGrade}
           </h2>
           {overriddenAt && originalReport && (

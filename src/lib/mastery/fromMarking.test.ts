@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-vi.mock('../curriculum/cache', () => ({ cachedResolveTopic: vi.fn() }));
+vi.mock('../curriculum/cache', () => ({ cachedResolveTopic: vi.fn(), cachedLoadTopicSubtopics: vi.fn() }));
 vi.mock('../ai/classifySubtopic', () => ({ classifyQuestionsToSubtopics: vi.fn() }));
 vi.mock('./record', () => ({ recordMasteryEvents: vi.fn() }));
 
-import { cachedResolveTopic as resolveTopic } from '../curriculum/cache';
+import { cachedLoadTopicSubtopics, cachedResolveTopic as resolveTopic } from '../curriculum/cache';
 import { classifyQuestionsToSubtopics } from '../ai/classifySubtopic';
 import { recordMasteryEvents, type EvidenceInput } from './record';
 import { recordMarkingEvidence } from './fromMarking';
@@ -37,6 +37,7 @@ beforeEach(() => {
     subtopics: SUBTOPICS,
     ambiguousSpecification: false,
   });
+  vi.mocked(cachedLoadTopicSubtopics).mockResolvedValue(SUBTOPICS);
   vi.mocked(classifyQuestionsToSubtopics).mockResolvedValue({ subtopicIds: [] });
   vi.mocked(recordMasteryEvents).mockResolvedValue({ eventsWritten: 0, subtopicsUpdated: 0, errors: [] });
 });
@@ -58,6 +59,7 @@ describe('recordMarkingEvidence', () => {
         sourceId: 'attempt-1',
         marksAwarded: 3,
         marksAvailable: 4,
+        learningObjectiveId: null,
         rawWeaknessText: 'lattice',
       },
     ]);
@@ -148,5 +150,70 @@ describe('recordMarkingEvidence', () => {
         markedAnswers: [{ questionIndex: 0, marksAwarded: 3, maxMarks: 6 }],
       })
     ).resolves.toBeUndefined();
+  });
+
+  // Assignments carry real curriculum foreign keys. Before these paths existed,
+  // marking resolved the assignment *title* against `topics.name`, which never
+  // matched ("Cell Biology - Assignment - 01" is nobody's topic name), so every
+  // assignment produced zero mastery events.
+  describe('with curriculum ids from the source row', () => {
+    it('attributes every question to a known subtopic without a lookup or a model call', async () => {
+      await recordMarkingEvidence(admin, 'user-1', {
+        ...SCOPE,
+        topic: 'Cell Biology - Assignment - 01',
+        source: 'assignment',
+        sourceId: 'assignment-1',
+        curriculum: { subtopicId: 'st-declared', learningObjectiveId: 'lo-7' },
+        questions: [
+          { question: 'Describe active transport', marks: 4 },
+          { question: 'Explain osmosis', marks: 2 },
+        ],
+        markedAnswers: [
+          { questionIndex: 0, marksAwarded: 4, maxMarks: 4 },
+          { questionIndex: 1, marksAwarded: 1, maxMarks: 2 },
+        ],
+      });
+
+      expect(resolveTopic).not.toHaveBeenCalled();
+      expect(classifyQuestionsToSubtopics).not.toHaveBeenCalled();
+      expect(recorded()).toEqual([
+        expect.objectContaining({
+          subtopicId: 'st-declared',
+          outcome: 1,
+          source: 'assignment',
+          sourceId: 'assignment-1',
+          learningObjectiveId: 'lo-7',
+        }),
+        expect.objectContaining({ subtopicId: 'st-declared', outcome: 0.5 }),
+      ]);
+    });
+
+    it('classifies across the subtopics of a known topic id', async () => {
+      vi.mocked(classifyQuestionsToSubtopics).mockResolvedValue({ subtopicIds: ['st-covalent'] });
+
+      await recordMarkingEvidence(admin, 'user-1', {
+        ...SCOPE,
+        topic: 'Cell Biology - Assignment - 01',
+        source: 'assignment',
+        curriculum: { topicId: 't-known', subtopicId: null },
+        questions: [{ question: 'Why does diamond have a high melting point?', marks: 3 }],
+        markedAnswers: [{ questionIndex: 0, marksAwarded: 3, maxMarks: 3 }],
+      });
+
+      expect(cachedLoadTopicSubtopics).toHaveBeenCalledWith('t-known');
+      expect(resolveTopic).not.toHaveBeenCalled();
+      expect(recorded()[0]).toMatchObject({ subtopicId: 'st-covalent' });
+    });
+
+    it('still uses the free-text path when no curriculum ids are supplied', async () => {
+      await recordMarkingEvidence(admin, 'user-1', {
+        ...SCOPE,
+        questions: [{ question: 'Ionic bonding', marks: 2 }],
+        markedAnswers: [{ questionIndex: 0, marksAwarded: 2, maxMarks: 2 }],
+      });
+
+      expect(resolveTopic).toHaveBeenCalled();
+      expect(recorded()[0]).toMatchObject({ subtopicId: 'st-ionic' });
+    });
   });
 });

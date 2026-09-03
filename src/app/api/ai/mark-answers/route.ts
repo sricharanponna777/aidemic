@@ -8,6 +8,7 @@ import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/
 import { gradeBoundaryNote, gradeFromPercentage, nextGradeUp, topGrade as topGradeFor } from '@/lib/ai/gradeScales';
 import { getExamBoardLabel, getExamTypeLabel, getSpecTier } from '@/lib/ai/qualifications';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
+import { createStageTimer, type StageTimer } from '@/lib/ai/timing';
 import { buildSpecString } from '@/lib/ai/subjectConfig';
 import {
   extractChatMessageText,
@@ -100,6 +101,9 @@ type AssignmentJoinRow = {
   questions_payload: unknown;
   source_material: string | null;
   allow_reattempts: boolean;
+  topic_id: string | null;
+  subtopic_id: string | null;
+  learning_objective_id: string | null;
   classes: {
     specifications: {
       name: string;
@@ -108,6 +112,9 @@ type AssignmentJoinRow = {
     } | null;
   } | null;
 };
+
+// Question types whose marks are computed by code, never by the model.
+const DETERMINISTIC_QUESTION_TYPES = new Set(['mcq', 'plot', 'diagram']);
 
 const MAX_QUESTIONS = 20;
 const MAX_MARK_VALUE = 40;
@@ -329,8 +336,44 @@ const getBand = (marksAwarded: number, maxMarks: number) => {
   return 'Limited';
 };
 
+/**
+ * Map the model's `markedAnswers` back onto question positions.
+ *
+ * Server-marked questions (MCQ, plot, diagram) are stripped from the prompt, so
+ * the indices sent to the model have gaps. It is told to echo them verbatim, and
+ * normally does — but if it renumbers 0..n-1 anyway, an index lookup would mark
+ * question 5's answer against question 0. So: trust the indices only when they
+ * are a subset of what was actually sent, and otherwise fall back to matching by
+ * position within the sent subset, which is what a renumbering model produced.
+ */
+export const indexMarkedAnswers = (aiAnswers: MarkedAnswer[], questions: MarkingQuestion[]) => {
+  const sentIndices = questions
+    .map((question, index) => (DETERMINISTIC_QUESTION_TYPES.has(question.questionType) ? -1 : index))
+    .filter((index) => index >= 0);
+  const sent = new Set(sentIndices);
+
+  const byIndex = new Map<number, MarkedAnswer>();
+  const trustIndices = aiAnswers.every((answer) => sent.has(Math.floor(Number(answer?.questionIndex))));
+
+  if (trustIndices) {
+    for (const answer of aiAnswers) byIndex.set(Math.floor(Number(answer.questionIndex)), answer);
+    return byIndex;
+  }
+
+  console.warn(
+    '[mark-answers] model returned questionIndex values outside the set it was sent; falling back to positional mapping',
+    JSON.stringify({ sent: sentIndices, received: aiAnswers.map((a) => a?.questionIndex) })
+  );
+  aiAnswers.forEach((answer, position) => {
+    const target = sentIndices[position];
+    if (target !== undefined) byIndex.set(target, answer);
+  });
+  return byIndex;
+};
+
 const normalizeMarkedAnswers = (aiReport: AIMarkingReport | null, questions: MarkingQuestion[], answers: string[]) => {
   const aiAnswers = Array.isArray(aiReport?.markedAnswers) ? aiReport.markedAnswers : [];
+  const aiAnswerByIndex = indexMarkedAnswers(aiAnswers, questions);
 
   return questions.map((question, index) => {
     if (question.questionType === 'plot') {
@@ -406,7 +449,7 @@ const normalizeMarkedAnswers = (aiReport: AIMarkingReport | null, questions: Mar
       };
     }
 
-    const aiAnswer = aiAnswers.find((item) => Math.floor(Number(item?.questionIndex)) === index);
+    const aiAnswer = aiAnswerByIndex.get(index);
     const marksAwarded = answers[index]?.trim()
       ? clampAwardedMarks(aiAnswer?.marksAwarded, question.marks)
       : 0;
@@ -497,14 +540,19 @@ const buildFinalReport = (
   };
 };
 
-const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Promise<AIMarkingReport> => {
+const aiMarkAnswers = async (
+  payload: ReturnType<typeof normalizePayload>,
+  timer: StageTimer
+): Promise<AIMarkingReport> => {
   const config = getAIConfig();
 
   const system = [
     `Mark exam answers as strict JSON. Board:${getExamBoardLabel(payload.examBoard ?? '')} Qualification:${getExamTypeLabel(payload.examType)} Subject:${payload.subject}.`,
     payload.specification ? `Spec:${payload.specification}` : '',
     'Award integer marks 0–maxMarks per question. Blank/irrelevant=0.',
-    'MCQs marked by server; include in summary/weaknessAnalysis/gradeBoostAdvice only.',
+    payload.questions.some((question) => question.questionType === 'mcq')
+      ? 'Some questions were multiple-choice, marked automatically by the server against the stored correct option (excluded from the attempt below); do not attempt to grade them, but you may reference them in summary/weaknessAnalysis/gradeBoostAdvice.'
+      : '',
     payload.questions.some((question) => question.questionType === 'plot')
       ? 'Some questions were chart-plotting questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference chart-drawing skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
       : '',
@@ -514,8 +562,16 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
     'If a question earns full marks, leave its improvements and weaknessTags empty.',
     'Calculations: credit correct method+working+answer+units; wording not required.',
     'Open: reward knowledge, application, analysis, evaluation per mark value.',
-    'One markedAnswers entry per question, same order, zero-based questionIndex.',
+    // Server-marked questions are removed from the attempt, so the indices that
+    // remain have gaps in them. "zero-based" used to invite renumbering 0..n-1,
+    // which would mark each answer against the wrong question.
+    'One markedAnswers entry per question in the attempt, same order. Copy each questionIndex exactly as given — they are NOT consecutive, because server-marked questions were removed. Never renumber them.',
     'feedback: specific to student answer, where marks won/lost.',
+    // These tags are shown verbatim to students AND parents. Left unconstrained
+    // the model emitted identifiers ("confusion-osmosis-ions", "missing_keyword:x"),
+    // which read as internal keys on the parent dashboard. weaknesses.ts still
+    // rewrites what is already stored; this stops new ones being written.
+    'weaknessTags: 2-5 words of plain English naming the concept the student got wrong, capitalised like a title ("Osmosis and ion movement"). Never slugs, snake_case, kebab-case, codes or prefixes.',
     'weaknessAnalysis: aggregate repeated weaknesses across attempt.',
     'gradeBoostAdvice: concrete next steps to raise grade by ≥1 level.',
     'Keep all text concise: feedback≤30 words, strengths/improvements≤1 item each, exemplarAnswer≤40 words, summary≤20 words.',
@@ -539,7 +595,12 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
       modelAnswer: question.modelAnswer,
       studentAnswer: payload.answers[index] || '',
     }))
-    .filter((item) => item.questionType !== 'plot' && item.questionType !== 'diagram');
+    // MCQ, plot and diagram are all marked deterministically by
+    // normalizeMarkedAnswers, so none of them belong in the prompt. MCQs used to
+    // be sent anyway with their options, mark scheme and model answer attached,
+    // which is pure latency and token spend on questions whose marks the model
+    // was explicitly told not to decide.
+    .filter((item) => !DETERMINISTIC_QUESTION_TYPES.has(item.questionType));
 
   const user = [
     `Topic: ${payload.topic}`,
@@ -552,20 +613,22 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
 
   // OpenRouter: skip /responses (unsupported) and go straight to chat
   if (!config.isOpenRouter) {
-    const responsesResponse = await fetch(`${config.baseUrl}/responses`, {
-      method: 'POST',
-      headers: commonHeaders,
-      body: JSON.stringify({
-        model: config.model,
-        temperature: 0,
-        max_output_tokens: MARKING_MAX_OUTPUT_TOKENS,
-        input: [
-          { role: 'system', content: [{ type: 'input_text', text: system }] },
-          { role: 'user', content: [{ type: 'input_text', text: user }] },
-        ],
-        text: { format: { type: 'json_schema', name: 'exam_answer_marking', schema: SCHEMA, strict: true } },
-      }),
-    });
+    const responsesResponse = await timer.step('aiResponsesMs', () =>
+      fetch(`${config.baseUrl}/responses`, {
+        method: 'POST',
+        headers: commonHeaders,
+        body: JSON.stringify({
+          model: config.model,
+          temperature: 0,
+          max_output_tokens: MARKING_MAX_OUTPUT_TOKENS,
+          input: [
+            { role: 'system', content: [{ type: 'input_text', text: system }] },
+            { role: 'user', content: [{ type: 'input_text', text: user }] },
+          ],
+          text: { format: { type: 'json_schema', name: 'exam_answer_marking', schema: SCHEMA, strict: true } },
+        }),
+      })
+    );
 
     if (responsesResponse.ok) {
       const body = (await responsesResponse.json()) as OpenAIResponseBody;
@@ -580,22 +643,24 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
 
   const responsesErrorText = '';
 
-  const chatResponse = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: commonHeaders,
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0,
-      max_tokens: MARKING_MAX_OUTPUT_TOKENS,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      ...(config.supportsJsonSchema
-        ? { response_format: { type: 'json_schema', json_schema: { name: 'exam_answer_marking', schema: SCHEMA, strict: true } } }
-        : { response_format: { type: 'json_object' } }),
-    }),
-  });
+  const chatResponse = await timer.step('aiChatMs', () =>
+    fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: commonHeaders,
+      body: JSON.stringify({
+        model: config.model,
+        temperature: 0,
+        max_tokens: MARKING_MAX_OUTPUT_TOKENS,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        ...(config.supportsJsonSchema
+          ? { response_format: { type: 'json_schema', json_schema: { name: 'exam_answer_marking', schema: SCHEMA, strict: true } } }
+          : { response_format: { type: 'json_object' } }),
+      }),
+    })
+  );
 
   if (!chatResponse.ok) {
     const chatErrorText = await chatResponse.text();
@@ -623,12 +688,13 @@ const aiMarkAnswers = async (payload: ReturnType<typeof normalizePayload>): Prom
 };
 
 export async function POST(request: Request) {
+  const timer = createStageTimer('mark-answers');
   try {
     const supabase = await createClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await timer.step('authMs', () => supabase.auth.getUser());
     if (authError || !authData.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { allowed } = await checkAiRateLimit(supabase, AI_DAILY_LIMITS.markAnswers);
+    const { allowed } = await timer.step('rateLimitMs', () => checkAiRateLimit(supabase, AI_DAILY_LIMITS.markAnswers));
     if (!allowed) return NextResponse.json({ error: 'Daily AI usage limit reached. Try again tomorrow.' }, { status: 429 });
 
     const rawBody = (await request.json()) as MarkAnswersPayload;
@@ -649,6 +715,9 @@ export async function POST(request: Request) {
     let adminClient: ReturnType<typeof createAdminClient> | null = null;
     let paperTranscript: PaperTranscriptEntry[] = [];
     let paperAttemptId = '';
+    // Curriculum ids the source row already knows, so the spine does not have to
+    // re-derive them from free text. Only assignments carry them today.
+    let spineCurriculum: { topicId?: string | null; subtopicId?: string | null; learningObjectiveId?: string | null } | null = null;
 
     if (paperId) {
       // Paper mode: the same shape of trust as assignment mode. Questions and
@@ -659,7 +728,7 @@ export async function POST(request: Request) {
       // student is allowed to correct what the vision model misread.
       adminClient = createAdminClient();
 
-      const paper = await loadOwnedPaper(adminClient, paperId, authData.user.id);
+      const paper = await timer.step('paperLoadMs', () => loadOwnedPaper(adminClient!, paperId, authData.user.id));
       if (!paper) return NextResponse.json({ error: 'Paper not found.' }, { status: 404 });
       if (paper.status === 'marked') {
         return NextResponse.json({ error: 'This paper has already been marked.' }, { status: 409 });
@@ -691,41 +760,53 @@ export async function POST(request: Request) {
       // service key fails before any AI spend.
       adminClient = createAdminClient();
 
-      const { data: assignmentRow, error: assignmentError } = await supabase
+      const { data: assignmentRow, error: assignmentError } = await timer.step('assignmentLoadMs', () =>
+        supabase
         .from('assignments')
         .select(
-          'id, title, class_id, questions_payload, source_material, allow_reattempts, classes ( specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
+          'id, title, class_id, questions_payload, source_material, allow_reattempts, topic_id, subtopic_id, learning_objective_id, classes ( specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
         )
         .eq('id', assignmentId)
-        .maybeSingle();
+        .maybeSingle()
+      );
       if (assignmentError || !assignmentRow) {
         return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 });
       }
       const assignment = assignmentRow as unknown as AssignmentJoinRow;
 
-      const { data: enrollment } = await supabase
-        .from('class_students')
-        .select('id')
-        .eq('class_id', assignment.class_id)
-        .eq('student_id', authData.user.id)
-        .eq('status', 'active')
-        .maybeSingle();
+      const { data: enrollment } = await timer.step('enrolmentCheckMs', () =>
+        supabase
+          .from('class_students')
+          .select('id')
+          .eq('class_id', assignment.class_id)
+          .eq('student_id', authData.user.id)
+          .eq('status', 'active')
+          .maybeSingle()
+      );
       if (!enrollment) {
         return NextResponse.json({ error: 'You are not enrolled in this class.' }, { status: 403 });
       }
 
-      const { data: existingAttempt } = await supabase
-        .from('assignment_attempts')
-        .select('status, ai_feedback')
-        .eq('assignment_id', assignmentId)
-        .eq('student_id', authData.user.id)
-        .maybeSingle();
+      const { data: existingAttempt } = await timer.step('existingAttemptMs', () =>
+        supabase
+          .from('assignment_attempts')
+          .select('status, ai_feedback')
+          .eq('assignment_id', assignmentId)
+          .eq('student_id', authData.user.id)
+          .maybeSingle()
+      );
       if (existingAttempt?.status === 'completed' && !assignment.allow_reattempts) {
         return NextResponse.json(
           { error: 'This assignment has already been submitted.', report: existingAttempt.ai_feedback },
           { status: 409 }
         );
       }
+
+      spineCurriculum = {
+        topicId: assignment.topic_id,
+        subtopicId: assignment.subtopic_id,
+        learningObjectiveId: assignment.learning_objective_id,
+      };
 
       const spec = assignment.classes?.specifications;
       const subjectChain = spec?.subjects;
@@ -766,11 +847,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: missingKeyError }, { status: 500 });
     }
 
-    const aiReport = await aiMarkAnswers(payload);
+    // Every question type in DETERMINISTIC_QUESTION_TYPES is marked by code, so
+    // an all-MCQ attempt has nothing to ask a model about -- and asking anyway
+    // cost a full round trip for a report that normalizeMarkedAnswers discards.
+    const needsModel = payload.questions.some(
+      (question) => !DETERMINISTIC_QUESTION_TYPES.has(question.questionType)
+    );
+    const aiReport = needsModel ? await aiMarkAnswers(payload, timer) : null;
     const report = buildFinalReport(aiReport, payload);
 
     if (assignmentId && adminClient) {
-      const { error: saveError } = await adminClient.from('assignment_attempts').upsert(
+      const { error: saveError } = await timer.step('attemptSaveMs', () =>
+        adminClient!.from('assignment_attempts').upsert(
         {
           assignment_id: assignmentId,
           student_id: authData.user.id,
@@ -783,6 +871,7 @@ export async function POST(request: Request) {
           status: 'completed',
         },
         { onConflict: 'assignment_id,student_id' }
+        )
       );
       if (saveError) {
         console.error('[mark-answers] Failed to save assignment attempt', saveError);
@@ -877,11 +966,19 @@ export async function POST(request: Request) {
                 ? 'mock'
                 : 'exam_practice',
           sourceId: paperId || assignmentId || null,
+          curriculum: spineCurriculum,
           questions: payload.questions,
           markedAnswers: report.markedAnswers,
         })
       );
     }
+
+    timer.done({
+      mode: paperId ? 'paper' : assignmentId ? 'assignment' : 'practice',
+      questions: payload.questions.length,
+      modelMarked: payload.questions.filter((q) => !DETERMINISTIC_QUESTION_TYPES.has(q.questionType)).length,
+      model: needsModel ? config.model : 'none',
+    });
 
     return NextResponse.json({
       success: true,
@@ -892,6 +989,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to mark answers.';
+    timer.done({ failed: true, error: message.slice(0, 200) });
     return NextResponse.json({ error: txt(message, MAX_AI_ERROR_TEXT) }, { status: 500 });
   }
 }

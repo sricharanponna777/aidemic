@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, LogIn, Plus, Users } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
@@ -72,18 +73,20 @@ function ParentShell({ children }: { children: React.ReactNode }) {
         title={isParentHome ? 'Parent Dashboard' : navMatch?.item.label ?? 'Parent Dashboard'}
         description={PAGE_DESCRIPTIONS[pathname]}
         actions={
-          <button
-            type="button"
-            onClick={() => setShowLinkForm((v) => !v)}
-            className={buttonStyles({ variant: 'secondary', size: 'sm' })}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {students.length === 0 ? 'Add a child' : 'Add another child'}
-          </button>
+          isParentHome ? (
+            <button
+              type="button"
+              onClick={() => setShowLinkForm((v) => !v)}
+              className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {students.length === 0 ? 'Add a child' : 'Add another child'}
+            </button>
+          ) : undefined
         }
       />
 
-      {showLinkForm ? (
+      {isParentHome && showLinkForm ? (
         <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
           {requestSent ? (
             <div className="space-y-3">
@@ -139,8 +142,16 @@ function ParentShell({ children }: { children: React.ReactNode }) {
           <Users className="mx-auto mb-3 h-10 w-10 text-slate-300 dark:text-content-muted" />
           <p className="font-semibold text-content-muted dark:text-slate-200">No linked children yet</p>
           <p className="mt-1 text-sm text-content-subtle">
-            Use <span className="font-semibold">Add a child</span> above to send a request with their email address or
-            username. They&apos;ll need to accept it from their dashboard before their progress appears here.
+            Use <span className="font-semibold">Add a child</span>{' '}
+            {isParentHome ? (
+              'above'
+            ) : (
+              <Link href="/dashboard/parent" className="font-semibold text-accent hover:underline">
+                on your Parent Dashboard
+              </Link>
+            )}{' '}
+            to send a request with their email address or username. They&apos;ll need to accept it from their dashboard
+            before their progress appears here.
           </p>
         </div>
       ) : (

@@ -237,3 +237,182 @@ export function atRiskStudents(stats: StudentStat[]): StudentStat[] {
       return aScore - bScore;
     });
 }
+
+/**
+ * Graded attention bands.
+ *
+ * `atRiskStudents` answers one binary question — is this student below 40%? —
+ * and a class of 86% and 67% therefore produced "no students at risk", which is
+ * true and useless: 67% is not a crisis but it is the student to teach next.
+ * These bands keep "at risk" meaning what it meant and add the middle that was
+ * previously invisible.
+ */
+export type SupportBand = 'not_started' | 'at_risk' | 'needs_support' | 'secure' | 'strong';
+
+/** Lower bound of each scored band, highest first. */
+const BAND_FLOORS: [SupportBand, number][] = [
+  ['strong', 85],
+  ['secure', 70],
+  ['needs_support', 40],
+  ['at_risk', 0],
+];
+
+export const SUPPORT_BAND_LABELS: Record<SupportBand, string> = {
+  not_started: 'Not started',
+  at_risk: 'At risk',
+  needs_support: 'Needs support',
+  secure: 'Secure',
+  strong: 'Strong',
+};
+
+export function studentSupportBand(stat: StudentStat): SupportBand | null {
+  if (stat.assignedCount === 0) return null;
+  if (stat.completedCount === 0) return 'not_started';
+  if (stat.avgScore === null) return null;
+  return BAND_FLOORS.find(([, floor]) => stat.avgScore! >= floor)?.[0] ?? 'at_risk';
+}
+
+/** Bands that warrant a teacher doing something, most urgent first. */
+const ATTENTION_ORDER: SupportBand[] = ['not_started', 'at_risk', 'needs_support'];
+
+/**
+ * Students who need attention, ordered by how urgently. Unlike `atRiskStudents`
+ * this includes the "needs support" middle, so a 67% student is surfaced as an
+ * improvement opportunity rather than dropped for not being a crisis.
+ */
+export function studentsNeedingAttention(stats: StudentStat[]): (StudentStat & { band: SupportBand })[] {
+  return stats
+    .flatMap((stat) => {
+      const band = studentSupportBand(stat);
+      return band && ATTENTION_ORDER.includes(band) ? [{ ...stat, band }] : [];
+    })
+    .sort((a, b) => {
+      const byBand = ATTENTION_ORDER.indexOf(a.band) - ATTENTION_ORDER.indexOf(b.band);
+      return byBand !== 0 ? byBand : (a.avgScore ?? 100) - (b.avgScore ?? 100);
+    });
+}
+
+/**
+ * A spread this wide means one lesson cannot serve the whole class, so it is
+ * worth surfacing even when every student is individually fine. Deliberately
+ * lower than it looks: 86% and 67% sitting in the same room is already two
+ * different lessons, and that gap is 19 points.
+ */
+export const WIDE_SPREAD_POINTS = 15;
+
+export type ClassSpread = {
+  class_id: string;
+  className: string;
+  low: number;
+  high: number;
+  range: number;
+  studentCount: number;
+};
+
+/** Score range per class, widest first. Only classes with 2+ scored students. */
+export function classSpreads(stats: StudentStat[]): ClassSpread[] {
+  const byClass = new Map<string, { className: string; scores: number[] }>();
+  for (const stat of stats) {
+    if (stat.completedCount === 0 || stat.avgScore === null) continue;
+    const entry = byClass.get(stat.class_id) ?? { className: stat.className, scores: [] };
+    entry.scores.push(stat.avgScore);
+    byClass.set(stat.class_id, entry);
+  }
+
+  return [...byClass.entries()]
+    .flatMap(([class_id, entry]) => {
+      if (entry.scores.length < 2) return [];
+      const low = Math.min(...entry.scores);
+      const high = Math.max(...entry.scores);
+      return [{ class_id, className: entry.className, low, high, range: high - low, studentCount: entry.scores.length }];
+    })
+    .sort((a, b) => b.range - a.range);
+}
+
+/**
+ * Per-question and per-concept signal, read from the stored marking reports.
+ *
+ * Topic averages hide this: a class can average 86% on a topic while every
+ * single student loses the same two marks on the same question. That question is
+ * the thing to reteach, and nothing in the threshold-based view could see it.
+ */
+export type MarkedAnswerLike = { questionIndex?: number; marksAwarded?: number; maxMarks?: number; weaknessTags?: string[] };
+export type MarkingReportLike = { markedAnswers?: MarkedAnswerLike[] } | null | undefined;
+
+export type QuestionWeakness = {
+  assignment_id: string;
+  assignmentTitle: string;
+  className: string;
+  questionIndex: number;
+  avgMarkPercent: number;
+  attempts: number;
+};
+
+/** Questions the class collectively did worst on, weakest first. */
+export function questionWeaknesses(
+  reports: { assignment_id: string; assignmentTitle: string; className: string; report: MarkingReportLike }[],
+  { minAttempts = 2, maxPercent = 70 }: { minAttempts?: number; maxPercent?: number } = {}
+): QuestionWeakness[] {
+  const byQuestion = new Map<string, { meta: Omit<QuestionWeakness, 'avgMarkPercent' | 'attempts'>; ratios: number[] }>();
+
+  for (const entry of reports) {
+    for (const answer of entry.report?.markedAnswers ?? []) {
+      const max = answer.maxMarks ?? 0;
+      if (!max || typeof answer.questionIndex !== 'number') continue;
+      const key = `${entry.assignment_id}:${answer.questionIndex}`;
+      const bucket = byQuestion.get(key) ?? {
+        meta: {
+          assignment_id: entry.assignment_id,
+          assignmentTitle: entry.assignmentTitle,
+          className: entry.className,
+          questionIndex: answer.questionIndex,
+        },
+        ratios: [],
+      };
+      bucket.ratios.push(((answer.marksAwarded ?? 0) / max) * 100);
+      byQuestion.set(key, bucket);
+    }
+  }
+
+  return [...byQuestion.values()]
+    .flatMap(({ meta, ratios }) => {
+      if (ratios.length < minAttempts) return [];
+      const avgMarkPercent = Math.round(ratios.reduce((sum, r) => sum + r, 0) / ratios.length);
+      return avgMarkPercent <= maxPercent ? [{ ...meta, avgMarkPercent, attempts: ratios.length }] : [];
+    })
+    .sort((a, b) => a.avgMarkPercent - b.avgMarkPercent);
+}
+
+export type ConceptGap = { label: string; students: number; occurrences: number };
+
+/**
+ * Weakness tags seen across more than one student — the repeated missing
+ * concepts. A tag one student produced once is noise; the same gap in three
+ * scripts is a reteach.
+ */
+export function repeatedConceptGaps(
+  reports: { student_id: string; report: MarkingReportLike }[],
+  normalizeLabel: (value: string) => string,
+  { minStudents = 2 }: { minStudents?: number } = {}
+): ConceptGap[] {
+  const byLabel = new Map<string, { students: Set<string>; occurrences: number }>();
+
+  for (const entry of reports) {
+    for (const answer of entry.report?.markedAnswers ?? []) {
+      for (const raw of answer.weaknessTags ?? []) {
+        const label = normalizeLabel(raw);
+        if (!label) continue;
+        const bucket = byLabel.get(label) ?? { students: new Set<string>(), occurrences: 0 };
+        bucket.students.add(entry.student_id);
+        bucket.occurrences += 1;
+        byLabel.set(label, bucket);
+      }
+    }
+  }
+
+  return [...byLabel.entries()]
+    .flatMap(([label, { students, occurrences }]) =>
+      students.size >= minStudents ? [{ label, students: students.size, occurrences }] : []
+    )
+    .sort((a, b) => b.students - a.students || b.occurrences - a.occurrences);
+}

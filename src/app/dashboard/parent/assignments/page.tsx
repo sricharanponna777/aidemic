@@ -112,9 +112,15 @@ export default function ParentAssignmentsPage() {
   return (
     <div className="space-y-6">
       {rows.length > 0 ? (
-        <p className="text-sm text-content-subtle">
-          {summary.completed}/{summary.total} completed
-        </p>
+        <div className="space-y-1">
+          <p className="text-sm text-content-subtle">
+            {summary.completed}/{summary.total} completed
+          </p>
+          <p className="text-xs text-content-subtle">
+            The grade shown against a completed assignment is what that piece of work alone was worth. It is not their
+            predicted grade, which is on the dashboard and builds up from everything they have done.
+          </p>
+        </div>
       ) : null}
 
       {rows.length === 0 ? (
