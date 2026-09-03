@@ -19,6 +19,7 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react';
+import { GenerationProgressPanel } from '@/components/ai/GenerationProgressPanel';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
@@ -28,6 +29,7 @@ import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
+import { useGenerationJob, type GenerationJobRow } from '@/hooks/useGenerationJob';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useTopicOptions } from '@/hooks/useTopicOptions';
 import { useSubtopicOptions } from '@/hooks/useSubtopicOptions';
@@ -173,8 +175,27 @@ const SS_SESSION_META = 'exam-session-meta';
 const SS_MOCK_MODE = 'exam-mock-mode';
 const SS_MOCK_DURATION = 'exam-mock-duration';
 const SS_MOCK_DEADLINE = 'exam-mock-deadline';
+/**
+ * The in-flight generation job, so a student who navigates away mid-run picks
+ * it back up instead of losing it. Everything the finished result needs to be
+ * applied is stored with it rather than re-read from the form: the form is
+ * still editable while a job runs, and a resumed run must land as the run that
+ * was actually started.
+ */
+const SS_JOB = 'exam-generation-job';
 
 const MOCK_DURATION_OPTIONS = [30, 45, 60, 90] as const;
+
+const STAGE_LABELS = { saving: 'Saving your question set' };
+const JOB_COLUMNS = 'id, status, result, error, updated_at';
+
+type GenerationResult = {
+  questions?: ExamQuestion[];
+  sourceMaterial?: string;
+  warnings?: string[];
+};
+
+type QuestionJobRow = GenerationJobRow & { result: GenerationResult | null };
 
 type SessionMeta = {
   topic: string;
@@ -182,6 +203,16 @@ type SessionMeta = {
   examBoard: string;
   examType: string;
   specification: string;
+};
+
+/** A generation job in flight, plus the context its result must be applied with. */
+type PendingJob = {
+  id: string;
+  startedAt: number;
+  meta: SessionMeta;
+  isPaperMode: boolean;
+  isMockExam: boolean;
+  mockDurationMinutes: number;
 };
 
 function ssRead<T>(key: string, fallback: T): T {
@@ -358,6 +389,7 @@ export default function AIQuestionsPage() {
   });
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const job = useGenerationJob<QuestionJobRow>({ table: 'question_generation_jobs', columns: JOB_COLUMNS });
   const [isMarking, setIsMarking] = useState(false);
   const [questions, setQuestions] = useState<ExamQuestion[]>(() => {
     const deepLink = readDeepLinkParams();
@@ -462,6 +494,82 @@ export default function AIQuestionsPage() {
     || (!isEnglishLanguagePractice && topicsLoading ? 'Loading topics for this qualification...' : '')
     || (!isEnglishLanguagePractice && !topicIsReady ? 'Topic must be at least 3 characters, or leave it blank to generalise.' : '')
     || (!isEnglishLanguagePractice && !topicIsAllowed ? 'Choose one of the suggested topics for this qualification.' : '');
+  /**
+   * Apply a finished question set. Shared by a fresh run and by one resumed
+   * after navigating away, so both land identically -- and applied with the
+   * context the run was *started* with, which the form may since have moved on
+   * from.
+   */
+  const applyGenerationResult = async (result: GenerationResult, pending: PendingJob) => {
+    const generatedQuestions: ExamQuestion[] = Array.isArray(result.questions) ? result.questions : [];
+    if (generatedQuestions.length === 0) {
+      setStatus({ tone: 'error', text: 'No questions were returned.' });
+      return;
+    }
+    const embeddedSource = splitEnglishSourceFromQuestion(generatedQuestions[0]?.question ?? '');
+    const nextSourceMaterial = typeof result.sourceMaterial === 'string' && result.sourceMaterial.trim()
+      ? result.sourceMaterial.trim()
+      : embeddedSource.source;
+    const cleanQuestions = embeddedSource.source
+      ? generatedQuestions.map((question, index) => (
+          index === 0 ? { ...question, question: embeddedSource.question } : question
+        ))
+      : generatedQuestions;
+
+    const warnings: string[] = Array.isArray(result.warnings)
+      ? result.warnings.filter((item: unknown): item is string => typeof item === 'string')
+      : [];
+
+    if (pending.isPaperMode) {
+      // The paper is stored server-side and answered on paper, so this flow
+      // never enters the on-screen practice state at all.
+      const paperResponse = await fetch('/api/papers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...pending.meta, sourceMaterial: nextSourceMaterial, questions: cleanQuestions }),
+      });
+      const paperBody = await paperResponse.json();
+      if (!paperResponse.ok) {
+        setStatus({ tone: 'error', text: paperBody.error || 'Could not create the paper.' });
+        return;
+      }
+      router.push(`/dashboard/ai-questions/paper/${paperBody.paperId}`);
+      return;
+    }
+
+    setSessionMeta(pending.meta);
+    setSourceMaterial(nextSourceMaterial);
+    setQuestions(cleanQuestions);
+    setAnswers(Array.from({ length: cleanQuestions.length }, () => ''));
+    hasAutoSubmittedRef.current = false;
+    setMockDeadline(pending.isMockExam ? Date.now() + pending.mockDurationMinutes * 60000 : null);
+    setStatus({
+      tone: warnings.length > 0 ? 'warning' : 'success',
+      text: pending.isMockExam
+        ? `Mock exam started: ${cleanQuestions.length} questions, ${pending.mockDurationMinutes} minutes on the clock.`
+        : `Generated ${cleanQuestions.length} exam-practice questions.${warnings.length > 0 ? ` ${warnings.join(' ')}` : ''}`,
+    });
+  };
+
+  /** Handle a job that stopped being tracked: completed, failed, or timed out. */
+  const settleJob = async (settled: QuestionJobRow | null, pending: PendingJob) => {
+    if (!settled) {
+      // Still running server-side, so the pointer stays put and coming back to
+      // this tab resumes it rather than starting a second paid run.
+      setStatus({
+        tone: 'warning',
+        text: 'Generation is taking longer than expected. It is still running — come back to this tab shortly.',
+      });
+      return;
+    }
+    ssWrite(SS_JOB, null);
+    if (settled.status === 'failed' || !settled.result) {
+      setStatus({ tone: 'error', text: settled.error || 'Generation failed.' });
+      return;
+    }
+    await applyGenerationResult(settled.result, pending);
+  };
+
   const handleGenerate = async () => {
     if (!selectedSubject) {
       setStatus({ tone: 'error', text: 'Choose one of your saved subjects before generating questions.' });
@@ -533,12 +641,34 @@ export default function AIQuestionsPage() {
       useOnlineResources: true,
     };
 
+    const pending: PendingJob = {
+      id: '',
+      startedAt: Date.now(),
+      meta: {
+        topic: payload.topic || 'General revision',
+        subject: selectedSubject.subject,
+        examBoard: selectedSubject.exam_board,
+        examType: selectedSubject.exam_type,
+        specification,
+      },
+      isPaperMode,
+      isMockExam,
+      mockDurationMinutes,
+    };
+
     setIsGenerating(true);
     setReport(null);
-    setStatus({ tone: 'info', text: 'Generating Topic-wise exam practice questions...' });
+    // The progress panel says what the old status banner said, and says it with
+    // a stage rather than a guess, so there is nothing left for the banner here.
+    setStatus(null);
+    job.begin(pending.startedAt);
 
     try {
-      const response = await fetch('/api/ai/generate-questions', {
+      // Generation runs as a background job: this returns a job id as soon as
+      // the row exists, and the pipeline reports each stage onto that row for
+      // the panel to follow. The work no longer depends on this page staying
+      // open, which is what makes resuming possible at all.
+      const response = await fetch('/api/questions/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -549,74 +679,54 @@ export default function AIQuestionsPage() {
         return;
       }
 
-      const generatedQuestions: ExamQuestion[] = Array.isArray(body.questions) ? body.questions : [];
-      if (generatedQuestions.length === 0) {
-        setStatus({ tone: 'error', text: 'No questions were returned.' });
-        return;
-      }
-      const embeddedSource = splitEnglishSourceFromQuestion(generatedQuestions[0]?.question ?? '');
-      const nextSourceMaterial = typeof body.sourceMaterial === 'string' && body.sourceMaterial.trim()
-        ? body.sourceMaterial.trim()
-        : embeddedSource.source;
-      const cleanQuestions = embeddedSource.source
-        ? generatedQuestions.map((question, index) => (
-            index === 0 ? { ...question, question: embeddedSource.question } : question
-          ))
-        : generatedQuestions;
-
-      const warnings: string[] = Array.isArray(body.warnings)
-        ? body.warnings.filter((item: unknown): item is string => typeof item === 'string')
-        : [];
-      if (isPaperMode) {
-        // The paper is stored server-side and answered on paper, so this flow
-        // never enters the on-screen practice state at all.
-        const paperResponse = await fetch('/api/papers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            topic: payload.topic || 'General revision',
-            subject: selectedSubject.subject,
-            examBoard: selectedSubject.exam_board,
-            examType: selectedSubject.exam_type,
-            specification,
-            sourceMaterial: nextSourceMaterial,
-            questions: cleanQuestions,
-          }),
-        });
-        const paperBody = await paperResponse.json();
-        if (!paperResponse.ok) {
-          setStatus({ tone: 'error', text: paperBody.error || 'Could not create the paper.' });
-          return;
-        }
-        router.push(`/dashboard/ai-questions/paper/${paperBody.paperId}`);
-        return;
-      }
-
-      setSessionMeta({
-        topic: payload.topic || 'General revision',
-        subject: selectedSubject.subject,
-        examBoard: selectedSubject.exam_board,
-        examType: selectedSubject.exam_type,
-        specification,
-      });
-      setSourceMaterial(nextSourceMaterial);
-      setQuestions(cleanQuestions);
-      setAnswers(Array.from({ length: cleanQuestions.length }, () => ''));
-      hasAutoSubmittedRef.current = false;
-      setMockDeadline(isMockExam ? Date.now() + mockDurationMinutes * 60000 : null);
-      setStatus({
-        tone: warnings.length > 0 ? 'warning' : 'success',
-        text: isMockExam
-          ? `Mock exam started: ${cleanQuestions.length} questions, ${mockDurationMinutes} minutes on the clock.`
-          : `Generated ${cleanQuestions.length} exam-practice questions.${warnings.length > 0 ? ` ${warnings.join(' ')}` : ''}`,
-      });
+      const started: PendingJob = { ...pending, id: body.jobId as string };
+      ssWrite(SS_JOB, started);
+      await settleJob(await job.track(started.id), started);
     } catch (err) {
       console.error('Question generation failed', err);
       setStatus({ tone: 'error', text: 'Generation failed due to a network or server error.' });
     } finally {
       setIsGenerating(false);
+      job.reset();
     }
   };
+
+  /**
+   * Pick up a generation that was still running when this page was last left.
+   * The job row is the source of truth, so the run survives the navigation, and
+   * the elapsed clock is restored from when it actually started rather than
+   * restarting from zero and understating the wait.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    const resume = async () => {
+      const pending = ssRead<PendingJob | null>(SS_JOB, null);
+      if (!pending?.id) return;
+      // A finished set is already on screen from this session; the pointer is
+      // stale and applying it again would clobber work in progress.
+      if (questions.length > 0) {
+        ssWrite(SS_JOB, null);
+        return;
+      }
+      setIsGenerating(true);
+      job.begin(pending.startedAt);
+      try {
+        const settled = await job.track(pending.id);
+        if (!cancelled) await settleJob(settled, pending);
+      } finally {
+        if (!cancelled) {
+          setIsGenerating(false);
+          job.reset();
+        }
+      }
+    };
+    void resume();
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: this resumes whatever was in flight when the page was left.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateAnswer = (index: number, value: string) => {
     setAnswers((prev) => {
@@ -754,6 +864,7 @@ export default function AIQuestionsPage() {
       sessionStorage.removeItem(SS_MOCK_MODE);
       sessionStorage.removeItem(SS_MOCK_DURATION);
       sessionStorage.removeItem(SS_MOCK_DEADLINE);
+      sessionStorage.removeItem(SS_JOB);
     } catch {}
   };
 
@@ -809,13 +920,16 @@ export default function AIQuestionsPage() {
         <div role="status" aria-live="polite" className={`rounded-xl border px-4 py-3 text-sm ${statusStyles[status.tone]}`}>{status.text}</div>
       ) : null}
 
-      {isGenerating ? (
-        <>
-          <style>{`@keyframes ai-loading{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
-          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-surface/10">
-            <div className="h-full w-2/5 rounded-full bg-linear-to-r from-indigo-600 to-purple-500" style={{ animation: 'ai-loading 1.4s ease-in-out infinite' }} />
-          </div>
-        </>
+      {job.status ? (
+        <GenerationProgressPanel
+          status={job.status}
+          elapsedMs={job.elapsedMs}
+          progress={job.progress}
+          remainingMs={job.remainingMs}
+          overrunningStage={job.overrunningStage}
+          labels={STAGE_LABELS}
+          footer="Generation keeps running on the server — you can move around the app and come back to this tab to pick it up."
+        />
       ) : null}
 
       {!inPractice && pendingPapers.length > 0 ? (

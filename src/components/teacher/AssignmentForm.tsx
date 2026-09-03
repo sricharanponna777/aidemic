@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { GenerationProgressPanel } from '@/components/ai/GenerationProgressPanel';
 import { buttonStyles } from '@/components/ui/button';
+import { useGenerationJob, type GenerationJobRow } from '@/hooks/useGenerationJob';
 import { createClient } from '@/lib/supabase-client';
 import { buildSpecString } from '@/lib/ai/subjectConfig';
 import { normalizeBoard, normalizeExamType } from '@/lib/ai/validation';
@@ -14,56 +15,13 @@ const selectClass =
  * Generation runs as a background job and reports which stage it is on. Showing
  * the stage rather than one indefinite spinner is the whole point: the pipeline
  * takes over a minute, and "Generating..." for 74 seconds is indistinguishable
- * from a frozen page.
+ * from a frozen page. The stage vocabulary, the progress arithmetic and the
+ * panel itself are shared with the student generator.
  */
-type JobStatus =
-  | 'queued'
-  | 'validating'
-  | 'generating'
-  | 'backfilling'
-  | 'finalising'
-  | 'saving'
-  | 'completed'
-  | 'failed';
+const STAGE_LABELS = { saving: 'Saving the assignment' };
+const JOB_COLUMNS = 'id, status, assignment_id, error, updated_at';
 
-const STAGE_ORDER: JobStatus[] = ['queued', 'validating', 'generating', 'backfilling', 'finalising', 'saving'];
-
-const STAGE_LABEL: Record<JobStatus, string> = {
-  queued: 'Starting up',
-  validating: 'Checking the topic against the specification',
-  generating: 'Writing questions',
-  backfilling: 'Filling gaps in the question set',
-  finalising: 'Checking the question set over',
-  saving: 'Saving the assignment',
-  completed: 'Done',
-  failed: 'Failed',
-};
-
-/** Backfill only runs when the first pass came up short, so it may be skipped. */
-const POLL_INTERVAL_MS = 2000;
-/** Generous: generation has been measured at ~74s and can retry internally. */
-const JOB_TIMEOUT_MS = 5 * 60 * 1000;
-/**
- * A job whose stage has not moved in this long is treated as dead.
- *
- * Generation runs inside the request's own invocation (`after()`), so if the
- * platform terminates that invocation — the route is pinned at Vercel's 300s
- * ceiling, with no headroom — nothing is left to write `failed` and the row sits
- * in `generating` forever. Without this the teacher watches a spinner for the
- * full five minutes and is then told, wrongly, that it is still running.
- *
- * Comfortably longer than the slowest single stage: generation itself is the
- * long one at ~74s, and it updates the row on entry and exit.
- */
-const STALE_AFTER_MS = 3 * 60 * 1000;
-
-type JobRow = {
-  id: string;
-  status: JobStatus;
-  assignment_id: string | null;
-  error: string | null;
-  updated_at: string;
-};
+type JobRow = GenerationJobRow & { assignment_id: string | null };
 
 export type AssignmentFormClass = {
   id: string;
@@ -122,8 +80,8 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
   const [questionCount, setQuestionCount] = useState(6);
   const [allowReattempts, setAllowReattempts] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
   const [formError, setFormError] = useState('');
+  const job = useGenerationJob<JobRow>({ table: 'assignment_generation_jobs', columns: JOB_COLUMNS });
 
   const classInfo = classes.find((c) => c.id === selectedClassId) ?? null;
 
@@ -175,39 +133,6 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
   const effectiveObjectives = selectedClassId ? objectives : [];
   const effectiveSubtopics = topicId ? subtopics : [];
 
-  /**
-   * Poll the job row until it settles. Returns null on timeout, which is not the
-   * same as failure — the job is still running server-side, and the assignment
-   * will appear on its own.
-   */
-  const pollJob = async (jobId: string): Promise<JobRow | null> => {
-    const deadline = Date.now() + JOB_TIMEOUT_MS;
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-      const { data } = await supabase
-        .from('assignment_generation_jobs')
-        .select('id, status, assignment_id, error, updated_at')
-        .eq('id', jobId)
-        .maybeSingle();
-      const row = data as JobRow | null;
-      if (!row) continue;
-      setJobStatus(row.status);
-      if (row.status === 'completed' || row.status === 'failed') return row;
-
-      // Nothing is left running to mark this failed, so say so rather than
-      // spinning until the timeout and implying it is still going.
-      const sinceUpdate = Date.now() - new Date(row.updated_at).getTime();
-      if (Number.isFinite(sinceUpdate) && sinceUpdate > STALE_AFTER_MS) {
-        return {
-          ...row,
-          status: 'failed',
-          error: 'Generation stopped partway through and did not finish. Nothing was saved — please try again.',
-        };
-      }
-    }
-    return null;
-  };
-
   const handleCreateAssignment = async () => {
     if (!classInfo) {
       setFormError('Choose a class for this assignment.');
@@ -238,7 +163,7 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
     }
 
     setIsGenerating(true);
-    setJobStatus('queued');
+    job.begin();
     try {
       // The server writes the assignment itself once generation finishes, so a
       // teacher who closes this tab still gets the assignment.
@@ -269,35 +194,27 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
       const body = await response.json();
       if (!response.ok) {
         setFormError(body.error || 'Failed to start generation.');
-        setIsGenerating(false);
-        setJobStatus(null);
         return;
       }
 
-      const job = await pollJob(body.jobId as string);
-      if (!job) {
+      const settled = await job.track(body.jobId as string);
+      if (!settled) {
         setFormError('Generation is taking longer than expected. It is still running — reload this page shortly to see the assignment.');
-        setIsGenerating(false);
-        setJobStatus(null);
         return;
       }
-      if (job.status === 'failed' || !job.assignment_id) {
-        setFormError(job.error || 'Failed to generate questions.');
-        setIsGenerating(false);
-        setJobStatus(null);
+      if (settled.status === 'failed' || !settled.assignment_id) {
+        setFormError(settled.error || 'Failed to generate questions.');
         return;
       }
 
       const { data, error } = await supabase
         .from('assignments')
         .select('id, title, assignment_type, due_date, created_at, class_id, topic_id, topics ( name ), assignment_attempts ( count ), allow_reattempts')
-        .eq('id', job.assignment_id)
+        .eq('id', settled.assignment_id)
         .single();
 
       if (error) {
         setFormError(error.message);
-        setIsGenerating(false);
-        setJobStatus(null);
         return;
       }
 
@@ -306,7 +223,7 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
       setFormError(err instanceof Error ? err.message : 'Failed to create assignment.');
     } finally {
       setIsGenerating(false);
-      setJobStatus(null);
+      job.reset();
     }
   };
 
@@ -450,40 +367,17 @@ export function AssignmentForm({ classes, fixedClassId, onCreated, onCancel }: A
 
       {formError ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{formError}</p> : null}
 
-      {jobStatus ? (
-        <div className="mt-4 rounded-xl border border-subtle bg-surface-sunken p-4 dark:bg-surface/3">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-accent" />
-            <p className="text-sm font-medium text-content">{STAGE_LABEL[jobStatus]}</p>
-          </div>
-          <ol className="mt-3 space-y-1.5">
-            {STAGE_ORDER.map((stage, index) => {
-              const currentIndex = STAGE_ORDER.indexOf(jobStatus);
-              // A stage can be skipped (backfill only runs on a short first
-              // pass), so "done" is by position rather than by having been seen.
-              const done = currentIndex > index;
-              const active = currentIndex === index;
-              return (
-                <li
-                  key={stage}
-                  className={`flex items-center gap-2 text-xs ${
-                    active ? 'font-semibold text-content' : done ? 'text-content-muted' : 'text-content-subtle'
-                  }`}
-                >
-                  {done ? (
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  ) : (
-                    <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-accent' : 'bg-slate-300 dark:bg-white/20'}`} />
-                  )}
-                  {STAGE_LABEL[stage]}
-                </li>
-              );
-            })}
-          </ol>
-          <p className="mt-3 text-xs text-content-subtle">
-            This usually takes about a minute. You can leave this page — the assignment will be waiting for you.
-          </p>
-        </div>
+      {job.status ? (
+        <GenerationProgressPanel
+          className="mt-4"
+          status={job.status}
+          elapsedMs={job.elapsedMs}
+          progress={job.progress}
+          remainingMs={job.remainingMs}
+          overrunningStage={job.overrunningStage}
+          labels={STAGE_LABELS}
+          footer="You can leave this page — the assignment will be waiting for you."
+        />
       ) : null}
 
       <div className="mt-4 flex justify-end gap-2">

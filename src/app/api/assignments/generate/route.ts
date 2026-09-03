@@ -134,9 +134,43 @@ async function runJob({
   const setStatus = (status: string, extra: Record<string, unknown> = {}) =>
     admin.from('assignment_generation_jobs').update({ status, ...extra }).eq('id', jobId);
 
+  /**
+   * Stage updates are deliberately not awaited inside the pipeline -- doing so
+   * would put a database round trip between every step of the very thing being
+   * measured. They must still be *issued*, though: a Supabase query builder is
+   * a lazy thenable, so `void builder` composes the request and never sends it.
+   * That left every job reading `queued` right up until it finished, which is
+   * the one thing a progress display must never do.
+   *
+   * Chained rather than fired in parallel, because two in-flight updates can
+   * land in either order and would park the teacher on a stage the job has
+   * already left.
+   */
+  let stageWrites: Promise<void> = Promise.resolve();
+  const reportStage = (status: string) => {
+    stageWrites = stageWrites.then(() =>
+      setStatus(status).then(
+        ({ error }) => {
+          if (error) console.error('[assignment-generate] stage update failed', status, error);
+        },
+        (err: unknown) => console.error('[assignment-generate] stage update failed', status, err)
+      )
+    );
+  };
+
+  /**
+   * Write a terminal status. Waits for the queued stage writes first so a late
+   * `generating` cannot overwrite `completed` and strand the browser polling a
+   * job that has already finished.
+   */
+  const settle = async (status: string, extra: Record<string, unknown> = {}) => {
+    await stageWrites;
+    await setStatus(status, extra);
+  };
+
   const fail = async (message: string) => {
     timer.done({ jobId, failed: true, error: message.slice(0, 200) });
-    await setStatus('failed', { error: txt(message, 500) });
+    await settle('failed', { error: txt(message, 500) });
   };
 
   try {
@@ -144,9 +178,7 @@ async function runJob({
       supabase,
       userId,
       timer,
-      // Fire-and-forget: a missed stage update costs a stale progress label, and
-      // awaiting it would put a database round trip between each pipeline step.
-      onStage: (stage) => void setStatus(STAGE_STATUS[stage]),
+      onStage: (stage) => reportStage(STAGE_STATUS[stage]),
     });
 
     if (isGenerationFailure(result)) {
@@ -154,7 +186,7 @@ async function runJob({
       return;
     }
 
-    await setStatus('saving');
+    await settle('saving');
 
     const { data: assignmentRow, error: insertError } = await timer.step('assignmentInsertMs', () =>
       admin
@@ -183,7 +215,7 @@ async function runJob({
     }
 
     timer.done({ jobId, produced: result.questionCount, warnings: result.warnings.length });
-    await setStatus('completed', {
+    await settle('completed', {
       assignment_id: (assignmentRow as { id: string }).id,
       warnings: result.warnings,
     });
