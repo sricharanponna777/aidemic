@@ -19,7 +19,6 @@ type JoinedClass = {
     description: string | null;
     academic_year: string | null;
     specifications: {
-      name: string;
       tier: string | null;
       subjects: {
         name: string;
@@ -44,7 +43,7 @@ export default function StudentClassesPage() {
     const { data, error } = await supabase
       .from('class_students')
       .select(
-        'class_id, classes ( id, name, description, academic_year, specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
+        'class_id, classes ( id, name, description, academic_year, specifications ( tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) )'
       )
       .eq('student_id', studentId)
       .eq('status', 'active');

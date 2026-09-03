@@ -31,6 +31,36 @@
           "papers": 2
         }
       ],
+      "combined science (biology)": [
+        {
+          "name": "AQA GCSE Combined Science: Trilogy (Biology)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (chemistry)": [
+        {
+          "name": "AQA GCSE Combined Science: Trilogy (Chemistry)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (physics)": [
+        {
+          "name": "AQA GCSE Combined Science: Trilogy (Physics)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
       "mathematics": [
         {
           "name": "AQA GCSE Mathematics",
@@ -326,6 +356,36 @@
       "physics": [
         {
           "name": "Edexcel GCSE Physics",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (biology)": [
+        {
+          "name": "Edexcel GCSE Combined Science (Biology)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (chemistry)": [
+        {
+          "name": "Edexcel GCSE Combined Science (Chemistry)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (physics)": [
+        {
+          "name": "Edexcel GCSE Combined Science (Physics)",
           "tiers": [
             "Foundation",
             "Higher"
@@ -638,6 +698,60 @@
         },
         {
           "name": "OCR GCSE Physics B (Twenty First Century Science)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (biology)": [
+        {
+          "name": "OCR GCSE Combined Science A: Gateway Science (Biology)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        },
+        {
+          "name": "OCR GCSE Combined Science B: Twenty First Century Science (Biology)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (chemistry)": [
+        {
+          "name": "OCR GCSE Combined Science A: Gateway Science (Chemistry)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        },
+        {
+          "name": "OCR GCSE Combined Science B: Twenty First Century Science (Chemistry)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        }
+      ],
+      "combined science (physics)": [
+        {
+          "name": "OCR GCSE Combined Science A: Gateway Science (Physics)",
+          "tiers": [
+            "Foundation",
+            "Higher"
+          ],
+          "papers": 2
+        },
+        {
+          "name": "OCR GCSE Combined Science B: Twenty First Century Science (Physics)",
           "tiers": [
             "Foundation",
             "Higher"

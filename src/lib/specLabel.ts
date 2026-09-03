@@ -1,6 +1,10 @@
 /**
  * The qualification chain a class is taught against, as display parts:
- * qualification -> exam board -> subject -> specification (with its tier).
+ * qualification -> exam board -> subject -> tier.
+ *
+ * The specification's own name is deliberately left out: on UK specs it is just
+ * board + qualification + subject again ("AQA GCSE Mathematics"), so showing it
+ * repeats the three parts either side of it.
  *
  * Every level is nullable because PostgREST returns null for an embed the row
  * does not have -- a class with no `specification_id`, or a spec whose subject
@@ -8,7 +12,6 @@
  * rather than as gaps or stray separators.
  */
 export type SpecificationChain = {
-  name: string;
   tier: string | null;
   subjects: {
     name: string;
@@ -23,6 +26,6 @@ export function specChainParts(spec: SpecificationChain): string[] {
   if (board?.qualifications) parts.push(board.qualifications.name);
   if (board) parts.push(board.name);
   if (subject) parts.push(subject.name);
-  if (spec) parts.push(spec.tier ? `${spec.name} (${spec.tier})` : spec.name);
+  if (spec?.tier) parts.push(spec.tier);
   return parts;
 }

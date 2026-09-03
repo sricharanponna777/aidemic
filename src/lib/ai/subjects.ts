@@ -6,6 +6,13 @@ export const SUPPORTED_SUBJECTS = [
   'biology',
   'chemistry',
   'physics',
+  // GCSE Combined Science is worth two GCSEs and is examined as three science papers,
+  // so it is three subjects rather than one. Each slug must stay an exact lowercase copy
+  // of its `subjects.name` row: mapStudentSubjectRow lowercases the name to get the slug
+  // and resolveSubjectId feeds the label straight back as a database lookup key.
+  'combined science (biology)',
+  'combined science (chemistry)',
+  'combined science (physics)',
   'mathematics',
   'english language',
   'english literature',
@@ -54,6 +61,9 @@ export const SUBJECT_LABELS: Record<SupportedSubject, string> = {
   biology: 'Biology',
   chemistry: 'Chemistry',
   physics: 'Physics',
+  'combined science (biology)': 'Combined Science (Biology)',
+  'combined science (chemistry)': 'Combined Science (Chemistry)',
+  'combined science (physics)': 'Combined Science (Physics)',
   mathematics: 'Mathematics',
   'english language': 'English Language',
   'english literature': 'English Literature',

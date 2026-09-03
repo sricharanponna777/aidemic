@@ -1,6 +1,13 @@
 import { SupportedSubject } from '@/lib/ai/validation';
 
-const MATH_SUBJECTS: SupportedSubject[] = ['mathematics', 'physics', 'chemistry', 'computer science'];
+const MATH_SUBJECTS: SupportedSubject[] = [
+  'mathematics',
+  'physics',
+  'chemistry',
+  'computer science',
+  'combined science (physics)',
+  'combined science (chemistry)',
+];
 
 export const normalizeMathExpression = (expression: string) => {
   let next = expression;

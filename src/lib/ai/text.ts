@@ -3,7 +3,15 @@ export const MAX_AI_ERROR_TEXT = 2400;
 export const isDataAnalysisObjective = (learningObjective: string) =>
   /graphs,\s*tables,\s*and\s*data\s*sets/i.test(learningObjective);
 
-const CHART_PLOTTING_SUBJECTS = new Set(['mathematics', 'biology', 'chemistry', 'physics']);
+const CHART_PLOTTING_SUBJECTS = new Set([
+  'mathematics',
+  'biology',
+  'chemistry',
+  'physics',
+  'combined science (biology)',
+  'combined science (chemistry)',
+  'combined science (physics)',
+]);
 
 const CHART_PLOTTING_KEYWORDS =
   /\b(pie\s*charts?|bar\s*charts?|line\s*graphs?|scatter\s*graphs?|scatter(?:plot)?s?|correlations?|lines?\s+of\s+best\s*fit|curves?\s+of\s+best\s*fit|histograms?|frequency\s+polygons?|stem[\s-]and[\s-]leaf(?:\s*diagrams?|\s*plots?)?|box\s*plots?|box[\s-]and[\s-]whiskers?|cumulative\s+frequenc(?:y|ies)|data\s+representations?|drawing\s+graphs?|constructing\s+graphs?)\b/i;
@@ -17,7 +25,14 @@ export const isChartPlottingTopic = (subject: string, topic: string, subtopic: s
 // unlocked by the seeded diagram_completion learning objective or by topic/subtopic wording
 // that clearly implies a labelled/structural diagram (a cell, apparatus, a circuit, a cycle,
 // a food web, an energy-transfer chain).
-const DIAGRAM_SUBJECTS = new Set(['biology', 'chemistry', 'physics']);
+const DIAGRAM_SUBJECTS = new Set([
+  'biology',
+  'chemistry',
+  'physics',
+  'combined science (biology)',
+  'combined science (chemistry)',
+  'combined science (physics)',
+]);
 
 const DIAGRAM_KEYWORDS =
   /\b(diagram|label(?:led|ling)?|structure|apparatus|circuit|ray\b|food\s*(?:web|chain)|life\s*cycle|the\s+\w+\s+cycle|carbon\s+cycle|water\s+cycle|nitrogen\s+cycle|pathway|flow\s*chart|energy\s+transfer|classification|dot[\s-]and[\s-]cross|ionic\s+bond(?:ing)?|covalent\s+bond(?:ing)?|electron\s+shell|atomic\s+structure|ray\s+diagram|lens|mirror|refraction|reflection|distillation|titration|electrolysis|chromatography|filtration|nephron|palisade|epithelial|wave(?:length|s)?|transverse|longitudinal|amplitude|electromagnetic|spectrum|heart|circulatory|digestive|organ|series\s+circuit|parallel\s+circuit)\b/i;

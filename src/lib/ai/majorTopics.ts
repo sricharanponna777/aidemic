@@ -45,6 +45,41 @@ const GCSE_TOPICS: Record<string, string[]> = {
     'Space physics',
     'Required practical skills',
   ],
+  // Combined Science covers the same topic headings as the separate sciences -- the
+  // reduction is in the detail under each, not in which topics appear -- with the one
+  // exception that Space physics is separate-Physics only.
+  'combined science (biology)': [
+    'Cell biology',
+    'Organisation',
+    'Infection and response',
+    'Bioenergetics',
+    'Homeostasis and response',
+    'Inheritance, variation and evolution',
+    'Ecology',
+    'Required practical skills',
+  ],
+  'combined science (chemistry)': [
+    'Atomic structure and the periodic table',
+    'Bonding, structure and properties of matter',
+    'Quantitative chemistry',
+    'Chemical changes',
+    'Energy changes',
+    'Rate and extent of chemical change',
+    'Organic chemistry',
+    'Chemical analysis',
+    'Chemistry of the atmosphere',
+    'Using resources',
+  ],
+  'combined science (physics)': [
+    'Energy',
+    'Electricity',
+    'Particle model of matter',
+    'Atomic structure and radiation',
+    'Forces',
+    'Waves',
+    'Magnetism and electromagnetism',
+    'Required practical skills',
+  ],
   mathematics: [
     'Number',
     'Algebra',
