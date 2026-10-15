@@ -11,6 +11,7 @@ import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { countLeeches, isLeech } from '@/lib/leeches';
+import { countDueCards } from '@/lib/flashcardsDue';
 
 const TAG_COLORS = ['#2563eb', '#0f766e', '#7c3aed', '#be123c', '#b45309', '#0284c7'];
 
@@ -92,7 +93,7 @@ export default function DeckPage() {
     });
   }, [cards, searchQuery, activeFilterTagId, cardTags, showLeechesOnly]);
 
-  const dueCards = useMemo(() => cards.filter((card) => new Date(card.next_review_date || 0) <= new Date()).length, [cards]);
+  const dueCards = useMemo(() => countDueCards(cards, new Date()), [cards]);
   const leechCount = useMemo(() => countLeeches(cards), [cards]);
 
   const handleAddCard = async () => {

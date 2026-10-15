@@ -4,6 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
+import {
+  STUDENT_SUBJECT_SELECT,
+  buildGradeContext,
+  gradeContextFor,
+  type StudentSubjectRow,
+} from '@/lib/ai/studentSubjects';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 import { useLinkedChildren } from '../ParentChildContext';
@@ -16,6 +22,7 @@ type AttemptRow = {
   total_marks_awarded?: number | null;
   total_available_marks?: number | null;
   created_at?: string | null;
+  attempt_mode?: string | null;
 };
 
 type SubjectTrend = {
@@ -23,6 +30,8 @@ type SubjectTrend = {
   subject: string;
   examType: string | null;
   grade: string;
+  /** Carried so the badge colour reads off the same ladder the grade did. */
+  specTier: string | null;
   latestPercentage: number | null;
   delta: number | null;
   series: number[];
@@ -68,6 +77,13 @@ export default function ParentProgressPage() {
   const { selectedStudentId } = useLinkedChildren();
 
   const [attempts, setAttempts] = useState<AttemptRow[]>([]);
+  // Tier and board per subject. gradeFromPercentage picks the Foundation/Higher
+  // boundary table from the tier and applies the edexcel -2 / ocr -1 offset from
+  // the board, so without these a parent saw a different predicted grade from
+  // the one on the student's own dashboard for the very same attempts.
+  const [gradeContext, setGradeContext] = useState<Map<string, { specTier: string | null; examBoard: string | null }>>(
+    new Map()
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,14 +91,20 @@ export default function ParentProgressPage() {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from('exam_practice_attempts')
-        .select('subject, exam_type, percentage, predicted_grade, total_marks_awarded, total_available_marks, created_at')
-        .eq('user_id', selectedStudentId)
-        .order('created_at', { ascending: true })
-        .limit(200);
+      // Reads through the existing "Parents can view linked students subjects"
+      // SELECT policy -- no new policy, and still read-only.
+      const [{ data }, subjectsResponse] = await Promise.all([
+        supabase
+          .from('exam_practice_attempts')
+          .select('subject, exam_type, percentage, predicted_grade, total_marks_awarded, total_available_marks, created_at, attempt_mode')
+          .eq('user_id', selectedStudentId)
+          .order('created_at', { ascending: true })
+          .limit(200),
+        supabase.from('student_subjects').select(STUDENT_SUBJECT_SELECT).eq('user_id', selectedStudentId),
+      ]);
       if (cancelled) return;
       setAttempts((data ?? []) as AttemptRow[]);
+      setGradeContext(buildGradeContext((subjectsResponse.data ?? []) as StudentSubjectRow[]));
       setLoading(false);
     };
     void load();
@@ -101,17 +123,35 @@ export default function ParentProgressPage() {
       .map(([key, group]) => {
         const [subject, examType] = key.split('|');
         const normalizedExamType = examType === 'unknown' ? null : examType;
-        const prediction = weightedPredictedGrade(group, normalizedExamType);
+        const context = gradeContextFor(gradeContext, subject, examType);
+        const prediction = weightedPredictedGrade(
+          group,
+          normalizedExamType,
+          context?.specTier,
+          context?.examBoard
+        );
+        // Blurt attempts carry a free-recall coverage %, not a mark-scheme
+        // score, so they belong in neither the sparkline nor its delta.
         const series = group
+          .filter((a) => a.attempt_mode !== 'blurt')
           .map((a) => (typeof a.percentage === 'number' ? a.percentage : null))
           .filter((v): v is number => v !== null);
         const latestPercentage = series.length > 0 ? series[series.length - 1] : null;
         const delta = series.length >= 2 ? Math.round(series[series.length - 1] - series[0]) : null;
-        return { key, subject, examType: normalizedExamType, grade: prediction.grade, latestPercentage, delta, series };
+        return {
+          key,
+          subject,
+          examType: normalizedExamType,
+          grade: prediction.grade,
+          specTier: context?.specTier ?? null,
+          latestPercentage,
+          delta,
+          series,
+        };
       })
       .filter((item) => item.grade !== 'N/A' || item.series.length > 0)
       .sort((a, b) => a.subject.localeCompare(b.subject));
-  }, [attempts]);
+  }, [attempts, gradeContext]);
 
   if (loading) {
     return <PageLoader text="Loading progress trends..." />;
@@ -143,6 +183,7 @@ export default function ParentProgressPage() {
                   className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({
                     grade: item.grade,
                     examType: item.examType,
+                    specTier: item.specTier,
                   })}`}
                 >
                   {item.grade}

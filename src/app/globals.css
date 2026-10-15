@@ -492,9 +492,16 @@ h3 {
    paper rather than a screenshot of the app.
    ========================================================================== */
 @media print {
+  /* margin: 0, not 16mm. Browsers paint their own header (page title) and
+     footer (the dashboard URL and page numbers) *into the @page margin box* --
+     that is where the leaked `/dashboard/ai-questions/paper/...` string in the
+     printed sheet came from. With no margin there is nowhere to paint them, so
+     the gutter moves onto the sheet itself (print:p-[14mm] on the paper
+     <article>). A student who explicitly ticks "Headers and footers" in the
+     print dialog still gets them; no CSS can override that choice. */
   @page {
     size: A4;
-    margin: 16mm;
+    margin: 0;
   }
 
   /* The theme tokens are whatever the student is browsing in, and a dark
@@ -531,6 +538,10 @@ h3 {
   [data-print-question] {
     break-inside: avoid;
     page-break-inside: avoid;
+    /* With @page margin at 0 the sheet's own padding only gutters the first and
+       last page. This keeps a question that starts a fresh page off the paper
+       edge. */
+    margin-block: 3mm;
   }
 
   /* Ruled answer space: the lines are the point of printing at all. */

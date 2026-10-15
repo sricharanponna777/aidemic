@@ -28,6 +28,7 @@ import { PageHero } from "@/components/ui/feedback";
 import { DEFAULT_STUDY_GOALS, fetchStudyGoals } from "@/lib/studyGoals";
 import { BarChart } from "@/components/ui/charts";
 import { countLeeches } from "@/lib/leeches";
+import { countDueCards } from "@/lib/flashcardsDue";
 import { rankWeaknesses, trendLabel, type RankedWeakness } from "@/lib/weaknesses";
 import { GetStartedChecklist } from "@/components/GetStartedChecklist";
 import { loadStudentChecklist, type ChecklistItem } from "@/lib/onboarding/checklist";
@@ -319,7 +320,7 @@ export default function Dashboard() {
             .select("id, subject, topic, weakness_tags, weakness_analysis, exam_board, exam_type, percentage, predicted_grade, total_marks_awarded, total_available_marks, created_at, attempt_mode")
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: false })
-            .limit(50),
+            .limit(200),
           supabase
             .from("student_subjects")
             .select(`specification_id, ${STUDENT_SUBJECT_SELECT}`)
@@ -356,7 +357,9 @@ export default function Dashboard() {
         const subtopicCounts = await readSpecificationSubtopicCounts(supabase, [
           ...specificationBySubject.values(),
         ]);
-        const latestAttempt = attempts[0];
+        // "Latest practice score" has to be a practice score: a blurt row carries
+        // a free-recall coverage %, which would read as an exam result it is not.
+        const latestAttempt = attempts.find((attempt) => attempt.attempt_mode !== "blurt");
         const primaryExamType = (attempts[0]?.exam_type ?? null) as ExamType | null;
         // Recency-weighted so the headline weakness reflects what is costing
         // marks now, not whatever was most common over the student's lifetime.
@@ -482,11 +485,7 @@ export default function Dashboard() {
         setMetrics({
           deckCount: deckRows.length,
           totalCards: cards.length || deckRows.reduce((sum, d) => sum + (d.card_count || 0), 0),
-          dueCards: cards.filter((card) => {
-            if (!card.next_review_date) return true;
-            const nextReview = new Date(card.next_review_date);
-            return Number.isNaN(nextReview.getTime()) || nextReview <= now;
-          }).length,
+          dueCards: countDueCards(cards, now),
           reviewedCards: cards.filter((card) => (card.times_studied || 0) > 0).length,
           sessionsCompleted: sessions.length,
           totalStudyMinutes: sessions.reduce((sum, s) => sum + s.durationMinutes, 0),
@@ -873,8 +872,11 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ) : metrics.dueCards > 0 ? (
+                    // Daily Review, not study-sessions: this count is across every
+                    // deck, and a study session is one deck at a time, so the
+                    // number the student clicked was never the one they then saw.
                     <Link
-                      href="/dashboard/study-sessions"
+                      href="/dashboard/daily-review"
                       className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm font-semibold text-indigo-900 transition hover:bg-indigo-100 dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-indigo-100"
                     >
                       {metrics.dueCards} cards are due for review

@@ -12,9 +12,14 @@ type ParentChildContextValue = {
   setSelectedStudentId: (id: string) => void;
   loading: boolean;
   linkChild: (identifier: string) => Promise<{ error?: string; studentName?: string }>;
+  /** Re-read the link list. The acceptance happens in the child's browser. */
+  refresh: () => Promise<void>;
 };
 
 const STORAGE_KEY = 'aidemic-parent-child';
+
+/** How often to look for an accepted link while the parent has none yet. */
+const PENDING_POLL_MS = 30_000;
 
 const ParentChildContext = createContext<ParentChildContextValue | null>(null);
 
@@ -67,31 +72,80 @@ export function ParentChildProvider({ children }: { children: React.ReactNode })
     [supabase]
   );
 
+  /**
+   * Apply the current link list.
+   *
+   * Deliberately does not touch `loading`: it runs on a timer and on every tab
+   * focus, and a parent reading the page should not get the full-page loader
+   * thrown over it every thirty seconds. Only the first load clears it.
+   */
+  const applyStudents = useCallback(
+    async (parentId: string) => {
+      const rows = await loadStudents(parentId);
+      setStudents(rows);
+      setSelectedStudentIdState((current) => {
+        // Keep the parent on the child they were already looking at.
+        if (current && rows.some((row) => row.studentId === current)) return current;
+        let stored: string | null = null;
+        try {
+          stored = window.localStorage.getItem(STORAGE_KEY);
+        } catch {
+          stored = null;
+        }
+        const validStored = stored && rows.some((row) => row.studentId === stored) ? stored : null;
+        return validStored ?? rows[0]?.studentId ?? null;
+      });
+    },
+    [loadStudents]
+  );
+
+  const refresh = useCallback(async () => {
+    if (!session) return;
+    await applyStudents(session.user.id);
+  }, [session, applyStudents]);
+
   useEffect(() => {
     if (!session) return;
-
     let cancelled = false;
     const load = async () => {
-      setLoading(true);
-      const rows = await loadStudents(session.user.id);
-      if (cancelled) return;
-      setStudents(rows);
-
-      let stored: string | null = null;
-      try {
-        stored = window.localStorage.getItem(STORAGE_KEY);
-      } catch {
-        stored = null;
-      }
-      const validStored = stored && rows.some((r) => r.studentId === stored) ? stored : null;
-      setSelectedStudentIdState(validStored ?? rows[0]?.studentId ?? null);
-      setLoading(false);
+      await applyStudents(session.user.id);
+      if (!cancelled) setLoading(false);
     };
     void load();
     return () => {
       cancelled = true;
     };
-  }, [session, loadStudents]);
+  }, [session, applyStudents]);
+
+  /**
+   * A child accepts the request in their own browser, and there is no channel
+   * back to this one -- no Realtime anywhere in the app, and useAuth
+   * deliberately dampens the session churn that would otherwise re-run the
+   * effect above. So re-read on the two moments a parent would otherwise reach
+   * for F5: coming back to the tab, and sitting on an empty dashboard waiting.
+   */
+  useEffect(() => {
+    if (!session) return;
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    const poll =
+      students.length === 0
+        ? window.setInterval(() => {
+            if (document.visibilityState === 'visible') void refresh();
+          }, PENDING_POLL_MS)
+        : undefined;
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      if (poll !== undefined) window.clearInterval(poll);
+    };
+  }, [session, refresh, students.length]);
 
   const linkChild = useCallback(
     async (identifier: string): Promise<{ error?: string; studentName?: string }> => {
@@ -124,7 +178,9 @@ export function ParentChildProvider({ children }: { children: React.ReactNode })
   );
 
   return (
-    <ParentChildContext.Provider value={{ students, selectedStudentId, setSelectedStudentId, loading, linkChild }}>
+    <ParentChildContext.Provider
+      value={{ students, selectedStudentId, setSelectedStudentId, loading, linkChild, refresh }}
+    >
       {children}
     </ParentChildContext.Provider>
   );

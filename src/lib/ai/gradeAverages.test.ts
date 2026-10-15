@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { averagePredictedGrade, normalisePredictedGrade, weightedPredictedGrade } from './gradeAverages';
-
-describe('normalisePredictedGrade', () => {
-  it('trims and upper-cases', () => {
-    expect(normalisePredictedGrade('  a* ')).toBe('A*');
-    expect(normalisePredictedGrade(null)).toBe('');
-  });
-});
+import { PREDICTED_GRADE_WINDOW, averagePredictedGrade, weightedPredictedGrade } from './gradeAverages';
 
 describe('averagePredictedGrade', () => {
   it('returns N/A when nothing is analysable', () => {
@@ -58,5 +51,82 @@ describe('weightedPredictedGrade', () => {
     );
     expect(result.grade).toBe('6');
     expect(result.percentage).toBeNull();
+  });
+});
+
+describe('averagePredictedGrade on mixed-case ladders', () => {
+  // The entrance exams report an outcome band rather than a grade, and those
+  // labels are words. Upper-casing the input before an exact indexOf meant none
+  // of them ever matched their own ladder, so every one of these fell through to
+  // 'N/A' with analysableCount 0.
+  it('averages JEE Advanced rank bands', () => {
+    const result = averagePredictedGrade(['Top 4000', 'Top 8000'], 'jee-advanced');
+    expect(result.grade).toBe('Top 4000');
+    expect(result.analysableCount).toBe(2);
+  });
+
+  it('averages CLAT bands and tolerates the casing a caller happens to send', () => {
+    const result = averagePredictedGrade(['top 1000', 'TOP 1000'], 'clat');
+    expect(result.analysableCount).toBe(2);
+    expect(result.grade).toBe('Top 1000');
+  });
+
+  it('still returns N/A for a grade that is genuinely not on the ladder', () => {
+    expect(averagePredictedGrade(['Top 7'], 'jee-advanced').grade).toBe('N/A');
+    expect(averagePredictedGrade([null, ''], 'jee-advanced').analysableCount).toBe(0);
+  });
+
+  it('leaves the uppercase ladders working exactly as before', () => {
+    expect(averagePredictedGrade(['A*', 'A'], 'a-level').analysableCount).toBe(2);
+    expect(averagePredictedGrade(['7', '9'], 'gcse').analysableCount).toBe(2);
+  });
+});
+
+describe('weightedPredictedGrade attempt window', () => {
+  const attempt = (marks: number, created_at: string) => ({
+    total_marks_awarded: marks,
+    total_available_marks: 10,
+    created_at,
+  });
+
+  // Sixty consecutive days, oldest first. The ten oldest scored zero; the
+  // newest fifty -- the whole window -- scored full marks.
+  const dayAfter = (index: number) =>
+    new Date(Date.UTC(2026, 0, 1) + index * 24 * 60 * 60 * 1000).toISOString();
+  const sixtyAttempts = Array.from({ length: 60 }, (_unused, index) =>
+    attempt(index < 10 ? 0 : 10, dayAfter(index))
+  );
+
+  it('pools only the newest attempts', () => {
+    const result = weightedPredictedGrade(sixtyAttempts, 'gcse');
+    expect(result.analysableCount).toBe(PREDICTED_GRADE_WINDOW);
+    // The ten ancient zeroes are outside the window, so 100%, not 83%.
+    expect(result.percentage).toBe(100);
+  });
+
+  it('picks the same window whichever order the caller fetched in', () => {
+    // The parent progress page fetches ascending; everyone else descending.
+    // Those used to be different windows, so the same student and subject
+    // showed different predicted grades on different pages.
+    const ascending = weightedPredictedGrade(sixtyAttempts, 'gcse');
+    const descending = weightedPredictedGrade([...sixtyAttempts].reverse(), 'gcse');
+    expect(descending.grade).toBe(ascending.grade);
+    expect(descending.percentage).toBe(ascending.percentage);
+  });
+
+  it('leaves a group smaller than the window untouched', () => {
+    const three = sixtyAttempts.slice(0, 3);
+    expect(weightedPredictedGrade(three, 'gcse').analysableCount).toBe(3);
+  });
+
+  it('excludes blurt attempts but keeps rows with no mode recorded', () => {
+    const rows = [
+      { ...attempt(10, '2026-02-01T00:00:00.000Z'), attempt_mode: 'practice' },
+      { ...attempt(0, '2026-02-02T00:00:00.000Z'), attempt_mode: 'blurt' },
+      attempt(10, '2026-02-03T00:00:00.000Z'),
+    ];
+    const result = weightedPredictedGrade(rows, 'gcse');
+    expect(result.analysableCount).toBe(2);
+    expect(result.percentage).toBe(100);
   });
 });

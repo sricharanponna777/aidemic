@@ -7,6 +7,7 @@ import { Flashcard, FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
+import { isCardDue } from '@/lib/flashcardsDue';
 
 type Deck = Pick<FlashcardDeck, 'id' | 'name' | 'card_count' | 'ai_generated' | 'updated_at' | 'created_at' | 'description'> & {
   due_count?: number;
@@ -55,9 +56,7 @@ export default function Flashcards() {
             const dueCounts = new Map<string, number>();
 
             cardRows.forEach((card) => {
-              const nextReview = card.next_review_date ? new Date(card.next_review_date) : null;
-              const isDue = !nextReview || nextReview <= now;
-              if (isDue) {
+              if (isCardDue(card.next_review_date, now)) {
                 dueCounts.set(card.deck_id, (dueCounts.get(card.deck_id) || 0) + 1);
               }
             });

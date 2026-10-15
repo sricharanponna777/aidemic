@@ -7,7 +7,13 @@ import { PageLoader } from '@/components/PageLoader';
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { gradeBadgeTone } from '@/lib/gradeTone';
-import { STUDENT_SUBJECT_SELECT, mapStudentSubjectRow, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
+import {
+  STUDENT_SUBJECT_SELECT,
+  buildGradeContext,
+  gradeContextFor,
+  mapStudentSubjectRow,
+  type StudentSubjectRow,
+} from '@/lib/ai/studentSubjects';
 import { useLinkedChildren } from '../ParentChildContext';
 
 type AttemptRow = {
@@ -20,6 +26,7 @@ type AttemptRow = {
   total_marks_awarded?: number | null;
   total_available_marks?: number | null;
   created_at?: string | null;
+  attempt_mode?: string | null;
 };
 
 type SubjectCard = {
@@ -27,6 +34,8 @@ type SubjectCard = {
   subject: string;
   examType: string | null;
   grade: string;
+  /** Carried so the badge colour reads off the same ladder the grade did. */
+  specTier: string | null;
   attempts: number;
   avgPercentage: number | null;
   trend: 'improving' | 'declining' | 'steady';
@@ -49,6 +58,11 @@ export default function ParentSubjectsPage() {
 
   const [attempts, setAttempts] = useState<AttemptRow[]>([]);
   const [enrolledSubjects, setEnrolledSubjects] = useState<string[]>([]);
+  // Tier and board per subject, so a predicted grade shown to a parent is read
+  // off the same boundary table as the one the student sees.
+  const [gradeContext, setGradeContext] = useState<Map<string, { specTier: string | null; examBoard: string | null }>>(
+    new Map()
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,7 +73,7 @@ export default function ParentSubjectsPage() {
       const [attemptsResponse, subjectsResponse] = await Promise.all([
         supabase
           .from('exam_practice_attempts')
-          .select('subject, exam_type, percentage, predicted_grade, weakness_tags, weakness_analysis, total_marks_awarded, total_available_marks, created_at')
+          .select('subject, exam_type, percentage, predicted_grade, weakness_tags, weakness_analysis, total_marks_awarded, total_available_marks, created_at, attempt_mode')
           .eq('user_id', selectedStudentId)
           .order('created_at', { ascending: false })
           .limit(200),
@@ -67,9 +81,9 @@ export default function ParentSubjectsPage() {
       ]);
       if (cancelled) return;
       setAttempts((attemptsResponse.data ?? []) as AttemptRow[]);
-      setEnrolledSubjects(
-        ((subjectsResponse.data ?? []) as StudentSubjectRow[]).map((row) => mapStudentSubjectRow(row).subject).filter(Boolean)
-      );
+      const mappedSubjects = ((subjectsResponse.data ?? []) as StudentSubjectRow[]).map(mapStudentSubjectRow);
+      setEnrolledSubjects(mappedSubjects.map((row) => row.subject).filter(Boolean));
+      setGradeContext(buildGradeContext((subjectsResponse.data ?? []) as StudentSubjectRow[]));
       setLoading(false);
     };
     void load();
@@ -88,10 +102,19 @@ export default function ParentSubjectsPage() {
       .map(([key, group]) => {
         const [subject, examType] = key.split('|');
         const normalizedExamType = examType === 'unknown' ? null : examType;
-        const prediction = weightedPredictedGrade(group, normalizedExamType);
+        const context = gradeContextFor(gradeContext, subject, examType);
+        const prediction = weightedPredictedGrade(
+          group,
+          normalizedExamType,
+          context?.specTier,
+          context?.examBoard
+        );
 
-        // group is newest-first (query ordered descending).
-        const withPct = group.filter((a) => typeof a.percentage === 'number') as Array<{ percentage: number }>;
+        // group is newest-first (query ordered descending). Blurt attempts carry
+        // a free-recall coverage %, not a mark-scheme score.
+        const withPct = group.filter(
+          (a) => a.attempt_mode !== 'blurt' && typeof a.percentage === 'number'
+        ) as Array<{ percentage: number }>;
         const avgPercentage =
           withPct.length > 0 ? Math.round(withPct.reduce((sum, a) => sum + a.percentage, 0) / withPct.length) : null;
         const recent = withPct.slice(0, RECENT_WINDOW);
@@ -119,10 +142,20 @@ export default function ParentSubjectsPage() {
           .slice(0, 3)
           .map(([tag, count]) => ({ tag, count }));
 
-        return { key, subject, examType: normalizedExamType, grade: prediction.grade, attempts: group.length, avgPercentage, trend, weakAreas };
+        return {
+          key,
+          subject,
+          examType: normalizedExamType,
+          grade: prediction.grade,
+          specTier: context?.specTier ?? null,
+          attempts: group.length,
+          avgPercentage,
+          trend,
+          weakAreas,
+        };
       })
       .sort((a, b) => a.subject.localeCompare(b.subject));
-  }, [attempts]);
+  }, [attempts, gradeContext]);
 
   const practisedSubjects = useMemo(() => new Set(cards.map((c) => c.subject)), [cards]);
   const notStarted = useMemo(
@@ -158,6 +191,7 @@ export default function ParentSubjectsPage() {
                   className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({
                     grade: card.grade,
                     examType: card.examType,
+                    specTier: card.specTier,
                   })}`}
                 >
                   {card.grade}

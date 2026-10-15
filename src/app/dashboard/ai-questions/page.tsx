@@ -804,13 +804,16 @@ export default function AIQuestionsPage() {
           predicted_grade: markedReport.predictedGrade,
           weakness_tags: savedWeaknessTags,
           weakness_analysis: markedReport.weaknessAnalysis,
+          // Part of the base row, not the enriched one: the fallback below drops
+          // the payload columns, and dropping this with them silently recorded a
+          // mock as an ordinary practice attempt in every average.
+          attempt_mode: isMockExam ? 'mock' : 'practice',
         };
         const { error: saveError } = await supabase.from('exam_practice_attempts').insert({
           ...attemptRow,
           questions_payload: questions,
           answers_payload: answers,
           marking_report: { ...markedReport, sourceMaterial },
-          attempt_mode: isMockExam ? 'mock' : 'practice',
           duration_minutes: isMockExam ? mockDurationMinutes : null,
           time_taken_seconds: isMockExam && mockDeadline
             ? Math.max(0, mockDurationMinutes * 60 - Math.max(0, Math.round((mockDeadline - Date.now()) / 1000)))

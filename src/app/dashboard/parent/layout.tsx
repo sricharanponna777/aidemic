@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, LogIn, Plus, Users } from 'lucide-react';
+import { LayoutDashboard, LogIn, Plus, RefreshCw, Users } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,14 +25,20 @@ function ParentShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { profile, isLoading } = useAuth();
-  const { students, selectedStudentId, setSelectedStudentId, loading } = useLinkedChildren();
+  const { students, selectedStudentId, setSelectedStudentId, loading, linkChild, refresh } = useLinkedChildren();
 
   const [showLinkForm, setShowLinkForm] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState('');
   const [requestSent, setRequestSent] = useState<string | null>(null);
-  const { linkChild } = useLinkedChildren();
+  const [isChecking, setIsChecking] = useState(false);
+
+  const handleCheckAgain = async () => {
+    setIsChecking(true);
+    await refresh();
+    setIsChecking(false);
+  };
 
   useEffect(() => {
     if (isLoading) return;
@@ -94,7 +100,16 @@ function ParentShell({ children }: { children: React.ReactNode }) {
               <p className="text-sm text-content-muted">
                 They&apos;ll need to approve it from their dashboard before you can see their progress.
               </p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleCheckAgain}
+                  disabled={isChecking}
+                  className={buttonStyles({ variant: 'primary', size: 'sm' })}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isChecking ? 'animate-spin' : ''}`} />
+                  {isChecking ? 'Checking...' : 'Check again'}
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -153,6 +168,15 @@ function ParentShell({ children }: { children: React.ReactNode }) {
             to send a request with their email address or username. They&apos;ll need to accept it from their dashboard
             before their progress appears here.
           </p>
+          <button
+            type="button"
+            onClick={handleCheckAgain}
+            disabled={isChecking}
+            className={`mt-4 ${buttonStyles({ variant: 'secondary', size: 'sm' })}`}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isChecking ? 'animate-spin' : ''}`} />
+            {isChecking ? 'Checking...' : 'Check again'}
+          </button>
         </div>
       ) : (
         <>

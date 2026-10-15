@@ -34,6 +34,7 @@ type AttemptRow = {
   weakness_analysis: string[] | null;
   marking_report: MarkingReport | null;
   created_at: string | null;
+  attempt_mode: string | null;
 };
 
 type CoachResult = { headline: string; patterns: string[]; nextSteps: string[] };
@@ -54,7 +55,7 @@ export default function ExamCoachPage() {
         const supabase = createClient();
         const { data, error } = await supabase
           .from('exam_practice_attempts')
-          .select('id, subject, percentage, weakness_tags, weakness_analysis, marking_report, created_at')
+          .select('id, subject, percentage, weakness_tags, weakness_analysis, marking_report, created_at, attempt_mode')
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false })
           .limit(ATTEMPT_LOOKBACK);
@@ -102,7 +103,9 @@ export default function ExamCoachPage() {
 
     const subjectStats = [...subjectGroups.entries()].map(([subject, group]) => {
       const sorted = [...group].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-      const withPct = sorted.filter((a) => typeof a.percentage === 'number');
+      // Blurting records a free-recall coverage %, not a mark-scheme score, so
+      // averaging it in here would read as a practice result it is not.
+      const withPct = sorted.filter((a) => a.attempt_mode !== 'blurt' && typeof a.percentage === 'number');
       const avgPercentage = withPct.length > 0
         ? Math.round(withPct.reduce((sum, a) => sum + (a.percentage || 0), 0) / withPct.length)
         : 0;

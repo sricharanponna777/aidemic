@@ -13,6 +13,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useToast } from '@/components/ToastProvider';
 import { createClient } from '@/lib/supabase-client';
+import {
+  MAX_DAILY_REVIEW_FLASHCARDS,
+  countDueCards,
+  selectDueCards,
+} from '@/lib/flashcardsDue';
 import { formatInterval, previewNextReview } from '@/lib/spacedRepetition';
 import { readDueSubtopics, readStudentMastery } from '@/lib/mastery/read';
 import { MASTERY_LABEL, masteryBadgeTone } from '@/lib/masteryTone';
@@ -20,7 +25,6 @@ import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import type { MasteryBand } from '@/lib/mastery';
 import type { Flashcard } from '@/types';
 
-const MAX_DUE_FLASHCARDS = 15;
 const MAX_WEAK_TOPICS = 3;
 const FLASHCARDS_PER_MICROQUESTION = 3;
 
@@ -75,11 +79,7 @@ type WeakTopicSummary = {
 
 type Phase = 'idle' | 'loading' | 'reviewing' | 'summary';
 
-const parseDateTime = (value?: string | null) => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
+type DueCardRow = { next_review_date: string | null };
 
 const buildMicroQuestionBack = (question: ExamQuestion) => {
   const parts: string[] = [];
@@ -118,6 +118,7 @@ export default function DailyReviewPage() {
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [dueFlashcardCount, setDueFlashcardCount] = useState(0);
+  const sessionFlashcardCount = Math.min(dueFlashcardCount, MAX_DAILY_REVIEW_FLASHCARDS);
   const [weakTopics, setWeakTopics] = useState<WeakTopicSummary[]>([]);
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -153,11 +154,7 @@ export default function DailyReviewPage() {
             .from('flashcards')
             .select('next_review_date')
             .in('deck_id', deckIds);
-          const now = new Date();
-          dueCount = (cards || []).filter((card: { next_review_date: string | null }) => {
-            const nextReview = parseDateTime(card.next_review_date);
-            return !nextReview || nextReview <= now;
-          }).length;
+          dueCount = countDueCards((cards || []) as DueCardRow[], new Date());
         }
         setDueFlashcardCount(dueCount);
 
@@ -367,15 +364,12 @@ export default function DailyReviewPage() {
           .from('flashcards')
           .select('*')
           .in('deck_id', deckIds)
-          .order('next_review_date', { ascending: true });
+          // nullsFirst matters: a null date counts as due, but Postgres' ASC
+          // default sorts nulls last, which made never-scheduled cards the
+          // first casualties of the cap below.
+          .order('next_review_date', { ascending: true, nullsFirst: true });
         if (error) throw error;
-        const now = new Date();
-        dueFlashcards = ((cards || []) as Flashcard[])
-          .filter((card) => {
-            const nextReview = parseDateTime(card.next_review_date);
-            return !nextReview || nextReview <= now;
-          })
-          .slice(0, MAX_DUE_FLASHCARDS);
+        dueFlashcards = selectDueCards((cards || []) as Flashcard[], new Date());
       }
 
       const flashcardItems: QueueItem[] = dueFlashcards.map((card) => ({
@@ -388,6 +382,16 @@ export default function DailyReviewPage() {
 
       const microQuestionResults = await Promise.all(weakTopics.map((topic) => generateMicroQuestion(topic)));
       const microItems = microQuestionResults.filter((item): item is QueueItem => item !== null);
+      // The idle screen promised one micro-question per weak spot. Generation
+      // can fail per topic, and silently shipping a shorter queue than the one
+      // advertised is the same defect as capping the flashcards without saying so.
+      const missingMicroQuestions = weakTopics.length - microItems.length;
+      if (missingMicroQuestions > 0) {
+        showToast(
+          'info',
+          `Could not build ${missingMicroQuestions} of your ${weakTopics.length} weak-spot question${weakTopics.length === 1 ? '' : 's'} — carrying on without them.`
+        );
+      }
 
       const combined = interleaveQueue(flashcardItems, microItems);
       if (combined.length === 0) {
@@ -563,8 +567,18 @@ export default function DailyReviewPage() {
         <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-subtle p-4">
-              <p className="text-sm font-medium text-content-muted">Flashcards due</p>
-              <p className="mt-2 text-3xl font-bold text-content">{isLoadingSummary ? '…' : dueFlashcardCount}</p>
+              <p className="text-sm font-medium text-content-muted">Flashcards this session</p>
+              {/* The session is capped, so this is the capped number: it has to
+                  match the "Item 1 of N" the student sees once they start. The
+                  full backlog is spelled out underneath rather than hidden. */}
+              <p className="mt-2 text-3xl font-bold text-content">
+                {isLoadingSummary ? '…' : sessionFlashcardCount}
+              </p>
+              {!isLoadingSummary && dueFlashcardCount > sessionFlashcardCount ? (
+                <p className="mt-1 text-caption text-content-subtle">
+                  {dueFlashcardCount} due — the rest carry over to your next session
+                </p>
+              ) : null}
             </div>
             <div className="rounded-xl border border-subtle p-4">
               <p className="text-sm font-medium text-content-muted">Weak spots targeted</p>

@@ -56,6 +56,19 @@ export function coerceTranscript(raw: unknown, questionCount?: number): PaperTra
   );
 }
 
+/**
+ * How many questions have something written against them.
+ *
+ * Zero means the transcriber read nothing at all -- a blank sheet, an unreadable
+ * photo, a PDF whose pages rendered white. Marking that produces a real 0-of-N
+ * attempt row, which is indistinguishable from a student who sat the paper and
+ * scored nothing, and it drags their predicted grade down for good. Both the
+ * review screen and the marking route refuse on this.
+ */
+export function countAnsweredEntries(transcript: PaperTranscriptEntry[]): number {
+  return transcript.filter((entry) => entry.text.trim().length > 0).length;
+}
+
 /** The positional `answers` array the marking route expects. */
 export function transcriptToAnswers(transcript: PaperTranscriptEntry[], questionCount: number): string[] {
   const dense = coerceTranscript(transcript, questionCount);

@@ -8,7 +8,13 @@ import { calculateRetentionRate, calculateStudyStreak } from '@/lib/spacedRepeti
 import { weightedPredictedGrade } from '@/lib/ai/gradeAverages';
 import { describeMasteryCoverage, masteryCoverage } from '@/lib/ai/gradeFromMastery';
 import { readSpecificationSubtopicCounts, readStudentMastery } from '@/lib/mastery/read';
-import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
+import {
+  buildGradeContext,
+  gradeContextFor,
+  mapStudentSubjectRow,
+  STUDENT_SUBJECT_SELECT,
+  type StudentSubjectRow,
+} from '@/lib/ai/studentSubjects';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 import { rankWeaknesses, trendLabel, type RankedWeakness } from '@/lib/weaknesses';
@@ -23,6 +29,7 @@ type AttemptRow = {
   predicted_grade?: string | null;
   total_marks_awarded?: number | null;
   total_available_marks?: number | null;
+  attempt_mode?: string | null;
 };
 
 type SubjectGrade = {
@@ -30,6 +37,9 @@ type SubjectGrade = {
   examType: string | null;
   grade: string;
   attempts: number;
+  /** Carried so the badge colour is read off the same ladder the grade was, which
+   *  is what keeps this page agreeing with the student's own dashboard. */
+  specTier: string | null;
   /** How much of the specification the grade rests on, when the spine knows. */
   coverageLabel: string | null;
 };
@@ -69,10 +79,10 @@ export default function ParentOverviewPage() {
         await Promise.all([
           supabase
             .from('exam_practice_attempts')
-            .select('subject, created_at, exam_type, weakness_tags, weakness_analysis, predicted_grade, total_marks_awarded, total_available_marks')
+            .select('subject, created_at, exam_type, weakness_tags, weakness_analysis, predicted_grade, total_marks_awarded, total_available_marks, attempt_mode')
             .eq('user_id', selectedStudentId)
             .order('created_at', { ascending: false })
-            .limit(50),
+            .limit(200),
           supabase.from('study_sessions').select('started_at').eq('user_id', selectedStudentId),
           supabase.from('flashcard_decks').select('id').eq('user_id', selectedStudentId),
           supabase.from('assignment_attempts').select('status').eq('student_id', selectedStudentId),
@@ -91,9 +101,15 @@ export default function ParentOverviewPage() {
         specification_id: string | null;
       })[];
       const specificationBySubject = new Map<string, string>();
+      // Tier and board decide which boundary table a percentage is read against
+      // (Foundation vs Higher) and the edexcel -2 / ocr -1 offset. Omitting them
+      // here made a parent's number disagree with the student's own dashboard --
+      // a Foundation student at 72% showed as 5 to them and 6 to their parent,
+      // which is a grade Foundation tier cannot even award.
+      const gradeContextBySubject = buildGradeContext(subjectRows);
       for (const row of subjectRows) {
-        const { subject } = mapStudentSubjectRow(row);
-        if (row.specification_id) specificationBySubject.set(subject, row.specification_id);
+        const mapped = mapStudentSubjectRow(row);
+        if (row.specification_id) specificationBySubject.set(mapped.subject, row.specification_id);
       }
       const subtopicCounts = await readSpecificationSubtopicCounts(supabase, [
         ...specificationBySubject.values(),
@@ -115,7 +131,13 @@ export default function ParentOverviewPage() {
       const subjectGrades: SubjectGrade[] = [...subjectGroups.entries()]
         .map(([key, group]) => {
           const [subject, examType] = key.split('|');
-          const prediction = weightedPredictedGrade(group, examType === 'unknown' ? null : examType);
+          const gradeContext = gradeContextFor(gradeContextBySubject, subject, examType);
+          const prediction = weightedPredictedGrade(
+            group,
+            examType === 'unknown' ? null : examType,
+            gradeContext?.specTier,
+            gradeContext?.examBoard
+          );
           const specificationId = specificationBySubject.get(subject);
           const coverage = specificationId
             ? masteryCoverage(
@@ -128,6 +150,7 @@ export default function ParentOverviewPage() {
             examType: examType === 'unknown' ? null : examType,
             grade: prediction.grade,
             attempts: group.length,
+            specTier: gradeContext?.specTier ?? null,
             coverageLabel: coverage ? describeMasteryCoverage(coverage) : null,
           };
         })
@@ -226,6 +249,7 @@ export default function ParentOverviewPage() {
                     className={`inline-flex min-w-14 justify-center rounded-lg px-3 py-1.5 text-sm font-black ${gradeBadgeTone({
                       grade: item.grade,
                       examType: item.examType,
+                      specTier: item.specTier,
                     })}`}
                   >
                     {item.grade}

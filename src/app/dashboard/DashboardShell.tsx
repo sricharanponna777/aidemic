@@ -154,8 +154,20 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       setHasLinkedChild((linkedChildren ?? 0) > 0);
     };
     void load();
+
+    // A child accepting a link in their own browser grows this parent's nav
+    // from two items to the full set. Without this the sidebar stays truncated
+    // even after the parent dashboard itself has populated.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, [session, supabase]);
 
@@ -180,7 +192,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     : STUDENT_NAV_GROUPS;
 
   const navGroups = isPlatformAdmin
-    ? [...baseNavGroups, { label: null, items: [{ href: "/dashboard/admin/schools", label: "Admin", icon: ShieldAlert }] }]
+    ? [...baseNavGroups, { label: null, items: [{ href: "/dashboard/admin/verification", label: "Admin", icon: ShieldAlert }] }]
     : baseNavGroups;
 
   const handleSignOut = async () => {

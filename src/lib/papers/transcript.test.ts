@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coerceTranscript, transcriptToAnswers } from './transcript';
+import { coerceTranscript, countAnsweredEntries, transcriptToAnswers } from './transcript';
 
 describe('coerceTranscript', () => {
   it('fills a gap rather than shifting later answers onto the wrong question', () => {
@@ -103,5 +103,32 @@ describe('transcriptToAnswers', () => {
     );
 
     expect(answers).toEqual(['first', 'second', '']);
+  });
+});
+
+describe('countAnsweredEntries', () => {
+  it('is zero for a sheet nothing was read from', () => {
+    // BUG-04: this transcript used to mark as a real 0-of-N attempt and pull
+    // the student's predicted grade down permanently.
+    expect(countAnsweredEntries(coerceTranscript([], 5))).toBe(0);
+  });
+
+  it('does not count whitespace as an answer', () => {
+    expect(
+      countAnsweredEntries([
+        { questionIndex: 0, text: '   ', confidence: 1 },
+        { questionIndex: 1, text: '\n\t', confidence: 1 },
+      ])
+    ).toBe(0);
+  });
+
+  it('counts the questions that have something written against them', () => {
+    expect(
+      countAnsweredEntries([
+        { questionIndex: 0, text: 'photosynthesis', confidence: 0.9 },
+        { questionIndex: 1, text: '', confidence: 0 },
+        { questionIndex: 2, text: '42', confidence: 0.4 },
+      ])
+    ).toBe(2);
   });
 });

@@ -12,6 +12,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
 import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
+import { isCardDue } from '@/lib/flashcardsDue';
 
 type Session = Pick<
   StudySession,
@@ -158,8 +159,7 @@ export default function StudySessions() {
           const now = new Date();
           const cardRows = (cards || []) as DueCardRow[];
           cardRows.forEach((card) => {
-            const nextReview = parseDateTime(card.next_review_date);
-            if (!nextReview || nextReview <= now) {
+            if (isCardDue(card.next_review_date, now)) {
               dueCounts.set(card.deck_id, (dueCounts.get(card.deck_id) || 0) + 1);
             }
           });
@@ -282,10 +282,7 @@ export default function StudySessions() {
     const cardRows = (cards || []) as Flashcard[];
     const now = new Date();
     const due = cardRows
-      .filter((card) => {
-        const nextReview = parseDateTime(card.next_review_date);
-        return !nextReview || nextReview <= now;
-      })
+      .filter((card) => isCardDue(card.next_review_date, now))
       .sort((a, b) => dateValue(a.next_review_date) - dateValue(b.next_review_date));
 
     if (due.length === 0) {

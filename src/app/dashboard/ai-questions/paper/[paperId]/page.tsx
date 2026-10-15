@@ -21,7 +21,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { downscaleToJpeg } from '@/lib/papers/downscale';
 import { isPdf, pdfToJpegPages } from '@/lib/papers/pdfPages';
 import { MAX_PAPER_PAGES, PAPER_SCANS_BUCKET } from '@/lib/papers/constants';
-import { LOW_CONFIDENCE } from '@/lib/papers/transcript';
+import { countAnsweredEntries, LOW_CONFIDENCE } from '@/lib/papers/transcript';
 import type { PaperTranscriptEntry, StudentSafePaper } from '@/types';
 
 /**
@@ -58,6 +58,11 @@ export default function PaperPage() {
   const [isMarking, setIsMarking] = useState(false);
   const [transcript, setTranscript] = useState<PaperTranscriptEntry[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Same guard the typed practice flow has: nothing read means nothing to mark.
+  // Marking anyway produces a real 0-of-N attempt that counts against the
+  // student's predicted grade for good.
+  const answeredCount = useMemo(() => countAnsweredEntries(transcript), [transcript]);
 
   // Fetches without touching state, so both the mount effect and the mutation
   // handlers can apply the result themselves.
@@ -224,6 +229,13 @@ export default function PaperPage() {
 
   const handleMark = async () => {
     if (!paper) return;
+    if (answeredCount === 0) {
+      setStatus({
+        tone: 'error',
+        text: 'Nothing was read from your pages, so there is nothing to mark yet.',
+      });
+      return;
+    }
     setIsMarking(true);
     setStatus({ tone: 'info', text: 'Marking your paper...' });
 
@@ -262,7 +274,11 @@ export default function PaperPage() {
 
   const updateTranscript = (questionIndex: number, text: string) => {
     setTranscript((prev) =>
-      prev.map((entry) => (entry.questionIndex === questionIndex ? { ...entry, text, confidence: 1 } : entry))
+      // Confidence is only earned by content: clearing a box has to put the
+      // "Nothing found for this question" warning back, not hide it.
+      prev.map((entry) =>
+        entry.questionIndex === questionIndex ? { ...entry, text, confidence: text.trim() ? 1 : 0 } : entry
+      )
     );
   };
 
@@ -341,7 +357,7 @@ export default function PaperPage() {
       ) : null}
 
       {/* ── The printable sheet ──────────────────────────────────────────── */}
-      <article className="rounded-2xl border border-subtle bg-surface p-6 shadow-card print:rounded-none print:border-0 print:p-0 print:shadow-none">
+      <article className="rounded-2xl border border-subtle bg-surface p-6 shadow-card print:rounded-none print:border-0 print:p-[14mm] print:shadow-none">
         <header className="border-b border-strong pb-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-title text-content">{paper.topic}</h2>
@@ -520,12 +536,19 @@ export default function PaperPage() {
           <button
             type="button"
             onClick={handleMark}
-            disabled={isMarking}
+            disabled={isMarking || answeredCount === 0}
             className={`mt-5 ${buttonStyles({ variant: 'primary' })}`}
           >
             {isMarking ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             This is right — mark my paper
           </button>
+          {answeredCount === 0 ? (
+            <p className="mt-2 flex items-start gap-1.5 text-caption text-warning">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Nothing was read from your pages. Re-upload clearer photos, or type what you wrote into the
+              boxes above — marking a blank paper would record it as a real score of zero.
+            </p>
+          ) : null}
         </section>
       ) : null}
     </div>

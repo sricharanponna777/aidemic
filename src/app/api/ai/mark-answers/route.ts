@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase-server';
 import { createAdminClient, tryCreateAdminClient } from '@/lib/supabase-admin';
 import { recordMarkingEvidence } from '@/lib/mastery/fromMarking';
 import { loadOwnedPaper } from '@/lib/papers/loadPaper';
-import { coerceTranscript, transcriptToAnswers } from '@/lib/papers/transcript';
+import { coerceTranscript, countAnsweredEntries, transcriptToAnswers } from '@/lib/papers/transcript';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { gradeBoundaryNote, gradeFromPercentage, nextGradeUp, topGrade as topGradeFor } from '@/lib/ai/gradeScales';
 import { getExamBoardLabel, getExamTypeLabel, getSpecTier } from '@/lib/ai/qualifications';
@@ -741,6 +741,22 @@ export async function POST(request: Request) {
         rawBody.transcript ?? paper.transcript_payload,
         paperQuestions.length
       );
+
+      // Nothing was read from the pages at all. Marking this would spend a model
+      // call to produce a 0-of-N attempt row that every dashboard average, the
+      // parent digest and the planner would then treat as a real sat paper.
+      // Refuse before the AI call and before the insert, leaving the paper
+      // `ready` so the student can re-photograph it rather than hitting the
+      // already-marked 409 above forever.
+      if (countAnsweredEntries(paperTranscript) === 0) {
+        return NextResponse.json(
+          {
+            error:
+              'We could not read any answers on those pages. Upload clearer photos, or type your answers in before marking.',
+          },
+          { status: 400 }
+        );
+      }
 
       payload = normalizePayload({
         topic: paper.topic,
