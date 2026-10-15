@@ -136,3 +136,47 @@ export const findSavedTierForSubject = async (
   const spec = (data as { specifications?: { tier: string | null } } | null)?.specifications;
   return spec?.tier ?? null;
 };
+
+/** Tier and board, which decide which grade-boundary table a percentage is read
+ *  against and whether the edexcel -2 / ocr -1 offset applies. */
+export type GradeContext = { specTier: string | null; examBoard: string | null };
+
+/**
+ * Enrolment context indexed the way exam_practice_attempts rows are grouped:
+ * by subject AND qualification.
+ *
+ * Keyed on subject alone, a student taking the same subject at two
+ * qualifications -- mathematics at GCSE and at A-Level across a Year 11-12
+ * transition -- collapsed to one entry and the last row won. Their GCSE attempts
+ * were then graded against the A-Level ladder with the other enrolment's board
+ * offset, which is the exact divergence between a parent's number and the
+ * student's own that passing tier and board through was meant to remove.
+ *
+ * Read it back with gradeContextFor(), never with .get() directly: the two key
+ * shapes have to be built in one place to stay in agreement.
+ */
+export const buildGradeContext = (rows: StudentSubjectRow[]): Map<string, GradeContext> => {
+  const map = new Map<string, GradeContext>();
+  for (const row of rows) {
+    const mapped = mapStudentSubjectRow(row);
+    if (!mapped.subject) continue;
+    const context: GradeContext = {
+      specTier: mapped.spec_tier ?? null,
+      examBoard: mapped.exam_board ?? null,
+    };
+    map.set(`${mapped.subject}|${mapped.exam_type || 'unknown'}`, context);
+    // Subject-only fallback, first enrolment wins: an attempt whose exam_type is
+    // null or names a qualification the student is no longer enrolled in still
+    // grades against something rather than losing its tier entirely.
+    if (!map.has(mapped.subject)) map.set(mapped.subject, context);
+  }
+  return map;
+};
+
+/** Looks up what buildGradeContext stored, preferring the exact qualification. */
+export const gradeContextFor = (
+  context: Map<string, GradeContext>,
+  subject: string,
+  examType: string | null
+): GradeContext | undefined =>
+  context.get(`${subject}|${examType || 'unknown'}`) ?? context.get(subject);
