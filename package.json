@@ -18,6 +18,7 @@
     "seed:schools": "bun --env-file=.env.local run scripts/seed-uk-schools.ts"
   },
   "dependencies": {
+    "@sentry/nextjs": "^11.10.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.97.0",
     "@tiptap/core": "^3.22.4",

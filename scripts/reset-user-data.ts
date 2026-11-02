@@ -13,6 +13,12 @@
  *   bun --env-file=.env.local run scripts/reset-user-data.ts --email a@b.com
  *   bun --env-file=.env.local run scripts/reset-user-data.ts --email a@b.com --confirm
  *   bun --env-file=.env.local run scripts/reset-user-data.ts --user-id <uuid> --confirm
+ *   bun --env-file=.env.local run scripts/reset-user-data.ts --all --confirm
+ *
+ * --all resets every user at once. It also deletes every `teachers` row, and with
+ * it every class, assignment and invite code: the per-user refusal below exists to
+ * protect *other* users' work, and under --all there are no other users to protect.
+ * Teachers keep their login and role but have to re-verify with their school.
  *
  * Uses the service-role key, so it bypasses RLS. Point it at the right project.
  */
@@ -26,12 +32,13 @@ const flag = (name: string): string | undefined => {
 };
 
 const CONFIRM = args.includes('--confirm');
-const INCLUDE_TEACHER_DATA = args.includes('--include-teacher-data');
+const ALL = args.includes('--all');
+const INCLUDE_TEACHER_DATA = ALL || args.includes('--include-teacher-data');
 const email = flag('email');
 const userId = flag('user-id');
 
-if (!email && !userId) {
-  console.error('Pass --email <address> or --user-id <uuid>.');
+if (ALL ? Boolean(email || userId) : !email && !userId) {
+  console.error('Pass --email <address>, --user-id <uuid>, or --all (on its own).');
   process.exit(1);
 }
 
@@ -77,8 +84,9 @@ const USER_DATA: Array<{ table: string; column: string; legacy?: boolean; note?:
   { table: 'flashcard_decks', column: 'user_id', legacy: true, note: 'cascades to flashcards, tags, mappings' },
   { table: 'study_sessions', column: 'user_id', legacy: true, note: 'cascades to study_session_results' },
   { table: 'user_statistics', column: 'user_id', legacy: true },
-  { table: 'generated_podcasts', column: 'user_id' },
+  { table: 'generated_podcasts', column: 'user_id', note: 'the audio files are removed below' },
   { table: 'generated_videos', column: 'user_id', legacy: true },
+  { table: 'question_generation_jobs', column: 'user_id' },
 
   // Planner and goals
   { table: 'academic_terms', column: 'user_id', note: 'cascades to study_plan_items -> study_plan_progress' },
@@ -157,44 +165,86 @@ async function checkTeacherOwnership(id: string): Promise<{ blocked: boolean; cl
   return { blocked: (count ?? 0) > 0 && !INCLUDE_TEACHER_DATA, classCount: count ?? 0 };
 }
 
+/**
+ * Storage objects are not reached by any row cascade, so they are removed on their
+ * own. Both buckets key every object under `<user_id>/`, so everything under a
+ * user's folder is theirs by construction (the bucket policies enforce the prefix)
+ * and, under --all, everything in the bucket is user data.
+ */
+const USER_STORAGE: Array<{ bucket: string; note: string }> = [
+  { bucket: 'paper-scans', note: 'photographed handwriting' },
+  { bucket: 'generated-podcasts', note: 'podcast audio' },
+];
+
+/** Every file under `prefix`. A folder comes back from list() with no id. */
+async function listFiles(bucket: string, prefix: string): Promise<string[]> {
+  const paths: string[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await admin.storage.from(bucket).list(prefix, { limit: 1000, offset });
+    if (error) throw new Error(error.message);
+    for (const entry of data ?? []) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.id) paths.push(path);
+      else paths.push(...(await listFiles(bucket, path)));
+    }
+    if ((data ?? []).length < 1000) return paths;
+  }
+}
+
 async function main() {
-  const user = await resolveUser();
+  const user = ALL ? null : await resolveUser();
+
+  // Under --all every row with the column set is in scope. `not null` rather than
+  // no filter at all: PostgREST refuses an unfiltered delete, and it keeps the
+  // system mock_tests (user_id NULL) exactly as the per-user reset does.
+  const [scopeOp, scopeValue] = user ? ['eq', user.id] : ['not.is', null];
 
   console.log('');
-  console.log(`  Target : ${user.email}`);
-  console.log(`  User id: ${user.id}`);
-  console.log(`  Role   : ${user.role ?? '(none)'}${user.name ? `   Name: ${user.name}` : ''}`);
+  if (user) {
+    console.log(`  Target : ${user.email}`);
+    console.log(`  User id: ${user.id}`);
+    console.log(`  Role   : ${user.role ?? '(none)'}${user.name ? `   Name: ${user.name}` : ''}`);
+  } else {
+    const { count } = await admin.from('user_profiles').select('*', { count: 'exact', head: true });
+    console.log(`  Target : ALL USERS (${count ?? '?'} profiles)`);
+    console.log(`  Project: ${url}`);
+  }
   console.log(`  Mode   : ${CONFIRM ? 'DELETE (--confirm given)' : 'DRY RUN -- nothing will be deleted'}`);
   console.log('');
 
-  const teacher = await checkTeacherOwnership(user.id);
-  if (teacher.blocked) {
-    console.error(`  REFUSING: this user is a teacher who owns ${teacher.classCount} class(es).`);
-    console.error('');
-    console.error('  Deleting their teacher record cascades into classes -> assignments ->');
-    console.error('  assignment_attempts, which would destroy the work of every student in');
-    console.error('  those classes. That is not this user\'s history to clear.');
-    console.error('');
-    console.error('  Reassign or archive the classes first, or pass --include-teacher-data');
-    console.error('  if you genuinely intend to delete their students\' submissions too.');
-    process.exit(1);
-  }
-  if (teacher.classCount > 0) {
-    console.log(`  WARNING: --include-teacher-data is set and this user owns ${teacher.classCount} class(es).`);
-    console.log('  Their students\' assignment attempts will be deleted along with them.');
-    console.log('');
+  if (user) {
+    const teacher = await checkTeacherOwnership(user.id);
+    if (teacher.blocked) {
+      console.error(`  REFUSING: this user is a teacher who owns ${teacher.classCount} class(es).`);
+      console.error('');
+      console.error('  Deleting their teacher record cascades into classes -> assignments ->');
+      console.error('  assignment_attempts, which would destroy the work of every student in');
+      console.error('  those classes. That is not this user\'s history to clear.');
+      console.error('');
+      console.error('  Reassign or archive the classes first, or pass --include-teacher-data');
+      console.error('  if you genuinely intend to delete their students\' submissions too.');
+      process.exit(1);
+    }
+    if (teacher.classCount > 0) {
+      console.log(`  WARNING: --include-teacher-data is set and this user owns ${teacher.classCount} class(es).`);
+      console.log('  Their students\' assignment attempts will be deleted along with them.');
+      console.log('');
+    }
   }
 
   let total = 0;
   const skipped: string[] = [];
 
+  const seenTables = new Set<string>();
   for (const entry of USER_DATA) {
     const label = `${entry.table}.${entry.column}`;
 
-    const { count, error: countError } = await admin
-      .from(entry.table)
-      .select('*', { count: 'exact', head: true })
-      .eq(entry.column, user.id);
+    // parent_links is listed once per side. Under --all both sides match every
+    // row, so the second pass would count the same rows again.
+    if (!user && seenTables.has(entry.table)) continue;
+    seenTables.add(entry.table);
+
+    const { count, error: countError } = await admin.from(entry.table).select('*', { count: 'exact', head: true }).filter(entry.column, scopeOp, scopeValue);
 
     if (countError) {
       if (isMissingTable(countError)) {
@@ -210,7 +260,7 @@ async function main() {
     if (rows === 0) continue;
 
     if (CONFIRM) {
-      const { error: deleteError } = await admin.from(entry.table).delete().eq(entry.column, user.id);
+      const { error: deleteError } = await admin.from(entry.table).delete().filter(entry.column, scopeOp, scopeValue);
       if (deleteError) throw new Error(`Deleting from ${label}: ${deleteError.message}`);
     }
 
@@ -218,37 +268,37 @@ async function main() {
     console.log(`  ${CONFIRM ? 'deleted' : '  would delete'} ${String(rows).padStart(6)}  ${label}${suffix}`);
   }
 
-  // Storage objects are not reached by any row cascade, so the photographed
-  // handwriting has to be removed on its own. Everything under the user's own
-  // folder is theirs by construction (the bucket policies enforce the prefix).
-  const { data: scanPaperFolders, error: scanListError } = await admin.storage
-    .from('paper-scans')
-    .list(user.id, { limit: 1000 });
-
-  if (scanListError) {
-    skipped.push(`paper-scans storage (${scanListError.message})`);
-  } else if ((scanPaperFolders ?? []).length > 0) {
-    const paths: string[] = [];
-    for (const folder of scanPaperFolders ?? []) {
-      const { data: files } = await admin.storage.from('paper-scans').list(`${user.id}/${folder.name}`, { limit: 1000 });
-      for (const file of files ?? []) paths.push(`${user.id}/${folder.name}/${file.name}`);
+  for (const { bucket, note } of USER_STORAGE) {
+    let paths: string[];
+    try {
+      paths = await listFiles(bucket, user?.id ?? '');
+    } catch (err) {
+      skipped.push(`${bucket} storage (${err instanceof Error ? err.message : String(err)})`);
+      continue;
     }
+    if (paths.length === 0) continue;
 
-    if (paths.length > 0) {
-      if (CONFIRM) {
-        const { error: removeError } = await admin.storage.from('paper-scans').remove(paths);
-        if (removeError) throw new Error(`Deleting paper scans: ${removeError.message}`);
+    if (CONFIRM) {
+      for (let i = 0; i < paths.length; i += 1000) {
+        const { error: removeError } = await admin.storage.from(bucket).remove(paths.slice(i, i + 1000));
+        if (removeError) throw new Error(`Deleting from ${bucket}: ${removeError.message}`);
       }
-      console.log(`  ${CONFIRM ? 'deleted' : '  would delete'} ${String(paths.length).padStart(6)}  paper-scans/${user.id}/`);
     }
+    console.log(`  ${CONFIRM ? 'deleted' : '  would delete'} ${String(paths.length).padStart(6)}  ${bucket}/${user ? `${user.id}/` : ''}  -- ${note}`);
   }
 
   if (INCLUDE_TEACHER_DATA) {
-    const { error } = CONFIRM
-      ? await admin.from('teachers').delete().eq('user_id', user.id)
-      : { error: null };
-    if (error) throw new Error(`Deleting teacher record: ${error.message}`);
-    console.log(`  ${CONFIRM ? 'deleted' : '  would delete'}         teachers.user_id  -- cascades to classes and assignments`);
+    const { count, error: countError } = await admin.from('teachers').select('*', { count: 'exact', head: true }).filter('user_id', scopeOp, scopeValue);
+    if (countError && !isMissingTable(countError)) throw new Error(`Counting teachers: ${countError.message}`);
+
+    if ((count ?? 0) > 0) {
+      if (CONFIRM) {
+        const { error } = await admin.from('teachers').delete().filter('user_id', scopeOp, scopeValue);
+        if (error) throw new Error(`Deleting teacher record: ${error.message}`);
+      }
+      total += count ?? 0;
+      console.log(`  ${CONFIRM ? 'deleted' : '  would delete'} ${String(count).padStart(6)}  teachers.user_id  -- cascades to classes, assignments, invite codes`);
+    }
   }
 
   console.log('');

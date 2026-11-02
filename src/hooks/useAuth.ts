@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/lib/supabase-client';
 import { clearAiCache } from '@/lib/aiCache';
 import { useRouter } from 'next/navigation';
@@ -56,6 +57,7 @@ export function useAuth() {
 
       if (nextUserId !== currentUserId) {
         currentUserId = nextUserId;
+        Sentry.setUser(nextUserId ? { id: nextUserId } : null);
         if (nextUserId) {
           void loadProfile(nextUserId);
         } else {

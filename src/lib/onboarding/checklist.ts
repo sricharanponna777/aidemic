@@ -64,15 +64,6 @@ export async function loadStudentChecklist(
       done: subjects > 0,
     },
     {
-      id: 'practice',
-      icon: Target,
-      title: 'Sit your first Smart Practice',
-      body: 'A short set of exam-board questions, marked against the mark scheme with a predicted grade.',
-      href: '/dashboard/ai-questions',
-      cta: 'Start practice',
-      done: attempts > 0,
-    },
-    {
       id: 'flashcards',
       icon: Layers,
       title: 'Build a flashcard deck',
@@ -89,6 +80,15 @@ export async function loadStudentChecklist(
       href: '/dashboard/study-sessions',
       cta: 'Revise now',
       done: sessions > 0,
+    },
+    {
+      id: 'practice',
+      icon: Target,
+      title: 'Sit your first Smart Practice',
+      body: 'A short set of exam-board questions, marked against the mark scheme with a predicted grade.',
+      href: '/dashboard/ai-questions',
+      cta: 'Start practice',
+      done: attempts > 0,
     },
     {
       id: 'paper',

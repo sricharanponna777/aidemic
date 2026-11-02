@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
@@ -7,6 +8,8 @@ import { buttonStyles } from '@/components/ui/button';
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('Route error boundary caught:', error);
+    // A caught error never reaches window.onerror, so report it explicitly.
+    Sentry.captureException(error);
   }, [error]);
 
   return (

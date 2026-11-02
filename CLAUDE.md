@@ -205,6 +205,8 @@ See `.env.local.example` for the full list including OpenRouter and local LLM op
 
 Optional, for transactional email (see below): `BREVO_API_KEY`, `BREVO_SMTP_FROM`, `APP_NAME`, `APP_URL`, `SUPPORT_EMAIL`. If any is unset, emails are skipped with a console warning and signup still works.
 
+Optional, for Sentry: `NEXT_PUBLIC_SENTRY_DSN` (unset = Sentry is a no-op) and, at build time only, `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` for source-map upload. Init lives in [src/instrumentation.ts](src/instrumentation.ts) (server + proxy) and [src/instrumentation-client.ts](src/instrumentation-client.ts) (browser, with Replay on error only). Events go through the same-origin `/monitoring` tunnel, so the CSP needs no Sentry host — don't put that route behind `requiresAuthCheck()`. SDK v11 replaced `sendDefaultPii` with `dataCollection`, whose defaults collect everything; it is deliberately unset.
+
 Optional, `ROLE_CACHE_SECRET`: signs the short-lived cookie [src/proxy.ts](src/proxy.ts) uses to skip the `user_profiles` role-check query on most dashboard navigations (defense-in-depth only -- RLS is the real backstop). Unset just disables the cache; every request re-queries as before.
 
 ### Transactional email (Brevo API)
