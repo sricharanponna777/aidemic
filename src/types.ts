@@ -45,7 +45,12 @@ export interface Teacher {
   qualification_level?: string;
   school_id?: string;
   is_school_admin?: boolean;
+  /** Set by claim_school_admin(); awaits a platform admin decision. */
+  claimed_school_admin?: boolean;
   verification_status: 'pending' | 'approved' | 'rejected';
+  /** When they last entered the verification queue. What platform_admin_queue()
+   *  orders on -- deliberately not updated_at, which every profile edit bumps. */
+  verification_requested_at?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -54,9 +59,34 @@ export interface School {
   id: string;
   name: string;
   status: 'pending' | 'approved' | 'rejected';
+  /** Which official register the row came from; 'manual' predates the seed. */
+  source?: 'gias' | 'scotgov' | 'deni' | 'manual';
+  urn?: string;
+  nation?: 'england' | 'wales' | 'scotland' | 'northern-ireland';
+  town?: string;
+  postcode?: string;
+  local_authority?: string;
+  phase?: string;
+  website?: string;
+  /** Hostnames a headteacher claim may be made from. Empty means not claimable. */
+  domains?: string[];
+  head_name?: string;
   created_by?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/** One row of search_schools() -- the school browser's projection. */
+export interface SchoolSearchResult {
+  id: string;
+  name: string;
+  town: string | null;
+  postcode: string | null;
+  local_authority: string | null;
+  nation: 'england' | 'wales' | 'scotland' | 'northern-ireland' | null;
+  phase: string | null;
+  /** False when no official domain is on record, so the claim gate cannot pass. */
+  claimable: boolean;
 }
 
 export interface Class {

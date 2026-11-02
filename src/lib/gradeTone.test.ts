@@ -98,3 +98,20 @@ describe('gradeBadgeTone — every other scale reads its own ladder', () => {
     expect(toneFor('99%', 'neet-ug')).toBe('neutral');
   });
 });
+
+describe('an exam type that is given but unrecognised', () => {
+  // Distinct from an absent one. Falling through to the GCSE bands here read the
+  // other ladders backwards, because those numerics run the opposite way: ICSE 9
+  // is the fail grade, not a near-top grade.
+  it('gets no colour rather than a GCSE one', () => {
+    expect(toneFor('9', 'icse-2024')).toBe('neutral');
+    expect(toneFor('1', 'some-new-board')).toBe('neutral');
+    expect(toneFor('D2', 'cbse-class-11')).toBe('neutral');
+  });
+
+  it('does not disturb a recognised non-UK scale', () => {
+    // ICSE 1 is the TOP grade and 9 the fail, i.e. inverted against GCSE.
+    expect(toneFor('1', 'icse')).toBe('green');
+    expect(toneFor('9', 'icse')).toBe('red');
+  });
+});

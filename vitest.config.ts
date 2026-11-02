@@ -10,6 +10,9 @@ export default defineConfig({
     environment: 'node',
     // evals/ holds accuracy suites that call the live model; they self-skip
     // unless RUN_EVALS=1, so collecting them here costs nothing by default.
-    include: ['src/**/*.test.ts', 'evals/**/*.test.ts'],
+    // scripts/ is in here for the register parsers: their failure mode is a
+    // silent zero-row harvest (a BOM in the header, a blank row above it), which
+    // is exactly the kind of thing only a test notices.
+    include: ['src/**/*.test.ts', 'evals/**/*.test.ts', 'scripts/**/*.test.ts'],
   },
 });

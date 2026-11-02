@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import { ToastProvider } from "@/components/ToastProvider";
+import { THEME_INITIALIZER } from "@/lib/themeScript";
 
 // Self-hosted rather than next/font/google: that helper fetches the font files from
 // fonts.gstatic.com during `next build`, so a build could only succeed with outbound
@@ -61,16 +62,11 @@ export const viewport: Viewport = {
   ],
 };
 
-const themeInitializer = `
-(() => {
-  const root = document.documentElement;
-  const stored = window.localStorage.getItem("aidemic-theme");
-  const isDark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
-  root.classList.remove("light", "dark");
-  root.classList.add(isDark ? "dark" : "light");
-  root.style.colorScheme = isDark ? "dark" : "light";
-})();
-`;
+// Imported rather than written inline: the strict /dashboard/* CSP allow-lists
+// this script by SHA-256 (see src/lib/csp.ts), so the bytes rendered here and the
+// bytes hashed there have to be the same ones. Editing it in place would block
+// it on the dashboard again, which is how it came to be blocked in the first
+// place -- silently, apart from a console violation on every page load.
 
 export default function RootLayout({
   children,
@@ -80,7 +76,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitializer }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INITIALIZER }} />
       </head>
       <body className={`${spaceGrotesk.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}>
         <ToastProvider>{children}</ToastProvider>

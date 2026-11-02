@@ -11,16 +11,18 @@ import {
   type OpenAIResponseBody,
 } from '@/lib/ai/json';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
-import { getExamTypeLabel } from '@/lib/ai/qualifications';
+import { buildCourseSection, promptSection } from '@/lib/ai/courseContext';
 import { MAX_AI_ERROR_TEXT, txt } from '@/lib/ai/text';
 
 type BlurtPayload = {
   subject?: string;
   topic?: string;
   brainDump?: string;
-  /** Learning Spine resolution only; not part of the review prompt. */
+  /** Course the recall is judged against; board and type also drive Learning Spine resolution. */
   examBoard?: string;
   examType?: string;
+  /** Specification label, tier included ("... - Higher"). */
+  specification?: string;
 };
 
 type BlurtResult = {
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
     const brainDump = txt(rawBody.brainDump || '', MAX_DUMP_CHARS);
     const examBoard = txt(rawBody.examBoard || '', 40);
     const examType = txt(rawBody.examType || '', 40);
+    const specification = txt(rawBody.specification || '', 280);
 
     if (!topic) return NextResponse.json({ error: 'A topic is required.' }, { status: 400 });
     if (brainDump.trim().length < 20) {
@@ -95,11 +98,29 @@ export async function POST(request: Request) {
     if (missingKeyError) return NextResponse.json({ error: missingKeyError }, { status: 500 });
 
     const system = [
-      `You are ${examType ? `a ${getExamTypeLabel(examType)}` : 'an'} examiner grading a "blurting" (free-recall) exercise: the student has written down everything they can remember about a topic, and you assess how completely and accurately they covered it.`,
-      'Compare their brain dump against what a strong specification answer for this topic would contain.',
-      'Return strict JSON only with: "covered" (key points they correctly recalled, 3-10 concise items), "missed" (important spec points they omitted, 3-10 items), "misconceptions" (anything they stated that is wrong or imprecise, 0-6 items, each naming the error and the correction), "coverageScore" (0-100, how complete their recall was), and "summary" (one encouraging sentence with the single most useful next step).',
-      'Be specific to the subject and topic. Do not invent that they wrote something they did not. Reward correct recall generously but be honest about gaps.',
-    ].join('\n');
+      'You are a senior examiner for the exact course described below, reviewing a "blurting" (free-recall) exercise: the student has written down everything they can remember about one topic, and you judge how completely and accurately they recalled what this course requires.',
+      promptSection('1. OUTPUT CONTRACT', [
+        'Return ONLY one JSON object with exactly these fields, and nothing outside it:',
+        '- "covered": the key points they correctly recalled. Each item names one point. 0-10 items; never pad it.',
+        '- "missed": important points this course requires on this topic that they did not mention, most important first. 0-10 items.',
+        '- "misconceptions": anything they wrote that is wrong or imprecise for this course. Each item names the error and gives the correction. 0-6 items.',
+        '- "coverageScore": a whole number 0-100: the share of the topic\'s required content (weighted by importance) that they recalled correctly.',
+        '- "summary": one encouraging sentence naming the single most useful next step.',
+      ]),
+      buildCourseSection({ examBoard, examType, subject, specification, topic }, 'assess'),
+      promptSection('3. HOW TO JUDGE THE RECALL', [
+        '- The reference is what this specification requires on this topic at this tier: no more, no less. Never list as "missed" a point that is outside this course or tier.',
+        '- Only put a point in "covered" when the student actually wrote it, in their words or equivalent ones. Never infer what they meant, and never credit a point they did not write.',
+        '- A point that is stated wrongly goes in "misconceptions", not "covered". A point that is right but vague is "covered" only if this course would credit it.',
+        '- Every item in "missed" and every correction in "misconceptions" must be factually correct for this course. If unsure, leave it out.',
+        '- Keep the arrays consistent: a point never appears in both "covered" and "missed".',
+        '- coverageScore must agree with the arrays: lots covered and little missed scores high; little covered scores low; an empty or off-topic dump scores 0-10.',
+        '- Be warm in tone but honest about gaps.',
+      ]),
+      promptSection('4. FINAL VALIDATION', [
+        'Before responding, silently check every item against the student\'s text and this course, check the arrays do not overlap, and check coverageScore matches them. Fix anything that fails. Do not reveal this check.',
+      ]),
+    ].join('\n\n');
 
     const user = JSON.stringify({ subject, topic, brainDump }, null, 2);
     const commonHeaders = buildAIHeaders(config);
@@ -167,7 +188,13 @@ export async function POST(request: Request) {
     }
 
     const covered = result.covered.slice(0, 10).map((s) => txt(s, 200));
-    const missed = result.missed.slice(0, 10).map((s) => txt(s, 200));
+    // A point the student recalled cannot also be one they missed; the model
+    // occasionally lists it in both, which shows them a contradiction.
+    const coveredKeys = new Set(covered.map((s) => s.trim().toLowerCase()));
+    const missed = result.missed
+      .slice(0, 10)
+      .map((s) => txt(s, 200))
+      .filter((s) => !coveredKeys.has(s.trim().toLowerCase()));
     const misconceptions = result.misconceptions.slice(0, 6).map((s) => txt(s, 240));
 
     // Dual-write to the Learning Spine. Deferred with after() because it makes a

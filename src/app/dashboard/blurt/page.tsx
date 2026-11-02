@@ -8,7 +8,7 @@ import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { buttonStyles } from '@/components/ui/button';
 import { Alert, Label, fieldStyles } from '@/components/ui/field';
 import { PageHero, EmptyState } from '@/components/ui/feedback';
-import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { getExamTypeLabel, getSavedSpecLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { scoreBadgeTone } from '@/lib/scoreTone';
 import Link from 'next/link';
 
@@ -73,6 +73,7 @@ export default function BlurtPage() {
           brainDump: dump.trim(),
           examBoard: selectedSubject.exam_board,
           examType: selectedSubject.exam_type,
+          specification: getSavedSpecLabel(selectedSubject),
         }),
       });
       const data = await response.json();

@@ -18,6 +18,51 @@ interface FeatureResult {
   line: string;
 }
 
+/**
+ * Half an axis step, guarded against a spec that has no step recorded.
+ *
+ * `spec.yAxisStep / 2` on an absent field is NaN, and `x <= NaN` is false for
+ * every x -- so every point on the graph marked WRONG, silently and with no
+ * error to notice. PlotScatterData documents that "specs generated before this
+ * field existed fall back to re-deriving", and bar and line came out of the same
+ * generator, so the same gap applies to them even though their types say the
+ * field is required. ScatterFitInput already guards on the rendering side
+ * (deriveAxisFromValues); this is the marking side of the same problem.
+ */
+const toleranceFromStep = (step: number | undefined, correctValues: number[]): number => {
+  if (typeof step === 'number' && Number.isFinite(step) && step > 0) return step / 2;
+  // Same shape as the fallbacks elsewhere in this file: 5% of the largest value
+  // the student had to plot, with a floor so a graph of small numbers is not
+  // marked to an impossible precision.
+  const largest = Math.max(0, ...correctValues.filter((value) => Number.isFinite(value)).map(Math.abs));
+  return Math.max(0.05, largest * 0.05);
+};
+
+/**
+ * An axis maximum that can be relied on, for the same reason as toleranceFromStep.
+ *
+ * markScatter derives its tolerance from the axis diagonal, so an absent axis max
+ * makes the diagonal NaN, every distance NaN, and `bestDistance <= NaN` false for
+ * every point -- a perfectly plotted graph marked zero with nothing raised. The
+ * `|| 1` already guarding the two divisors below defended the ratio while leaving
+ * the tolerance it is multiplied by unguarded.
+ */
+const axisMaxOr = (value: number | undefined, plotted: number[]): number => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  const largest = Math.max(0, ...plotted.filter((entry) => Number.isFinite(entry)).map(Math.abs));
+  return largest > 0 ? largest : 1;
+};
+
+/** 2% of the spread the student actually had to plot, for a box plot whose spec
+ *  carries no usable axis range. */
+const boxPlotFallbackTolerance = (correct: NonNullable<PlotSpec['boxPlot']>['correctValues']): number => {
+  const values = [correct.min, correct.lowerQuartile, correct.median, correct.upperQuartile, correct.max].filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value)
+  );
+  if (values.length === 0) return 0.05;
+  return Math.max(0.05, (Math.max(...values) - Math.min(...values)) * 0.02);
+};
+
 const getBand = (marksAwarded: number, maxMarks: number) => {
   if (marksAwarded <= 0) return 'No credit yet';
   const ratio = marksAwarded / Math.max(maxMarks, 1);
@@ -73,7 +118,7 @@ const markPie = (spec: NonNullable<PlotSpec['pie']>, submission: PlotSubmission)
 
 const markBar = (spec: NonNullable<PlotSpec['bar']>, submission: PlotSubmission): FeatureResult[] => {
   const submitted = submission.barValues;
-  const tolerance = spec.yAxisStep / 2;
+  const tolerance = toleranceFromStep(spec.yAxisStep, spec.correctValues);
   const barFeatures = spec.categories.map((category, i) => {
     const correctValue = spec.correctValues[i];
     const submittedValue = Array.isArray(submitted) ? submitted[i] : undefined;
@@ -90,7 +135,7 @@ const markBar = (spec: NonNullable<PlotSpec['bar']>, submission: PlotSubmission)
 
 const markLine = (spec: NonNullable<PlotSpec['line']>, submission: PlotSubmission): FeatureResult[] => {
   const submitted = submission.lineYValues;
-  const tolerance = spec.yAxisStep / 2;
+  const tolerance = toleranceFromStep(spec.yAxisStep, spec.correctYValues);
   const pointFeatures = spec.points.map((point, i) => {
     const correctValue = spec.correctYValues[i];
     const submittedValue = Array.isArray(submitted) ? submitted[i] : undefined;
@@ -125,15 +170,17 @@ const markLine = (spec: NonNullable<PlotSpec['line']>, submission: PlotSubmissio
 
 const markScatter = (spec: NonNullable<PlotSpec['scatter']>, submission: PlotSubmission): FeatureResult[] => {
   const submittedPoints = Array.isArray(submission.scatterPoints) ? [...submission.scatterPoints] : [];
-  const diagonal = Math.sqrt(spec.xAxisMax ** 2 + spec.yAxisMax ** 2);
+  const xAxisMax = axisMaxOr(spec.xAxisMax, spec.givenPoints.map((point) => point.x));
+  const yAxisMax = axisMaxOr(spec.yAxisMax, spec.givenPoints.map((point) => point.y));
+  const diagonal = Math.sqrt(xAxisMax ** 2 + yAxisMax ** 2);
   const pointTolerance = diagonal * 0.03;
 
   const pointFeatures: FeatureResult[] = spec.givenPoints.map((given, i) => {
     let bestIndex = -1;
     let bestDistance = Infinity;
     submittedPoints.forEach((candidate, idx) => {
-      const dx = (candidate.x - given.x) / (spec.xAxisMax || 1);
-      const dy = (candidate.y - given.y) / (spec.yAxisMax || 1);
+      const dx = (candidate.x - given.x) / xAxisMax;
+      const dy = (candidate.y - given.y) / yAxisMax;
       const normalizedDistance = Math.sqrt(dx ** 2 + dy ** 2) * diagonal;
       if (normalizedDistance < bestDistance) {
         bestDistance = normalizedDistance;
@@ -224,7 +271,9 @@ const markStemLeaf = (spec: NonNullable<PlotSpec['stemLeaf']>, submission: PlotS
 };
 
 const markBoxPlot = (spec: NonNullable<PlotSpec['boxPlot']>, submission: PlotSubmission): FeatureResult[] => {
-  const tolerance = (spec.axisMax - spec.axisMin) * 0.02;
+  const span = spec.axisMax - spec.axisMin;
+  const tolerance =
+    Number.isFinite(span) && span > 0 ? span * 0.02 : boxPlotFallbackTolerance(spec.correctValues);
   const submitted = submission.boxPlotValues;
   const fields: { key: keyof NonNullable<PlotSubmission['boxPlotValues']>; label: string }[] = [
     { key: 'min', label: 'Minimum' },

@@ -81,6 +81,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ assi
   const isCompleted = attemptRow?.status === 'completed';
   const questions = ((assignmentRow.questions_payload as StoredQuestion[] | null) ?? []) as StoredQuestion[];
 
+  // Review keeps correctOption and the full plot/diagram specs -- showing the right
+  // answer is the point of it -- but never the mark scheme or the model answer.
+  // Nothing student-facing renders those two, so on the completed path they were
+  // pure leak: readable in the network tab, and still readable on a re-attempt.
+  const toReviewQuestion = (question: StoredQuestion) => ({
+    questionType: question.questionType,
+    question: question.question,
+    marks: question.marks,
+    options: question.options,
+    correctOption: question.correctOption,
+    plotSpec: question.plotSpec,
+    diagramSpec: question.diagramSpec,
+    diagramTemplate: question.diagramTemplate,
+  });
+
   return NextResponse.json({
     assignment: {
       id: assignmentRow.id,
@@ -88,7 +103,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ assi
       description: assignmentRow.description,
       source_material: assignmentRow.source_material,
       questions_payload: isCompleted
-        ? questions
+        ? questions.map(toReviewQuestion)
         : questions.map((question, index) => sanitizeQuestion(question, `${assignmentId}:${index}`)),
       allow_reattempts: assignmentRow.allow_reattempts,
     },

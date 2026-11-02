@@ -57,6 +57,7 @@ export type TeacherClassData = {
   teacherId: string | null;
   verificationStatus: 'pending' | 'approved' | 'rejected';
   schoolStatus: 'pending' | 'approved' | 'rejected' | null;
+  claimedSchoolAdmin: boolean;
   classes: TeacherClass[];
   assignments: TeacherAssignment[];
   attempts: TeacherAttempt[];
@@ -79,7 +80,7 @@ const fetchTeacherClassData = async (
 
   const { data: teacherRow } = await supabase
     .from('teachers')
-    .select('id, verification_status, schools ( status )')
+    .select('id, verification_status, claimed_school_admin, schools ( status )')
     .eq('user_id', userId)
     .maybeSingle();
   if (!teacherRow) {
@@ -89,6 +90,7 @@ const fetchTeacherClassData = async (
   const typed = teacherRow as unknown as {
     id: string;
     verification_status: 'pending' | 'approved' | 'rejected';
+    claimed_school_admin: boolean;
     schools: { status: 'pending' | 'approved' | 'rejected' } | null;
   };
 
@@ -101,7 +103,13 @@ const fetchTeacherClassData = async (
     .order('created_at', { ascending: false });
   const classList = (classRows as unknown as TeacherClass[]) ?? [];
 
-  const base = { teacherId: typed.id, verificationStatus: typed.verification_status, schoolStatus: typed.schools?.status ?? null, classes: classList };
+  const base = {
+    teacherId: typed.id,
+    verificationStatus: typed.verification_status,
+    schoolStatus: typed.schools?.status ?? null,
+    claimedSchoolAdmin: typed.claimed_school_admin ?? false,
+    classes: classList,
+  };
 
   const classIds = classList.map((c) => c.id);
   if (classIds.length === 0) {
@@ -179,6 +187,7 @@ export function useTeacherClassData(): TeacherClassData {
     teacherId: data?.teacherId ?? null,
     verificationStatus: data?.verificationStatus ?? 'pending',
     schoolStatus: data?.schoolStatus ?? null,
+    claimedSchoolAdmin: data?.claimedSchoolAdmin ?? false,
     classes: data?.classes ?? [],
     assignments: data?.assignments ?? [],
     attempts: data?.attempts ?? [],

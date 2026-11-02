@@ -223,9 +223,28 @@ function renderChildrenHtml(children: ChildDigest[]): string {
     .join('');
 }
 
+/** Constant-time compare that rejects a length mismatch without leaking where. */
+const secretMatches = (provided: string | null, expected: string): boolean => {
+  if (!provided || provided.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < provided.length; i++) diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+};
+
 Deno.serve(async (req) => {
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? '';
-  if (cronSecret && req.headers.get('x-cron-secret') !== cronSecret) {
+  // FAILS CLOSED. This function is deployed with --no-verify-jwt, so with
+  // CRON_SECRET unset the old `if (cronSecret && ...)` guard short-circuited and
+  // left an unauthenticated "email every parent" trigger on the public internet.
+  // Same reasoning as /api/email/bulk, which had exactly this bug.
+  const cronSecret = (Deno.env.get('CRON_SECRET') ?? '').trim();
+  if (!cronSecret) {
+    console.error('[weekly-digest] CRON_SECRET is not set; refusing to run.');
+    return new Response(JSON.stringify({ error: 'Not configured' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!secretMatches(req.headers.get('x-cron-secret'), cronSecret)) {
     return new Response('Unauthorized', { status: 401 });
   }
 

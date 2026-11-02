@@ -60,8 +60,11 @@ export async function pdfToJpegPages(file: File, maxPages: number): Promise<PdfR
 
   if (!workerConfigured) {
     // Resolved through the bundler so the worker is emitted as a same-origin
-    // asset. A cross-origin or blob: worker would be blocked outright — the
-    // CSP has no `worker-src`, so workers fall back to `default-src 'self'`.
+    // asset. The CSP now sets `worker-src 'self' blob:` explicitly — it used to
+    // rely on a fallback that was described here as `default-src 'self'`, which
+    // was wrong: the chain is worker-src → child-src → script-src → default-src,
+    // and script-src is set, so this was really governed by a script-src carrying
+    // 'strict-dynamic' (under which 'self' is ignored).
     pdfjs.GlobalWorkerOptions.workerSrc = new URL(
       'pdfjs-dist/build/pdf.worker.min.mjs',
       import.meta.url,

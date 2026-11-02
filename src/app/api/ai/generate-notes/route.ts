@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
-import { getExamTypeLabel } from '@/lib/ai/qualifications';
+import { buildCourseSection, promptSection } from '@/lib/ai/courseContext';
 import { getMajorTopicsForQualification, getQualificationTopicError } from '@/lib/ai/majorTopics';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
@@ -27,6 +27,7 @@ type NotesPayload = {
 
 const SLIDES_PER_DURATION: Record<string, number> = { '30': 5, '60': 10, '120': 20 };
 const MATRIX_ENVIRONMENT = '((?:p|b|B|v|V)?matrix)';
+const NOTES_MAX_ATTEMPTS = 2;
 
 // ── GET: fetch saved content ─────────────────────────────────────────────────
 
@@ -203,77 +204,107 @@ async function generateNotes(
   const slideCount = SLIDES_PER_DURATION[duration] ?? 5;
   const complexity = seconds <= 30 ? 'simple' : seconds <= 60 ? 'moderate' : 'detailed';
 
-  const boardContext = examBoard && examBoard !== 'general'
-    ? `Exam board: ${examBoard.toUpperCase()}.`
-    : '';
-  const levelContext = examType && examType !== 'general'
-    ? `Qualification: ${getExamTypeLabel(examType)}.`
-    : '';
-  const examContext = [boardContext, levelContext].filter(Boolean).join(' ');
-  const specContext = specification ? `Specification: ${specification}.` : '';
-  const courseContext = [examContext, specContext].filter(Boolean).join(' ');
-
-  const instruction = `${concept
-    ? `Create study notes about "${concept}" in ${subject}.`
-    : `Create general study notes for ${subject}. No specific topic was given, so generalise across ${paper ? `the topics assessed on ${paper} of the specification` : 'the whole specification'}, choosing a well-rounded, representative spread of topics.`}
-Depth: ${complexity}. Target reading time: ~${seconds} seconds total.${courseContext ? `\n${courseContext}` : ''}
-${subtopic ? `\nSubtopic focus: ${subtopic}. Concentrate the notes on this subtopic rather than covering the whole topic broadly.` : ''}
-${learningObjective ? `\nLearning objective: ${learningObjective}` : ''}
-${learningObjective && isDataAnalysisObjective(learningObjective) ? '\nThis is a data-analysis focused session: include at least one worked example presented as a markdown table (| col | col |) of realistic data that the notes show how to read, calculate from, or interpret.' : ''}
-${paper ? `\n${paper}. Only include content that is assessed on this paper of the specification, not content exclusive to another paper.` : ''}
-
-When the notes involve a data set, present it as a markdown table (| col | col |) so it renders correctly.
-${concept ? `Before writing, internally identify the exact qualification/specification being studied and check whether "${concept}" belongs on that specification.` : 'Before writing, internally identify the exact qualification/specification being studied.'}
-Use the selected exam board, qualification level, specification, tier, option, text, or topic focus as hard constraints.
-Only include content that is assessable for that course. Do not import topics from another board, another qualification level, or a different option route.
-For example, do not treat a topic as universal just because it appears in another exam board's course.
-Align terminology, examples, case studies, set texts, and required depth with the selected specification.
-
-Return ONLY valid JSON with this exact shape:
-{
-  "script": "<GitHub-flavored Markdown study notes with ## headings, concise explanations, bullet lists, worked examples where useful, **bold** key terms, and a final **Mini-summary** section>",
-  "slides": [${Array.from({ length: slideCount }, (_, i) => `\n    "<checkpoint ${i + 1}: one key idea or recall prompt>"`).join(',')}
+  const system = [
+    'You are an expert teacher and examiner for the exact course described below. You write accurate, specification-aligned revision notes that a student can learn from and trust completely.',
+    promptSection('1. OUTPUT CONTRACT', [
+      'Return ONLY one JSON object with exactly this shape, and no text outside it:',
+      '{',
+      '  "script": "<GitHub-flavoured Markdown study notes>",',
+      `  "slides": [${Array.from({ length: slideCount }, (_, i) => `"<checkpoint ${i + 1}>"`).join(', ')}]`,
+      '}',
+      `- "slides" contains exactly ${slideCount} non-empty strings. Each is one key idea or recall prompt from the notes.`,
+      '- "script" is never empty.',
+      '- Markdown only inside JSON string values. Never use raw HTML.',
+      '- The output must parse with JSON.parse().',
+    ]),
+    buildCourseSection(
+      {
+        examBoard: examBoard !== 'general' ? examBoard : null,
+        examType: examType !== 'general' ? examType : null,
+        subject,
+        specification,
+        topic: concept,
+        subtopic,
+        learningObjective,
+        paper,
+      },
+      'generate'
+    ),
+    promptSection('3. CONTENT OF THE NOTES', [
+      concept
+        ? `- Topic: "${concept}". Before writing, confirm it belongs to this specification at this tier, then cover what the specification requires on it.`
+        : `- No topic was given: cover a well-rounded, representative spread across ${paper ? `the topics assessed on ${paper}` : 'the whole specification'}.`,
+      subtopic ? `- Concentrate the notes on the subtopic "${subtopic}" rather than the whole topic.` : '',
+      learningObjective ? `- Make sure the notes fully meet the learning objective: ${learningObjective}` : '',
+      learningObjective && isDataAnalysisObjective(learningObjective)
+        ? '- This is a data-analysis session: include at least one worked example presented as a markdown table (| col | col |) of realistic data, showing how to read, calculate from, or interpret it.'
+        : '',
+      `- Depth: ${complexity}. Target reading time about ${seconds} seconds.`,
+      '- Use the definitions, terminology, equations, units, required practicals, case studies and set texts this specification uses, at the depth it requires at this tier.',
+      '- Every fact, definition, equation and worked example must be correct. Re-check every calculation. If you are unsure of a detail, leave it out rather than guess.',
+      '- Never invent statistics, case-study facts, quotations or exam-board claims.',
+      '- Write notes a student revises from, not narration: ## headings, concise explanations, bullet lists, worked examples where useful, **bold** key terms, and a final **Mini-summary** section.',
+      '- Present any data set as a markdown table (| col | col |).',
+    ]),
+    promptSection('4. MATHEMATICS AND LATEX', [
+      '- Wrap every math expression for rendering: \\\\(...\\\\) for inline math, \\\\[...\\\\] for display math. Never leave bare LaTeX in prose.',
+      '- Because the response is JSON, escape every LaTeX backslash as a double backslash, for example "\\\\(\\\\binom{7}{4}a^{3}b^{4}\\\\)", "\\\\(\\\\frac{1}{2}\\\\)", "\\\\(\\\\text{det}(A)\\\\)" and "\\\\[A = \\\\begin{pmatrix} a & b \\\\\\\\ c & d \\\\end{pmatrix}\\\\]".',
+      '- Always brace powers and subscripts: x^{2}, a_{n+1}.',
+      '- For matrices, use one clean display equation. Never add blank rows or trailing row separators inside a matrix. Write inverses as A^{-1} inside math, never A-1.',
+    ]),
+    promptSection('5. FINAL VALIDATION', [
+      `Before responding, silently check: every statement is correct and on this specification at this tier; every calculation is right; "slides" has exactly ${slideCount} non-empty items; every math expression is delimited and escaped; the JSON is valid. Fix anything that fails. Do not reveal this check.`,
+    ]),
   ]
-}
+    .filter(Boolean)
+    .join('\n\n');
 
-Write the script as notes a student can revise from, not narration. Keep it accurate, direct, and easy to scan.
-Use Markdown only inside JSON string values. Do not use raw HTML.
-Every math expression must be wrapped for rendering: use \\(...\\) for inline math and \\[...\\] for display math. Do not leave bare LaTeX in prose.
-Because the response is JSON, every LaTeX backslash must be escaped as a double backslash, for example \\(\\binom{7}{4}a^{3}b^{4}\\), \\(\\frac{1}{2}\\), \\(\\text{det}(A)\\), and \\[A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}\\].
-For matrices, use one clean display equation such as \\[ A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix} \\].
-Never add blank rows or trailing row separators inside a matrix. Write inverses as $A^{-1}$, not A-1.
-Do NOT include any text outside the JSON.`;
+  const user = concept
+    ? `Write the study notes on "${concept}" for ${subject}.`
+    : `Write general study notes for ${subject}.`;
 
-  const response = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: buildAIHeaders(config),
-    body: JSON.stringify({
-      model: config.model,
-      messages: [{
-        role: 'user',
-        content: instruction,
-      }],
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-    }),
-  });
+  // An empty script or a short checkpoint list is retried rather than saved:
+  // the row is cached by its inputs (see matchParams), so a bad result would be
+  // served back on every reopen.
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < NOTES_MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(`${config.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: buildAIHeaders(config),
+        body: JSON.stringify({
+          model: config.model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          temperature: 0.7,
+          response_format: { type: 'json_object' },
+        }),
+      });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error((err as { error?: { message?: string } }).error?.message ?? `AI provider error ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error((err as { error?: { message?: string } }).error?.message ?? `AI provider error ${response.status}`);
+      }
+
+      const data = await response.json() as { choices: { message: { content: string } }[] };
+      const rawContent = data.choices[0].message.content;
+      const parsed = parseGeneratedContent(rawContent) as {
+        script: string;
+        slides: string[];
+      };
+
+      const script = normalizeGeneratedText(parsed.script);
+      const slides = normalizeGeneratedSlides(parsed.slides).slice(0, slideCount);
+      if (!script) throw new Error('The AI returned empty notes.');
+      if (slides.length < slideCount) throw new Error(`The AI returned ${slides.length} of ${slideCount} checkpoints.`);
+      return { script, slides };
+    } catch (err) {
+      lastError = err;
+    }
   }
-
-  const data = await response.json() as { choices: { message: { content: string } }[] };
-  const rawContent = data.choices[0].message.content;
-  const parsed = parseGeneratedContent(rawContent) as {
-    script: string;
-    slides: string[];
-  };
-
-  return {
-    script: normalizeGeneratedText(parsed.script),
-    slides: normalizeGeneratedSlides(parsed.slides).slice(0, slideCount),
-  };
+  throw lastError instanceof Error ? lastError : new Error('Generation failed');
 }
 
 function parseGeneratedContent(content: string) {

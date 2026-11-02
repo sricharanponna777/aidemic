@@ -5,6 +5,7 @@ import { buildAIHeaders, getMissingHostedKeyError, getVisionConfig } from '@/lib
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { extractChatMessageText, extractJsonWithCoercer, tryExtractWithCoercer, type ChatCompletionsResponseBody } from '@/lib/ai/json';
 import { MAX_AI_ERROR_TEXT } from '@/lib/ai/text';
+import { promptSection } from '@/lib/ai/courseContext';
 import { loadOwnedPaper } from '@/lib/papers/loadPaper';
 import { MAX_PAPER_PAGES, PAPER_SCANS_BUCKET } from '@/lib/papers/constants';
 import { coerceTranscript } from '@/lib/papers/transcript';
@@ -104,17 +105,31 @@ export async function POST(request: Request) {
       images.push(`data:${data.type || 'image/jpeg'};base64,${base64}`);
     }
 
+    // Deliberately no course, specification or tier here -- see the note at the
+    // top of this file. Knowing what the answer "should" say is exactly what
+    // makes a transcriber read it into the page.
     const system = [
       'You transcribe handwritten exam answers from photographs. You do not grade, correct, complete or improve them.',
-      'Transcribe exactly what is written, including spelling mistakes, wrong units and unfinished sentences.',
-      'Keep the student\'s working for calculations, line by line, in the order written.',
-      'For a multiple-choice question, transcribe only the letter the student chose (A, B, C or D); use "" if none is clearly marked.',
-      'Crossed-out text is not an answer: ignore it.',
-      'If a question has no answer on any page, return an empty string for it with confidence 0. Never invent an answer.',
-      'confidence is 0-1 and describes how sure you are that you read the handwriting correctly, nothing else.',
-      'The pages are in order and one answer may continue across a page break.',
-      'Return one entry per question, zero-based questionIndex. Return JSON only.',
-    ].join(' ');
+      promptSection('1. OUTPUT CONTRACT', [
+        '- Return ONLY one JSON object: {"answers": [{"questionIndex": integer, "text": string, "confidence": number}, ...]}.',
+        '- Exactly one entry for EVERY question listed, with its zero-based questionIndex exactly as given, even when that question has no answer.',
+        '- confidence is a number from 0 to 1 describing only how sure you are that you read the handwriting correctly. It says nothing about whether the answer is right.',
+      ]),
+      promptSection('2. TRANSCRIBE EXACTLY WHAT IS WRITTEN', [
+        '- Copy the student\'s words as written, including spelling mistakes, wrong facts, wrong units, wrong arithmetic and unfinished sentences. Never fix, complete, reorder or improve anything.',
+        '- Never add a word, number, symbol or unit that is not on the page, even when the intended answer seems obvious.',
+        '- Keep calculation working line by line, in the order written. Write maths as the student wrote it, using plain text or LaTeX for notation (e.g. x^2, \\\\frac{a}{b}).',
+        '- For a multiple-choice question, transcribe only the letter the student chose (A, B, C or D). Use "" if no choice is clearly marked, or if more than one is marked and none is crossed out.',
+        '- Crossed-out text is not an answer: leave it out.',
+        '- A word you cannot read at all: write [illegible] in its place and lower the confidence. Never guess a word and present it as read.',
+        '- If a question has no answer on any page, return "" for it with confidence 0. Never invent an answer.',
+      ]),
+      promptSection('3. MATCHING ANSWERS TO QUESTIONS', [
+        '- The pages are in order, and one answer may continue across a page break.',
+        '- Use the question numbers the student wrote, and the position on the page, to decide which question an answer belongs to. If an answer cannot be confidently assigned, give it to the most likely question and lower that entry\'s confidence.',
+        '- Never copy one answer into two entries.',
+      ]),
+    ].join('\n\n');
 
     // Question text and marks only -- see the note at the top of this file.
     const questionList = questions.map((question, index) => ({

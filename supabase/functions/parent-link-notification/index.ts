@@ -61,9 +61,28 @@ function renderEmailHtml(
     </div>`;
 }
 
+/** Constant-time compare that rejects a length mismatch without leaking where. */
+const secretMatches = (provided: string | null, expected: string): boolean => {
+  if (!provided || provided.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < provided.length; i++) diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+};
+
 Deno.serve(async (req) => {
-  const linkSecret = Deno.env.get('PARENT_LINK_NOTIFICATION_SECRET') ?? '';
-  if (linkSecret && req.headers.get('x-link-secret') !== linkSecret) {
+  // FAILS CLOSED. Deployed with --no-verify-jwt, and the recipient is taken from
+  // the request body below -- so with the secret unset the old
+  // `if (linkSecret && ...)` guard short-circuited and left an unauthenticated
+  // "mail this user id from AIDemic's verified domain" primitive exposed.
+  const linkSecret = (Deno.env.get('PARENT_LINK_NOTIFICATION_SECRET') ?? '').trim();
+  if (!linkSecret) {
+    console.error('[parent-link-notification] PARENT_LINK_NOTIFICATION_SECRET is not set; refusing to send.');
+    return new Response(JSON.stringify({ error: 'Not configured' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!secretMatches(req.headers.get('x-link-secret'), linkSecret)) {
     return new Response('Unauthorized', { status: 401 });
   }
 

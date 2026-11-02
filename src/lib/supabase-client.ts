@@ -9,6 +9,14 @@ let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 // by clearing the session and firing SIGNED_OUT. Next's dev overlay treats
 // that console.error as a crash, so we silence just this known-benign case.
 const patchConsoleErrorForStaleRefreshToken = () => {
+  // Dev only. The justification above is entirely about Next's dev overlay, but
+  // this used to run in production too -- permanently swallowing every
+  // "Refresh Token Not Found" for every user, including the ones that were not
+  // benign at all. The middleware was dropping rotated session cookies on any
+  // redirect (see withCsp in src/proxy.ts), and this is the error that would
+  // have made that visible.
+  if (process.env.NODE_ENV === 'production') return;
+
   const originalConsoleError = console.error;
   console.error = (...args: unknown[]) => {
     const [first] = args;

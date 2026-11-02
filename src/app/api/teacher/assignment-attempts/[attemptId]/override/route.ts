@@ -38,6 +38,7 @@ type AttemptJoinRow = {
   assignments: {
     questions_payload: QuestionPayload[];
     classes: {
+      teacher_id: string;
       specifications: {
         name: string;
         tier: string | null;
@@ -59,12 +60,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Establish the caller is a teacher before touching the attempt. RLS still
-    // scopes the SELECT below to this teacher's own classes; doing the role
-    // check up front just turns a student's call into a 403 instead of a 500.
-    const { data: teacherRow } = await supabase.from('teachers').select('id').eq('user_id', authData.user.id).maybeSingle();
-    if (!teacherRow) {
-      return NextResponse.json({ error: 'Only teachers can override marks.' }, { status: 403 });
+    // Establish the caller is an approved teacher before touching the attempt.
+    // Note this is only a role check -- it is NOT the ownership check. Anyone can
+    // create their own `teachers` row ("Users can create their own teacher profile"
+    // is `WITH CHECK (auth.uid() = user_id)`), so row existence alone proves
+    // nothing; the class-ownership comparison below is what actually authorizes.
+    const { data: teacherRow } = await supabase
+      .from('teachers')
+      .select('id, verification_status')
+      .eq('user_id', authData.user.id)
+      .maybeSingle();
+    if (!teacherRow || teacherRow.verification_status !== 'approved') {
+      return NextResponse.json({ error: 'Only approved teachers can override marks.' }, { status: 403 });
     }
 
     const body = (await request.json()) as OverridePayload;
@@ -82,13 +89,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
       parsedOverrides.push({ questionIndex, marksAwarded });
     }
 
-    // RLS ("Teachers can view attempts for their classes") is the ownership
-    // check here: if this teacher doesn't own the class, this SELECT returns
-    // nothing and we 404 -- no separate is_teacher_of_class call needed.
+    // `classes.teacher_id` is selected so ownership can be compared explicitly
+    // below. It deliberately does NOT rely on RLS to scope this SELECT: the
+    // policies on assignment_attempts are a union (students see their own,
+    // parents see their linked child's, teachers see their classes'), so a row
+    // coming back proves only that *some* policy matched -- not the teacher one.
     const { data: attemptRow, error: attemptError } = await supabase
       .from('assignment_attempts')
       .select(
-        'id, status, ai_feedback, ai_feedback_original, assignments ( questions_payload, classes ( specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) ) )'
+        'id, status, ai_feedback, ai_feedback_original, assignments ( questions_payload, classes ( teacher_id, specifications ( name, tier, subjects ( name, exam_boards ( name, qualifications ( name ) ) ) ) ) )'
       )
       .eq('id', attemptId)
       .maybeSingle();
@@ -96,6 +105,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ at
       return NextResponse.json({ error: 'Attempt not found.' }, { status: 404 });
     }
     const attempt = attemptRow as unknown as AttemptJoinRow;
+
+    // The actual authorization. The update below runs with the service role and
+    // so bypasses RLS entirely; without this comparison any authenticated user
+    // could create a teachers row and rewrite the marks on their own attempt.
+    if (attempt.assignments?.classes?.teacher_id !== teacherRow.id) {
+      return NextResponse.json({ error: 'Attempt not found.' }, { status: 404 });
+    }
 
     if (attempt.status !== 'completed' || !attempt.ai_feedback) {
       return NextResponse.json({ error: 'This attempt has no marking to override yet.' }, { status: 400 });

@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'aidemic-theme';
+/** Exported so themeScript.test.ts can assert the inline anti-FOUC script reads
+ *  this exact key. The script cannot import it -- its bytes have to be static to
+ *  be hashed for the CSP -- so a rename here would otherwise leave it silently
+ *  reading a key nobody writes. */
+export const STORAGE_KEY = 'aidemic-theme';
 type ThemeMode = 'light' | 'dark';
 
 function getPreferredTheme(): ThemeMode {

@@ -71,6 +71,7 @@ export default function TeacherDashboardPage() {
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [schoolStatus, setSchoolStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
+  const [claimedSchoolAdmin, setClaimedSchoolAdmin] = useState(false);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [classesLoading, setClassesLoading] = useState(true);
   const [classAnalytics, setClassAnalytics] = useState<Record<string, ClassAnalytics>>({});
@@ -124,7 +125,7 @@ export default function TeacherDashboardPage() {
       setClassesLoading(true);
       const { data: teacherRow, error: teacherError } = await supabase
         .from('teachers')
-        .select('id, verification_status, schools ( status )')
+        .select('id, verification_status, claimed_school_admin, schools ( status )')
         .eq('user_id', session.user.id)
         .maybeSingle();
 
@@ -136,10 +137,12 @@ export default function TeacherDashboardPage() {
       const typedTeacherRow = teacherRow as unknown as {
         id: string;
         verification_status: 'pending' | 'approved' | 'rejected';
+        claimed_school_admin: boolean;
         schools: { status: 'pending' | 'approved' | 'rejected' } | null;
       };
       setTeacherId(typedTeacherRow.id);
       setVerificationStatus(typedTeacherRow.verification_status);
+      setClaimedSchoolAdmin(typedTeacherRow.claimed_school_admin ?? false);
       setSchoolStatus(typedTeacherRow.schools?.status ?? null);
 
       const { data: classRows, error: classesError } = await supabase
@@ -339,7 +342,11 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <VerificationBanner verificationStatus={verificationStatus} schoolStatus={schoolStatus} />
+      <VerificationBanner
+        verificationStatus={verificationStatus}
+        schoolStatus={schoolStatus}
+        claimedSchoolAdmin={claimedSchoolAdmin}
+      />
 
       <PageHero
         icon={Users}

@@ -59,7 +59,23 @@ export const gradeBadgeTone = ({
   // Every scale but the two UK ones is read off its own ladder. The hand-written bands below
   // get a CBSE 'D2' and an ICSE '1' backwards, and have no opinion at all on a JEE percentile
   // band. Matching is case-sensitive here because ladder labels are not all uppercase.
-  const scale = qualificationById(examType)?.gradeScale;
+  const qualification = qualificationById(examType);
+
+  // An exam type that was GIVEN but is not in the registry gets no colour rather
+  // than a UK one. The guard used to be `scale && scale !== 'gcse' && ...`, so an
+  // unrecognised type made `scale` undefined and fell through into the GCSE /
+  // A-Level bands below, which read every other ladder backwards: ICSE '9' is the
+  // FAIL grade and scored green, CBSE 'D2' (21-32%) scored green. It is reachable
+  // -- mapStudentSubjectRow falls back to a raw lowercased qualification name,
+  // and the parent dashboards pass attempt.exam_type straight through.
+  //
+  // An ABSENT exam type is a different case and keeps the GCSE fallback: it means
+  // no opinion was offered, and this is a UK-first product. gradeTone.test.ts
+  // pins that distinction.
+  const examTypeGiven = typeof examType === 'string' && examType.trim() !== '';
+  if (examTypeGiven && !qualification) return NEUTRAL;
+
+  const scale = qualification?.gradeScale;
   if (scale && scale !== 'gcse' && scale !== 'a-level') {
     return ladderTone((grade ?? '').trim(), examType) ?? NEUTRAL;
   }

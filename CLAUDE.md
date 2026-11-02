@@ -44,6 +44,35 @@ A second, teacher-initiated variant remains: a teacher generates an invite code 
 
 The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper (migration `20260720100000`) drive every cross-role SELECT policy — parents never get a write policy on any table.
 
+### UK school register and headteacher verification
+
+`schools` holds **every school in the UK** — 30,629 rows seeded from the four official registers by [scripts/seed-uk-schools.ts](scripts/seed-uk-schools.ts) (migrations `20260904000000`, corrected by `20260905000000`):
+
+| Nation | Register | Rows | Headteacher | Domain |
+|---|---|---|---|---|
+| England | GIAS (DfE), republished daily | 25,512 | 25,481 | 24,465 |
+| Wales | GIAS, `EstablishmentTypeGroup = 'Welsh schools'` | 1,569 | 26 | 61 |
+| Scotland | Scottish School Roll and Locations | 2,449 | — | 2,445 |
+| Northern Ireland | DE NI school-level reference data | 1,098 | — | — |
+
+```bash
+bun run seed:schools              # fetch + upsert (cached downloads)
+bun run seed:schools -- --dry-run # counts only, nothing written
+bun run seed:schools -- --refresh # ignore the download cache
+```
+
+Row ids are deterministic UUIDv5 values keyed on `<source>:<reference>`, so re-running is idempotent and a renamed school keeps the id its teachers are attached to. **Do not change the `NAMESPACE` constant.** [scripts/lib/tabular.ts](scripts/lib/tabular.ts) reads the CSV and .xlsx by hand rather than adding a spreadsheet dependency for a script that runs a few times a year; GIAS is Windows-1252, not UTF-8.
+
+Because schools now pre-exist, **the platform admin approves people, not schools** — `approve_school`/`reject_school` and the self-service "register a school" INSERT policy are gone. Five things follow:
+
+- **A headteacher claim is gated on an email-domain match, in one direction only.** `claim_school_admin()` compares the right-hand side of the caller's address against `schools.domains`, accepting the claimant's host being a *subdomain of* a recorded domain (`staff.school.sch.uk` for `school.sch.uk`) but never the reverse. Matching both ways — which `20260904000000` did — meant any holder of a `@glowscotland.org.uk` address matched `stmarys.glowscotland.org.uk`, i.e. every Scottish teacher could claim every Glow-hosted school; `20260905000000` removed that branch and escapes both sides before using them as a `LIKE` pattern. `domains` is normalised at seed time by [src/lib/schools/domain.ts](src/lib/schools/domain.ts), which drops shared hosts (`gmail.com`, `facebook.com`, `glowscotland.org.uk`) and bare public suffixes — `http://sch.uk` in one record would otherwise match every `.sch.uk` address in the country.
+- **Only England and Scotland can really use that gate** (96% and 99.8% of rows). The DfE does not maintain Welsh contact data and the Welsh Government's own address list publishes neither emails nor headteachers, and DE NI publishes neither either. Wales (4%) and NI (0%) go through `request_unverified_school_admin()` instead, which records the claim **without** asserting it was verified — it refuses any school that *does* have a domain on record, so it is not a way around the gate.
+- **`platform_admin_queue()` returns two kinds of row**: headship claims, and teachers at a school with *no* verified admin, who would otherwise wait forever for an approver who does not exist. Not every claim passed a domain check — the ones from Wales and NI could not be checked at all — so the queue hands the reviewer `domain_matches` and `head_name_matches` per row and lets them decide. `platform_approve_teacher(id, p_as_school_admin)` grants school admin; passing `false` approves an over-claimer as an ordinary teacher. Both are SECURITY DEFINER with an explicit `platform_admins` check, so platform admins need no broad SELECT policy on `teachers`. The queue is ordered by `verification_requested_at`, not `updated_at` — the latter moves on every profile edit, so editing your department used to send you to the back.
+- **`guard_teacher_privileged_columns()` is what makes any of this real.** "Users can update their own teacher profile" is `USING (auth.uid() = user_id)` with no column restriction, so before this migration a teacher could PATCH themselves to `is_school_admin = true, verification_status = 'approved'`. RLS cannot express "these columns are read-only to you", so a BEFORE INSERT OR UPDATE trigger guards them and they move only through the SECURITY DEFINER functions above, which set `aidemic.privileged` for the transaction. Same reasoning as `freeze_published_assignments()`. **Any future write to `teachers` touching those five columns has to go through an RPC** — `verification_requested_at` is one of them, because a column the queue is *ordered by* is as much a privilege as the queue membership itself.
+- **The unique index on `lower(name)` had to go.** There are 25 schools called "St Mary's Catholic Primary School"; `(source, urn)` keeps the seed idempotent and the browser shows town and postcode to tell them apart. `search_schools()` matches name, town or postcode, ranking exact name prefixes above trigram similarity. It ignores queries **shorter than three characters** — a trigram index cannot serve a shorter pattern, so a two-character query was a sequential scan over 30k rows on every keystroke. [src/app/onboarding/teacher/page.tsx](src/app/onboarding/teacher/page.tsx) mirrors that floor in `MIN_SEARCH_LENGTH`.
+
+Seeded rows arrive `status = 'approved'`, so `join_class_by_invite_code()`'s school gate is unchanged.
+
 ### Supabase Clients
 
 Two separate clients exist for different rendering contexts:

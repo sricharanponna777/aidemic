@@ -58,7 +58,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ pape
       attemptId: paper.attempt_id,
       createdAt: paper.created_at,
       questions: toStudentSafePaperQuestions((paper.questions_payload ?? []) as PaperQuestion[]),
-      transcript: paper.transcript_payload ? coerceTranscript(paper.transcript_payload) : null,
+      // The question count is not optional here. Without it coerceTranscript
+      // densifies only as far as the highest index the model actually returned,
+      // so a transcript that stopped short -- the exact failure the module exists
+      // for, "a vision model asked for twelve answers routinely returns eleven"
+      // -- renders fewer textareas than there are questions, and the student
+      // cannot type in the answers it missed. mark-answers already passes it.
+      transcript: paper.transcript_payload
+        ? coerceTranscript(paper.transcript_payload, ((paper.questions_payload ?? []) as PaperQuestion[]).length)
+        : null,
       pages,
     };
 

@@ -36,12 +36,27 @@ export async function proxy(request: NextRequest) {
     return headers;
   };
 
+  let response = NextResponse.next({ request: { headers: requestHeaders() } });
+
   const withCsp = <T extends NextResponse>(res: T): T => {
     res.headers.set('Content-Security-Policy', csp);
+
+    // Carry across any session cookies Supabase rotated while verifying the JWT.
+    // setAll() below writes them onto `response`, but every redirect in this
+    // function returns a *different*, freshly built response -- so they were
+    // dropped on exactly the paths that redirect (an unauthenticated /dashboard
+    // hit, a role bounce, an authenticated visit to /login). Under refresh-token
+    // rotation that means the server consumed the refresh token while the
+    // browser kept the now-dead one: an intermittent, unexplained sign-out.
+    //
+    // Done here rather than at each `return` so a redirect added later cannot
+    // forget it.
+    if (res !== response) {
+      for (const cookie of response.cookies.getAll()) res.cookies.set(cookie);
+    }
+
     return res;
   };
-
-  let response = NextResponse.next({ request: { headers: requestHeaders() } });
 
   if (!requiresAuthCheck(pathname)) return withCsp(response);
 

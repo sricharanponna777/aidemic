@@ -73,6 +73,12 @@ export default function SchoolAdminPage() {
         .select('id, user_id, department, qualification_level')
         .eq('school_id', typedTeacherRow.school_id)
         .eq('verification_status', 'pending')
+        // A pending headteacher claim belongs to the platform admin queue, not
+        // here. Approving one as an ordinary teacher moves it out of 'pending',
+        // which drops it from platform_admin_queue() while leaving
+        // claimed_school_admin set -- the claim then sits stranded with no route
+        // back in and no school admin ever granted.
+        .neq('claimed_school_admin', true)
         .neq('user_id', session.user.id);
 
       const typedTeacherRows = (teacherRows ?? []) as { id: string; user_id: string; department: string | null; qualification_level: string | null }[];
@@ -151,7 +157,15 @@ export default function SchoolAdminPage() {
     setActionError('');
     const { error } = await supabase.from('teachers').update({ verification_status: decision }).eq('id', teacherId);
     if (error) {
-      setActionError('Could not update that teacher. Please try again.');
+      console.error('School-admin decision failed:', error.message);
+      // guard_teacher_privileged_columns() raises its own phrasing for anything
+      // it refuses, and those are permanent -- "please try again" would send the
+      // admin round a loop that cannot succeed.
+      setActionError(
+        /school admin|verification status|support/i.test(error.message)
+          ? error.message
+          : 'Could not update that teacher. Please try again.'
+      );
       return;
     }
     setPendingTeachers((prev) => prev.filter((t) => t.id !== teacherId));

@@ -232,3 +232,108 @@ describe('toStudentSafeDiagramSpec', () => {
     expect(toStudentSafeDiagramSpec(null, 'seed')).toBeNull();
   });
 });
+
+// These are the regression tests for the answer-key leak: `rawValues` and
+// `rawDataOrDescription` used to survive the projection because it was built from
+// object spreads, so blanking `correctRows`/`correctValues` hid nothing. They assert
+// the ABSENCE of source data rather than the blanking of known answer fields, which
+// is the only shape of assertion that catches the next field someone adds.
+describe('toStudentSafePlotSpec answer-key containment', () => {
+  it('drops the stem-and-leaf raw dataset, which correctRows is only a sorted restatement of', () => {
+    const safe = toStudentSafePlotSpec({
+      ...emptyPlot,
+      chartType: 'stemLeaf',
+      stemLeaf: {
+        stemUnit: 10,
+        leafUnit: 1,
+        rawValues: [52, 55, 61],
+        correctRows: [
+          { stem: 5, leaves: [2, 5] },
+          { stem: 6, leaves: [1] },
+        ],
+        key: '5 | 2 means 52',
+      },
+    });
+    expect(safe!.stemLeaf!.rawValues).toEqual([]);
+  });
+
+  it('drops the box-plot raw dataset, which is the five-number summary in longhand', () => {
+    const safe = toStudentSafePlotSpec({
+      ...emptyPlot,
+      chartType: 'boxPlot',
+      boxPlot: {
+        axisLabel: 'mass',
+        axisMin: 0,
+        axisMax: 100,
+        correctValues: { min: 10, lowerQuartile: 25, median: 40, upperQuartile: 60, max: 90 },
+        rawDataOrDescription: '10, 25, 40, 60, 90',
+      },
+    });
+    expect(safe!.boxPlot!.rawDataOrDescription).toBe('');
+  });
+
+  it('serialises with no trace of any correct value, for every chart type at once', () => {
+    const safe = toStudentSafePlotSpec({
+      chartType: 'stemLeaf',
+      pie: { categories: [{ label: 'A', value: 3 }], correctAngles: [137] },
+      bar: { categories: ['A'], correctValues: [12], yAxisLabel: 'n', yAxisMax: 20, yAxisStep: 5 },
+      line: {
+        xLabel: 't',
+        yLabel: 'v',
+        points: [{ x: 1, y: 41 }],
+        correctYValues: [41],
+        yAxisMax: 50,
+        yAxisStep: 10,
+        requiresBestFit: true,
+        fitShape: 'line',
+        fitDescription: 'straight through the origin',
+      },
+      scatter: {
+        xLabel: 'x',
+        yLabel: 'y',
+        givenPoints: [{ x: 2, y: 37 }],
+        fitShape: 'curve',
+        fitDescription: 'rises then levels off',
+        connectPoints: true,
+        xAxisMax: 10,
+        yAxisMax: 50,
+        xAxisStep: 1,
+        yAxisStep: 10,
+      },
+      histogram: {
+        bars: [{ classStart: 0, classEnd: 10, frequency: 20, correctFrequencyDensity: 2 }],
+        xLabel: 'x',
+        yLabel: 'density',
+      },
+      frequencyPolygon: { classStart: [0], classEnd: [10], frequency: [20], xLabel: 'x', yLabel: 'f' },
+      stemLeaf: {
+        stemUnit: 10,
+        leafUnit: 1,
+        rawValues: [52, 55, 61],
+        correctRows: [{ stem: 5, leaves: [2, 5] }],
+        // Deliberately not '5 | 2 means 52': the key is the notation legend and is
+        // given data the input has to render, so a key that reuses a raw value would
+        // make this test fail on the question rather than on the answer.
+        key: '3 | 4 means 34',
+      },
+      boxPlot: {
+        axisLabel: 'mass',
+        axisMin: 0,
+        axisMax: 100,
+        correctValues: { min: 11, lowerQuartile: 26, median: 43, upperQuartile: 67, max: 91 },
+        rawDataOrDescription: '11, 26, 43, 67, 91',
+      },
+    });
+
+    const wire = JSON.stringify(safe);
+    // Every value that exists only in an answer field. The axis maxima and the given
+    // data (3, 12 is a correct value but 20/50/10 are axis bounds) are deliberately
+    // not in this list -- they are the question.
+    for (const secret of ['137', '41', '37', '52', '55', '61', '11', '26', '43', '67', '91']) {
+      expect(wire).not.toContain(secret);
+    }
+    // ...and the prose that describes the expected shape of the answer.
+    expect(wire).not.toContain('origin');
+    expect(wire).not.toContain('levels off');
+  });
+});

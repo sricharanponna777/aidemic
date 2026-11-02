@@ -6,7 +6,8 @@ import { loadOwnedPaper } from '@/lib/papers/loadPaper';
 import { coerceTranscript, countAnsweredEntries, transcriptToAnswers } from '@/lib/papers/transcript';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import { gradeBoundaryNote, gradeFromPercentage, nextGradeUp, topGrade as topGradeFor } from '@/lib/ai/gradeScales';
-import { getExamBoardLabel, getExamTypeLabel, getSpecTier } from '@/lib/ai/qualifications';
+import { getSpecTier } from '@/lib/ai/qualifications';
+import { buildCourseSection, promptSection } from '@/lib/ai/courseContext';
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { createStageTimer, type StageTimer } from '@/lib/ai/timing';
 import { buildSpecString } from '@/lib/ai/subjectConfig';
@@ -346,10 +347,10 @@ const getBand = (marksAwarded: number, maxMarks: number) => {
  * are a subset of what was actually sent, and otherwise fall back to matching by
  * position within the sent subset, which is what a renumbering model produced.
  */
-export const indexMarkedAnswers = (aiAnswers: MarkedAnswer[], questions: MarkingQuestion[]) => {
+export const indexMarkedAnswers = (aiAnswers: MarkedAnswer[], questions: MarkingQuestion[], onlyIndices?: Set<number>) => {
   const sentIndices = questions
     .map((question, index) => (DETERMINISTIC_QUESTION_TYPES.has(question.questionType) ? -1 : index))
-    .filter((index) => index >= 0);
+    .filter((index) => index >= 0 && (!onlyIndices || onlyIndices.has(index)));
   const sent = new Set(sentIndices);
 
   const byIndex = new Map<number, MarkedAnswer>();
@@ -369,6 +370,48 @@ export const indexMarkedAnswers = (aiAnswers: MarkedAnswer[], questions: Marking
     if (target !== undefined) byIndex.set(target, answer);
   });
   return byIndex;
+};
+
+/**
+ * Model-marked questions the student answered but the report has no entry for.
+ *
+ * normalizeMarkedAnswers would score each of these 0 with generic feedback --
+ * a silent wrong mark on an answer nobody looked at -- so they are re-marked
+ * instead.
+ */
+export const findSkippedQuestions = (
+  report: AIMarkingReport,
+  questions: MarkingQuestion[],
+  answers: string[]
+): Set<number> => {
+  const byIndex = indexMarkedAnswers(report.markedAnswers, questions);
+  const skipped = new Set<number>();
+  questions.forEach((question, index) => {
+    if (DETERMINISTIC_QUESTION_TYPES.has(question.questionType)) return;
+    if (!answers[index]?.trim()) return;
+    if (!byIndex.has(index)) skipped.add(index);
+  });
+  return skipped;
+};
+
+/** Fold a retry's entries into the first report. Every entry is rewritten onto
+ *  its resolved index, so the merged report's indices are all trusted. */
+export const mergeMarkingReports = (
+  first: AIMarkingReport,
+  retry: AIMarkingReport,
+  questions: MarkingQuestion[],
+  retried: Set<number>
+): AIMarkingReport => {
+  const byIndex = indexMarkedAnswers(first.markedAnswers, questions);
+  for (const [index, answer] of indexMarkedAnswers(retry.markedAnswers, questions, retried)) {
+    if (retried.has(index)) byIndex.set(index, answer);
+  }
+  return {
+    ...first,
+    markedAnswers: [...byIndex.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([index, answer]) => ({ ...answer, questionIndex: index })),
+  };
 };
 
 const normalizeMarkedAnswers = (aiReport: AIMarkingReport | null, questions: MarkingQuestion[], answers: string[]) => {
@@ -542,43 +585,68 @@ const buildFinalReport = (
 
 const aiMarkAnswers = async (
   payload: ReturnType<typeof normalizePayload>,
-  timer: StageTimer
+  timer: StageTimer,
+  /** Mark only these question indices (a retry for ones the model skipped). */
+  onlyIndices?: Set<number>
 ): Promise<AIMarkingReport> => {
   const config = getAIConfig();
 
-  const system = [
-    `Mark exam answers as strict JSON. Board:${getExamBoardLabel(payload.examBoard ?? '')} Qualification:${getExamTypeLabel(payload.examType)} Subject:${payload.subject}.`,
-    payload.specification ? `Spec:${payload.specification}` : '',
-    'Award integer marks 0–maxMarks per question. Blank/irrelevant=0.',
+  const serverMarkedNotes = [
     payload.questions.some((question) => question.questionType === 'mcq')
-      ? 'Some questions were multiple-choice, marked automatically by the server against the stored correct option (excluded from the attempt below); do not attempt to grade them, but you may reference them in summary/weaknessAnalysis/gradeBoostAdvice.'
+      ? '- Some questions were multiple-choice, marked automatically by the server against the stored correct option (excluded from the attempt below); do not attempt to grade them, but you may reference them in summary/weaknessAnalysis/gradeBoostAdvice.'
       : '',
     payload.questions.some((question) => question.questionType === 'plot')
-      ? 'Some questions were chart-plotting questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference chart-drawing skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
+      ? '- Some questions were chart-plotting questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference chart-drawing skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
       : '',
     payload.questions.some((question) => question.questionType === 'diagram')
-      ? 'Some questions were diagram-completion questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference diagram-labelling skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
+      ? '- Some questions were diagram-completion questions marked automatically by the server (excluded from the attempt below); do not attempt to grade them, but you may reference diagram-labelling skill in summary/weaknessAnalysis/gradeBoostAdvice if the topic warrants it.'
       : '',
-    'If a question earns full marks, leave its improvements and weaknessTags empty.',
-    'Calculations: credit correct method+working+answer+units; wording not required.',
-    'Open: reward knowledge, application, analysis, evaluation per mark value.',
-    // Server-marked questions are removed from the attempt, so the indices that
-    // remain have gaps in them. "zero-based" used to invite renumbering 0..n-1,
-    // which would mark each answer against the wrong question.
-    'One markedAnswers entry per question in the attempt, same order. Copy each questionIndex exactly as given — they are NOT consecutive, because server-marked questions were removed. Never renumber them.',
-    'feedback: specific to student answer, where marks won/lost.',
-    // These tags are shown verbatim to students AND parents. Left unconstrained
-    // the model emitted identifiers ("confusion-osmosis-ions", "missing_keyword:x"),
-    // which read as internal keys on the parent dashboard. weaknesses.ts still
-    // rewrites what is already stored; this stops new ones being written.
-    'weaknessTags: 2-5 words of plain English naming the concept the student got wrong, capitalised like a title ("Osmosis and ion movement"). Never slugs, snake_case, kebab-case, codes or prefixes.',
-    'weaknessAnalysis: aggregate repeated weaknesses across attempt.',
-    'gradeBoostAdvice: concrete next steps to raise grade by ≥1 level.',
-    'Keep all text concise: feedback≤30 words, strengths/improvements≤1 item each, exemplarAnswer≤40 words, summary≤20 words.',
-    'Return JSON only. Match schema.',
+  ];
+
+  const system = [
+    'You are a senior examiner for the exact course described below. You mark student answers exactly as a trained examiner for this exam board would: consistently, fairly, and strictly against the mark scheme.',
+    promptSection('1. OUTPUT CONTRACT', [
+      'Return ONLY one JSON object that matches the schema exactly: {"markedAnswers": [...], "summary": string, "weaknessAnalysis": [...], "gradeBoostAdvice": [...]}. No prose or code fences outside it.',
+      // Server-marked questions are removed from the attempt, so the indices that
+      // remain have gaps in them. "zero-based" used to invite renumbering 0..n-1,
+      // which would mark each answer against the wrong question.
+      '- Exactly one markedAnswers entry for EVERY question in the attempt, in the same order. Never skip a question, even a blank one.',
+      '- Copy each questionIndex exactly as given. They are NOT consecutive, because server-marked questions were removed. Never renumber them.',
+      '- maxMarks: copy the question\'s maxMarks exactly.',
+      '- The output must parse with JSON.parse().',
+    ]),
+    buildCourseSection(payload, 'assess'),
+    promptSection('3. HOW TO AWARD MARKS', [
+      '- marksAwarded is a whole number from 0 to maxMarks. Never exceed maxMarks, never go below 0, never use fractions.',
+      '- A blank, illegible or irrelevant answer scores 0. Never award marks for content the student did not write, and never infer what they "meant".',
+      '- The markScheme is the authority. Award each marking point only when the student\'s answer clearly contains it. The modelAnswer shows one full-mark answer; it is not the only one.',
+      '- Credit correct alternatives the mark scheme does not list when this course would credit them. Do not credit wrong or contradictory statements, and where a student gives a right and a wrong answer to the same point, do not credit that point.',
+      '- Calculations: credit correct method, working, final answer and units as the mark scheme allocates them. Apply error carried forward: a later step done correctly from an earlier wrong value still earns its method marks. Exact wording is not required.',
+      '- Extended or levels-marked answers: decide the level from the overall quality of knowledge, application, analysis and evaluation the mark value calls for, then the mark within it. Length alone earns nothing.',
+      '- Ignore spelling and grammar unless the question or mark scheme assesses them (e.g. technical accuracy in English, key scientific terms that must be spelt correctly to be unambiguous).',
+      '- Mark every question independently. Do not let one answer raise or lower the mark of another.',
+      ...serverMarkedNotes,
+    ]),
+    promptSection('4. FEEDBACK FIELDS', [
+      '- feedback: specific to this student\'s answer: which marking points they earned and exactly where marks were lost.',
+      '- If a question earns full marks, leave its improvements and weaknessTags empty.',
+      // These tags are shown verbatim to students AND parents. Left unconstrained
+      // the model emitted identifiers ("confusion-osmosis-ions", "missing_keyword:x"),
+      // which read as internal keys on the parent dashboard. weaknesses.ts still
+      // rewrites what is already stored; this stops new ones being written.
+      '- weaknessTags: 2-5 words of plain English naming the concept the student got wrong, capitalised like a title ("Osmosis and ion movement"). Never slugs, snake_case, kebab-case, codes or prefixes.',
+      '- exemplarAnswer: a full-mark answer to this question for this course and tier, consistent with the mark scheme.',
+      '- weaknessAnalysis: aggregate repeated weaknesses across the attempt.',
+      '- gradeBoostAdvice: concrete next steps to raise the grade by at least one level on this course and tier.',
+      '- Never state a grade, grade boundary or predicted grade; the server computes those.',
+      '- Keep all text concise: feedback ≤30 words, strengths/improvements ≤1 item each, exemplarAnswer ≤40 words, summary ≤20 words.',
+    ]),
+    promptSection('5. FINAL VALIDATION', [
+      'Before responding, silently check: one entry per question with its exact questionIndex; every marksAwarded an integer within 0..maxMarks; every mark traceable to a marking point the student actually wrote; blank answers at 0; full-mark answers with empty improvements and weaknessTags; valid JSON. Fix anything that fails. Do not reveal this check.',
+    ]),
   ]
     .filter(Boolean)
-    .join(' ');
+    .join('\n\n');
 
   const attempt = payload.questions
     .map((question, index) => ({
@@ -600,7 +668,8 @@ const aiMarkAnswers = async (
     // be sent anyway with their options, mark scheme and model answer attached,
     // which is pure latency and token spend on questions whose marks the model
     // was explicitly told not to decide.
-    .filter((item) => !DETERMINISTIC_QUESTION_TYPES.has(item.questionType));
+    .filter((item) => !DETERMINISTIC_QUESTION_TYPES.has(item.questionType))
+    .filter((item) => !onlyIndices || onlyIndices.has(item.questionIndex));
 
   const user = [
     `Topic: ${payload.topic}`,
@@ -869,7 +938,23 @@ export async function POST(request: Request) {
     const needsModel = payload.questions.some(
       (question) => !DETERMINISTIC_QUESTION_TYPES.has(question.questionType)
     );
-    const aiReport = needsModel ? await aiMarkAnswers(payload, timer) : null;
+    let aiReport = needsModel ? await aiMarkAnswers(payload, timer) : null;
+    if (aiReport) {
+      const skipped = findSkippedQuestions(aiReport, payload.questions, payload.answers);
+      if (skipped.size > 0) {
+        const retry = await aiMarkAnswers(payload, timer, skipped);
+        aiReport = mergeMarkingReports(aiReport, retry, payload.questions, skipped);
+        // Still missing after a retry: refuse rather than record a 0 for an
+        // answer nobody marked. Nothing has been persisted yet, so the student
+        // can simply resubmit.
+        if (findSkippedQuestions(aiReport, payload.questions, payload.answers).size > 0) {
+          return NextResponse.json(
+            { error: 'Marking could not be completed for every answer. Please submit again.' },
+            { status: 502 }
+          );
+        }
+      }
+    }
     const report = buildFinalReport(aiReport, payload);
 
     if (assignmentId && adminClient) {

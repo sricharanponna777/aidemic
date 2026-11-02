@@ -7,13 +7,19 @@ import { createClient } from '@/lib/supabase-client';
 interface VerificationBannerProps {
   verificationStatus: 'pending' | 'approved' | 'rejected';
   schoolStatus?: 'pending' | 'approved' | 'rejected' | null;
+  /** They claimed to run the school, so AIDemic is the approver, not a colleague. */
+  claimedSchoolAdmin?: boolean;
 }
 
 /** Shown on teacher dashboard pages while the teacher or their school hasn't
  * cleared verification yet. Students can't join classes until then (enforced
   * server-side by join_class_by_invite_code) -- this just explains why. A
   * teacher rejected at the account level can re-request review from here. */
-export function VerificationBanner({ verificationStatus, schoolStatus }: VerificationBannerProps) {
+export function VerificationBanner({
+  verificationStatus,
+  schoolStatus,
+  claimedSchoolAdmin = false,
+}: VerificationBannerProps) {
   const [resubmitState, setResubmitState] = useState<'idle' | 'loading' | 'done'>('idle');
   const [resubmitError, setResubmitError] = useState('');
 
@@ -37,7 +43,8 @@ export function VerificationBanner({ verificationStatus, schoolStatus }: Verific
     return (
       <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 dark:border-emerald-700/40 dark:bg-emerald-950/30 dark:text-emerald-300">
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-        Resubmitted for review. Your school admin will be notified to approve your account.
+        Resubmitted for review. Your school admin — or AIDemic, if your school doesn&apos;t have one yet — will
+        be notified to approve your account.
       </div>
     );
   }
@@ -48,10 +55,12 @@ export function VerificationBanner({ verificationStatus, schoolStatus }: Verific
     message = "Your school registration is awaiting approval. Students won't be able to join your classes until then.";
   } else if (schoolStatus === 'rejected') {
     message = 'Your school registration was not approved. Contact AIDemic support for help.';
+  } else if (verificationStatus === 'pending' && claimedSchoolAdmin) {
+    message = "AIDemic is verifying you as your school's administrator. Students won't be able to join your classes until then.";
   } else if (verificationStatus === 'pending') {
-    message = "Your account is awaiting approval from your school admin. Students won't be able to join your classes until then.";
+    message = "Your account is awaiting approval from your school admin, or from AIDemic if your school doesn't have one yet. Students won't be able to join your classes until then.";
   } else if (verificationStatus === 'rejected') {
-    message = 'Your account was not approved by your school admin.';
+    message = 'Your account was not approved.';
   }
 
   if (!message) return null;

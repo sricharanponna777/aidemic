@@ -18,6 +18,7 @@ import { normalizePlotSpec, PLOT_SPEC_JSON_SCHEMA } from '@/lib/ai/plotSpec';
 import { DIAGRAM_SPEC_JSON_SCHEMA } from '@/lib/ai/diagramSpec';
 import { buildDiagramTemplateCatalog, DIAGRAM_TEMPLATE_JSON_SCHEMA, normalizeDiagramTemplateSelection, resolveDiagramSpec } from '@/lib/ai/diagramTemplate';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
+import { buildCourseSection, promptSection } from '@/lib/ai/courseContext';
 import { getExamBoardLabel, getExamTypeLabel, isUkQualification } from '@/lib/ai/qualifications';
 import {
   clampCount,
@@ -95,6 +96,9 @@ const MAX_QUESTIONS = 20;
 const MIN_MARK_VALUE = 1;
 const MAX_MARK_VALUE = 40;
 const GENERATION_MAX_OUTPUT_TOKENS = 6000;
+/** The requested count is a target: normalisation discards malformed items and
+ *  dedup drops repeats, so short sets are backfilled for up to this many rounds. */
+const MAX_BACKFILL_ROUNDS = 3;
 const MAX_AI_RESPONSE_LOG_TEXT = 12000;
 
 const SCHEMA = {
@@ -701,36 +705,68 @@ const buildPrompt = (
       ].join(' ')
     : 'Never set questionType="diagram"; leave diagramSpec=null and diagramTemplate={templateId:"",stringParams:[],numberParams:[],listParams:[]} on every question.';
 
+  const countLabel = englishLanguageInstructions ? 'the fixed number of questions the paper format below requires' : `exactly ${payload.questionCount}`;
+
   const system = [
-    `Generate ${englishLanguageInstructions ? 'the required fixed-paper set' : payload.questionCount} exam practice questions as strict JSON. Board:${getExamBoardLabel(payload.examBoard ?? '')} Qualification:${getExamTypeLabel(payload.examType)} Subject:${payload.subject}.`,
-    payload.specification ? `Spec: ${payload.specification}` : '',
-    payload.allowPlot ? plotInstructions : '',
-    payload.allowDiagram ? diagramInstructions : '',
-    englishLanguageInstructions,
-    resourceInstruction,
-    formatInstruction,
-    calcInstruction,
-    'MCQ: questionType="mcq", 3 or 4 options (no letters in text), correctOption=A/B/C/D as applicable, modelAnswer explains correct option.',
-    'Open: questionType="open", options=[], correctOption="".',
-    payload.allowPlot ? '' : plotInstructions,
-    payload.allowDiagram ? '' : diagramInstructions,
-    'commandWord: the exact exam command word (e.g. Calculate/Explain/Evaluate/State). Never empty.',
-    'isCalculation: true only if numeric calculation required.',
-    'modelAnswer: full response earning full marks. Never empty.',
-    'skillsAssessed: ≥1 item, e.g. "AO1 Knowledge", "AO2 Application".',
-    'markScheme: string array, ≥1 item, one mark point per element. Clear enough for AI marking.',
-    'figureUrl: use provided URLs where relevant, else "".',
-    figureUrls.length > 0 ? '' : 'Do not invent figureUrls.',
-    difficultyNote,
-    'Use GFM Markdown in strings. No raw HTML.',
-    'Math: inline \\\\(...\\\\), display \\\\[...\\\\]. Double-escape backslashes in JSON. Always group: x^{2} not x^2.',
-    'sourceMaterial: use only for separate extracts/sources needed to answer the questions. Empty string for ordinary practice. Any extract must be original writing composed for this paper. Never reproduce, quote or closely paraphrase real published text (novels, poems, lyrics, speeches, articles, scripture), and never attribute it to a real author, publication or work — invent the passage and any attribution.',
-    'When a question involves a data set, present it as a markdown table (| col | col |) inside the question text so it renders correctly.',
-    'Keep all text fields concise: question≤2 sentences, markScheme items≤15 words each, modelAnswer≤40 words, skillsAssessed≤1 item.',
-    'Return JSON only. Match schema exactly.',
+    'You are a senior examiner and assessment writer for the exact course described below. You write exam-practice questions, mark schemes and model answers that are accurate, unambiguous and indistinguishable in style from the real papers for this course.',
+    promptSection('1. OUTPUT CONTRACT', [
+      'Return ONLY one JSON object that matches the schema exactly: {"sourceMaterial": string, "questions": [...]}. No prose, comments or code fences outside it.',
+      'Every question object contains every schema field. Never omit a field and never add one.',
+      `questions contains ${countLabel} items.`,
+      'Strings use GitHub-flavoured Markdown. Never use raw HTML.',
+      'The output must parse with JSON.parse(). Never trade JSON validity for formatting.',
+    ]),
+    buildCourseSection(payload, 'generate'),
+    promptSection('3. QUESTION DESIGN', [
+      '- Each question tests one clearly identifiable piece of course content or skill, and is answerable on its own without seeing any other question.',
+      '- Use the command words, phrasing, contexts and mark tariffs this exam board actually uses for this qualification and tier.',
+      '- Every question must have exactly one defensible correct answer (or, for extended responses, a clear set of creditworthy points). No ambiguity, no trick wording, no reliance on information the student is not given.',
+      '- Any data, values or context the student needs must be in the question text. Present a data set as a markdown table (| col | col |).',
+      '- Numerical questions: choose values that give a clean, checkable answer, state units, and verify the arithmetic yourself before writing the mark scheme.',
+      '- Never repeat a question or test the same fact twice in different words.',
+      difficultyNote ? `- ${difficultyNote}` : '',
+    ]),
+    promptSection('4. MARKS, MARK SCHEMES AND MODEL ANSWERS', [
+      '- marks: a whole number from 1 to 40, realistic for the command word and the demand on this course\'s papers.',
+      `- ${resourceInstruction}`,
+      '- markScheme: a string array, at least one item, one creditable marking point per element, precise enough that another examiner (or an AI marker) would award the same marks. Include the units, accepted alternatives and common errors that would lose the mark where relevant. For a levels-marked question, give the level descriptors instead.',
+      '- modelAnswer: a response that would earn full marks under this mark scheme. Never empty. It must agree with the mark scheme exactly; re-check every fact and every calculation in it.',
+      '- commandWord: the exact command word the question uses (e.g. Calculate, Explain, Evaluate, State). Never empty.',
+      '- isCalculation: true only when a numeric calculation is required.',
+      '- skillsAssessed: at least one item naming the assessment objective, e.g. "AO1 Knowledge", "AO2 Application".',
+      '- Keep all text fields concise: question ≤2 sentences (plus any data table it needs), markScheme items ≤15 words each, modelAnswer ≤40 words, skillsAssessed ≤1 item.',
+    ]),
+    promptSection('5. QUESTION FORMATS', [
+      `- ${formatInstruction}`,
+      `- ${calcInstruction}`,
+      '- MCQ: questionType="mcq", 3 or 4 options (no letters in the option text), exactly one correct option, correctOption = the letter (A/B/C/D) of that option, and modelAnswer explains why it is correct. Distractors must be plausible but unambiguously wrong. Use the mark value this course gives a multiple-choice question.',
+      '- Open: questionType="open", options=[], correctOption="".',
+      `- ${plotInstructions}`,
+      `- ${diagramInstructions}`,
+      `- figureUrl: use a provided figure URL where relevant, else "".${figureUrls.length > 0 ? '' : ' Do not invent figureUrls.'}`,
+    ]),
+    englishLanguageInstructions ? promptSection('6. FIXED PAPER FORMAT', [englishLanguageInstructions]) : '',
+    promptSection('7. MATHEMATICS AND SOURCES', [
+      '- Math: inline \\\\(...\\\\), display \\\\[...\\\\]. Double-escape every backslash in JSON. Always group powers and subscripts: x^{2}, not x^2.',
+      '- sourceMaterial: only for separate extracts or sources needed to answer the questions; otherwise an empty string. Any extract must be original writing composed for this paper. Never reproduce, quote or closely paraphrase real published text (novels, poems, lyrics, speeches, articles, scripture), and never attribute it to a real author, publication or work: invent the passage and any attribution.',
+    ]),
+    promptSection('8. FINAL VALIDATION', [
+      'Before responding, silently check every question:',
+      '- Is it on this specification, at this tier, on this paper and inside the requested topic/subtopic?',
+      '- Is the question unambiguous, and does its correct answer actually match the markScheme, modelAnswer and (for MCQ) correctOption?',
+      '- Is every calculation in the modelAnswer correct, with units?',
+      '- Are the marks realistic, and does the markScheme give enough creditable points for them?',
+      '- Is every field present, every required string non-empty, and the JSON valid?',
+      'Fix anything that fails before responding. Do not reveal this check.',
+    ]),
+    promptSection('9. NON-NEGOTIABLE', [
+      `Generate ${countLabel} questions. Not fewer, not more.`,
+      'Do not include content outside this course, tier, paper or topic to reach the count.',
+      'Return the JSON object and nothing else.',
+    ]),
   ]
     .filter(Boolean)
-    .join(' ');
+    .join('\n\n');
 
   const user = [
     payload.topic
@@ -1228,7 +1264,8 @@ export async function generateQuestionSet(
   let malformedCount = appendUniqueQuestions(uniqueQuestions, seen, rawQuestions, payload, sourceMaterialItems, figureUrls);
   let totalRawQuestions = rawQuestions.length;
 
-  if (uniqueQuestions.length < payload.questionCount) {
+  let backfillFailed = false;
+  for (let round = 0; round < MAX_BACKFILL_ROUNDS && uniqueQuestions.length < payload.questionCount; round++) {
     try {
       onStage('backfilling');
       const missingCount = payload.questionCount - uniqueQuestions.length;
@@ -1239,8 +1276,11 @@ export async function generateQuestionSet(
       totalRawQuestions += backfillQuestions.length;
       malformedCount += appendUniqueQuestions(uniqueQuestions, seen, backfillQuestions, payload, sourceMaterialItems, figureUrls);
     } catch {
-      warnings.push('Replacement question generation could not complete.');
+      backfillFailed = true;
     }
+  }
+  if (backfillFailed && uniqueQuestions.length < payload.questionCount) {
+    warnings.push('Replacement question generation could not complete.');
   }
 
   if (uniqueQuestions.length === 0) {
