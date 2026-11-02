@@ -12,6 +12,7 @@ import { normalizeInsightLabel } from '@/lib/weaknesses';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { useToast } from '@/components/ToastProvider';
+import { cachedAiFetch } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
 import {
   MAX_DAILY_REVIEW_FLASHCARDS,
@@ -307,27 +308,23 @@ export default function DailyReviewPage() {
 
     try {
       const specification = topic.specName ? `${topic.specName}${topic.specTier ? ` - ${topic.specTier}` : ''}` : '';
-      const response = await fetch('/api/ai/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subject: topic.subject,
-          examBoard: topic.examBoard,
-          examType: topic.examType,
-          specification,
-          // With spine data the question is scoped by real curriculum ids, so
-          // the model gets the topic and subtopic rather than a phrase lifted
-          // out of a marking report.
-          ...(topic.topicName ? { topic: topic.topicName, subtopic: topic.subtopicName } : {}),
-          prompt: topic.topicName
-            ? `The student is weak on this subtopic. Write one quick, focused retrieval-practice question that directly targets it.`
-            : `Focus tightly on this specific recurring weakness the student has: "${topic.tag}". Write one quick, focused retrieval-practice question that directly targets fixing it.`,
-          questionCount: 1,
-          allowMcq: true,
-          allowCalculation: false,
-          allowPlot: false,
-          useOnlineResources: false,
-        }),
+      const response = await cachedAiFetch('/api/ai/generate-questions', {
+        subject: topic.subject,
+        examBoard: topic.examBoard,
+        examType: topic.examType,
+        specification,
+        // With spine data the question is scoped by real curriculum ids, so
+        // the model gets the topic and subtopic rather than a phrase lifted
+        // out of a marking report.
+        ...(topic.topicName ? { topic: topic.topicName, subtopic: topic.subtopicName } : {}),
+        prompt: topic.topicName
+          ? `The student is weak on this subtopic. Write one quick, focused retrieval-practice question that directly targets it.`
+          : `Focus tightly on this specific recurring weakness the student has: "${topic.tag}". Write one quick, focused retrieval-practice question that directly targets fixing it.`,
+        questionCount: 1,
+        allowMcq: true,
+        allowCalculation: false,
+        allowPlot: false,
+        useOnlineResources: false,
       });
       const body = await response.json();
       if (!response.ok) return null;

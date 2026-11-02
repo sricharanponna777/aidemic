@@ -41,6 +41,7 @@ import {
   isAllowedQualificationTopic,
   isPoetryCluster,
 } from '@/lib/ai/majorTopics';
+import { aiCacheKey, cachedAiFetch, readAiCache, writeAiCache } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
 import { getCreationOptionChoices, getCreationOptionLabel, getPaperOptions, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
@@ -215,6 +216,9 @@ type PendingJob = {
   isPaperMode: boolean;
   isMockExam: boolean;
   mockDurationMinutes: number;
+  /** Where the finished set is cached (see aiCache), so a run resumed after
+   *  navigating away is cached too. Null when nobody is signed in. */
+  cacheKey: string | null;
 };
 
 function ssRead<T>(key: string, fallback: T): T {
@@ -569,6 +573,7 @@ export default function AIQuestionsPage() {
       setStatus({ tone: 'error', text: settled.error || 'Generation failed.' });
       return;
     }
+    if (pending.cacheKey) writeAiCache(pending.cacheKey, settled.result);
     await applyGenerationResult(settled.result, pending);
   };
 
@@ -657,7 +662,18 @@ export default function AIQuestionsPage() {
       isPaperMode,
       isMockExam,
       mockDurationMinutes,
+      cacheKey: await aiCacheKey('/api/questions/generate', payload),
     };
+
+    // The same request as before: reuse that set rather than paying for a new
+    // run. A paper is still created from it, since that happens on apply.
+    const cached = pending.cacheKey ? readAiCache<GenerationResult>(pending.cacheKey) : null;
+    if (cached) {
+      setReport(null);
+      setStatus(null);
+      await applyGenerationResult(cached, pending);
+      return;
+    }
 
     setIsGenerating(true);
     setReport(null);
@@ -762,20 +778,16 @@ export default function AIQuestionsPage() {
     };
 
     try {
-      const response = await fetch('/api/ai/mark-answers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: meta.topic,
-          subject: meta.subject,
-          examBoard: meta.examBoard,
-          examType: meta.examType,
-          attemptMode: isMockExam ? 'mock' : 'practice',
-          specification: meta.specification,
-          sourceMaterial,
-          questions,
-          answers,
-        }),
+      const response = await cachedAiFetch('/api/ai/mark-answers', {
+        topic: meta.topic,
+        subject: meta.subject,
+        examBoard: meta.examBoard,
+        examType: meta.examType,
+        attemptMode: isMockExam ? 'mock' : 'practice',
+        specification: meta.specification,
+        sourceMaterial,
+        questions,
+        answers,
       });
       const body = await response.json();
       if (!response.ok) {

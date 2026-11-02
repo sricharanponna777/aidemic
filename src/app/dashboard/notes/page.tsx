@@ -30,6 +30,7 @@ import {
   type UserSubject,
 } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
+import { cachedAiFetch } from '@/lib/aiCache';
 import { PageHero } from '@/components/ui/feedback';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
@@ -274,17 +275,13 @@ function StudyChat({
     setErrorMessage('');
 
     try {
-      const response = await fetch('/api/ai/study-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          concept,
-          subject,
-          examBoard,
-          examType,
-          mode: 'notes',
-          messages: nextMessages,
-        }),
+      const response = await cachedAiFetch('/api/ai/study-chat', {
+        concept,
+        subject,
+        examBoard,
+        examType,
+        mode: 'notes',
+        messages: nextMessages,
       });
       const body = await response.json();
       if (!response.ok) {
@@ -465,21 +462,17 @@ export default function NotesPage() {
     setErrorMessage('');
 
     try {
-      const response = await fetch('/api/ai/generate-notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          concept: topic.trim(),
-          subtopic: subtopic.trim() || undefined,
-          learningObjective: learningObjective || undefined,
-          paper: paper || undefined,
-          subject: selectedSubject.subject,
-          examBoard: selectedSubject.exam_board,
-          examType: selectedSubject.exam_type,
-          specification,
-          duration: '120',
-          mode: 'notes',
-        }),
+      const response = await cachedAiFetch('/api/ai/generate-notes', {
+        concept: topic.trim(),
+        subtopic: subtopic.trim() || undefined,
+        learningObjective: learningObjective || undefined,
+        paper: paper || undefined,
+        subject: selectedSubject.subject,
+        examBoard: selectedSubject.exam_board,
+        examType: selectedSubject.exam_type,
+        specification,
+        duration: '120',
+        mode: 'notes',
       });
       const body = await response.json();
       if (!response.ok) {

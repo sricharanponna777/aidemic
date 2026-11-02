@@ -9,6 +9,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { MathContent } from '@/components/MathContent';
 import { AssignmentStatusBadge } from '@/components/teacher/AssignmentStatusBadge';
 import { useAuth } from '@/hooks/useAuth';
+import { cachedAiFetch } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
 import { buildSpecString } from '@/lib/ai/subjectConfig';
@@ -203,18 +204,14 @@ export default function TeacherQuestionBankPage() {
     setSavedInfo(null);
     setSaveError('');
     try {
-      const response = await fetch('/api/ai/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: topic.name,
-          subtopic: subtopic?.name || '',
-          subject: subjectChain.name.toLowerCase(),
-          examBoard,
-          examType,
-          specification: buildSpecString(selectedClass.specifications?.name ?? '', selectedClass.specifications?.tier ?? '', ''),
-          questionCount,
-        }),
+      const response = await cachedAiFetch('/api/ai/generate-questions', {
+        topic: topic.name,
+        subtopic: subtopic?.name || '',
+        subject: subjectChain.name.toLowerCase(),
+        examBoard,
+        examType,
+        specification: buildSpecString(selectedClass.specifications?.name ?? '', selectedClass.specifications?.tier ?? '', ''),
+        questionCount,
       });
       const body = await response.json();
       if (!response.ok) {

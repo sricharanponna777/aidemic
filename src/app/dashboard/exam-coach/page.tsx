@@ -7,6 +7,7 @@ import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ToastProvider';
+import { cachedAiFetch } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { rankWeaknesses, trendLabel } from '@/lib/weaknesses';
@@ -130,16 +131,12 @@ export default function ExamCoachPage() {
     setIsGenerating(true);
     setReport(null);
     try {
-      const response = await fetch('/api/ai/exam-coach', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          totalAttempts: attempts.length,
-          totalQuestionsAnalyzed: analysis.totalQuestions,
-          bandDistribution: analysis.bandDistribution,
-          topWeaknesses: analysis.topWeaknesses,
-          subjects: analysis.subjectStats,
-        }),
+      const response = await cachedAiFetch('/api/ai/exam-coach', {
+        totalAttempts: attempts.length,
+        totalQuestionsAnalyzed: analysis.totalQuestions,
+        bandDistribution: analysis.bandDistribution,
+        topWeaknesses: analysis.topWeaknesses,
+        subjects: analysis.subjectStats,
       });
       const body = await response.json();
       if (!response.ok) {

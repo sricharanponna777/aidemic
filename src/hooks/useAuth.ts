@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase-client';
+import { clearAiCache } from '@/lib/aiCache';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AuthChangeEvent, Session } from '@supabase/supabase-js';
@@ -78,7 +79,9 @@ export function useAuth() {
     checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
+      (event: AuthChangeEvent, session: Session | null) => {
+        // Cached AI responses belong to the user who asked for them.
+        if (event === 'SIGNED_OUT') clearAiCache();
         applySession(session);
         if (!session) {
           router.push('/');

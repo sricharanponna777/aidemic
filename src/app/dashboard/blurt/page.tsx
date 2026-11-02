@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Brain, CheckCircle2, CircleAlert, Lightbulb, PenLine, RotateCcw, Timer } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { cachedAiFetch } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
 import { buttonStyles } from '@/components/ui/button';
@@ -64,17 +65,13 @@ export default function BlurtPage() {
     setPhase('reviewing');
 
     try {
-      const response = await fetch('/api/ai/blurt-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subject: getSubjectLabel(selectedSubject.subject),
-          topic: topic.trim(),
-          brainDump: dump.trim(),
-          examBoard: selectedSubject.exam_board,
-          examType: selectedSubject.exam_type,
-          specification: getSavedSpecLabel(selectedSubject),
-        }),
+      const response = await cachedAiFetch('/api/ai/blurt-review', {
+        subject: getSubjectLabel(selectedSubject.subject),
+        topic: topic.trim(),
+        brainDump: dump.trim(),
+        examBoard: selectedSubject.exam_board,
+        examType: selectedSubject.exam_type,
+        specification: getSavedSpecLabel(selectedSubject),
       });
       const data = await response.json();
       if (!response.ok) {

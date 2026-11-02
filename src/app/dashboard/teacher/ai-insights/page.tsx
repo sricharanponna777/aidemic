@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle, HelpCircle, Lightbulb, Repeat, Sparkles, TrendingDown, Users } from 'lucide-react';
 import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
+import { cachedAiFetch } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
 import { useTeacherClassData } from '@/hooks/useTeacherClassData';
 import {
@@ -144,11 +145,7 @@ export default function TeacherAiInsightsPage() {
     setSummaryError('');
     setIsGeneratingSummary(true);
     try {
-      const response = await fetch('/api/ai/generate-class-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classes: classSummaryInput }),
-      });
+      const response = await cachedAiFetch('/api/ai/generate-class-summary', { classes: classSummaryInput });
       const body = await response.json();
       if (!response.ok) {
         setSummaryError(body.error || 'Failed to generate summary.');
