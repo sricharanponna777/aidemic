@@ -301,7 +301,7 @@ export default function BlurtPage() {
             </div>
             {courseLine && (
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-mono text-[11px] text-content-muted">
+                <p className="font-mono text-xs text-content-muted">
                   {courseLine}
                   {topic.trim() ? ` · ${topic.trim()}` : ''}
                 </p>
@@ -327,7 +327,7 @@ export default function BlurtPage() {
           </div>
 
           {/* Status bar */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-subtle px-5 py-3 font-mono text-[11px]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-subtle px-5 py-3 font-mono text-xs">
             <span className={`flex items-center gap-1.5 font-semibold ${startedAt !== null ? 'text-danger' : 'text-content-subtle'}`}>
               <Clock className="h-3.5 w-3.5" />
               {timeUp ? "Time's up: finish your sentence and submit" : `${formatClock(remaining)} remaining`}
@@ -349,13 +349,13 @@ export default function BlurtPage() {
             <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-12 border-r border-subtle bg-surface-sunken" />
             <div
               aria-hidden={writing}
-              className={`[grid-area:1/1] whitespace-pre-wrap break-words py-4 pl-16 pr-5 text-[15px] leading-7 ${
+              className={`[grid-area:1/1] whitespace-pre-wrap break-words py-4 pl-16 pr-5 text-base leading-7 ${
                 writing ? 'text-transparent' : 'text-content'
               }`}
             >
               {lines.map((line, i) => (
                 <div key={i} className="relative">
-                  <span className="absolute -left-14 w-8 select-none text-right font-mono text-[11px] leading-7 text-content-subtle">
+                  <span className="absolute -left-14 w-8 select-none text-right font-mono text-xs leading-7 text-content-subtle">
                     {String(i + 1).padStart(2, '0')}
                   </span>
                   {writing
@@ -399,7 +399,7 @@ export default function BlurtPage() {
                 }}
                 spellCheck={false}
                 placeholder="Start typing. The timer starts with your first word…"
-                className="[grid-area:1/1] resize-none overflow-hidden bg-transparent py-4 pl-16 pr-5 text-[15px] leading-7 text-content caret-content outline-none placeholder:text-content-subtle"
+                className="[grid-area:1/1] resize-none overflow-hidden bg-transparent py-4 pl-16 pr-5 text-base leading-7 text-content caret-content outline-none placeholder:text-content-subtle"
               />
             )}
           </div>
@@ -413,7 +413,7 @@ export default function BlurtPage() {
               </button>
             ) : (
               <>
-                <p className="font-mono text-[11px] text-content-subtle max-sm:hidden">Press Ctrl + Enter to submit</p>
+                <p className="font-mono text-xs text-content-subtle max-sm:hidden">Press Ctrl + Enter to submit</p>
                 <button
                   type="button"
                   onClick={handleSubmit}
@@ -449,7 +449,7 @@ export default function BlurtPage() {
           {phase === 'writing' && (
             <Panel>
               <p className="text-sm font-semibold text-content">Your report appears here</p>
-              <ul className="mt-2 space-y-1.5 text-caption text-content-subtle">
+              <ul className="mt-2 space-y-1.5 text-[13px] text-content-subtle">
                 <li>How much of the topic you covered</li>
                 <li>Each point you got right</li>
                 <li>Anything to correct</li>
@@ -463,7 +463,7 @@ export default function BlurtPage() {
               <Panel>
                 <div className="flex items-center justify-between">
                   <MonoLabel>Coverage</MonoLabel>
-                  <span className="font-mono text-[11px] text-content-subtle">{band(result.coverageScore)}</span>
+                  <span className="font-mono text-xs text-content-subtle">{band(result.coverageScore)}</span>
                 </div>
                 <p className="mt-2 font-mono text-4xl font-semibold text-content">
                   {result.coverageScore}
@@ -475,12 +475,12 @@ export default function BlurtPage() {
                     <span key={mark} className="absolute -top-0.5 h-2.5 w-px bg-content-subtle" style={{ left: `${mark}%` }} aria-hidden="true" />
                   ))}
                 </div>
-                <div className="mt-2 grid grid-cols-3 font-mono text-[10px] text-content-subtle">
+                <div className="mt-2 grid grid-cols-3 font-mono text-[11px] text-content-subtle">
                   <span>Keep building</span>
                   <span className="text-center">Solid {SOLID}%+</span>
                   <span className="text-right">Strong {STRONG}%+</span>
                 </div>
-                <p className="mt-3 text-caption text-content-muted">{result.summary}</p>
+                <p className="mt-3 text-[13px] text-content-muted">{result.summary}</p>
               </Panel>
 
               {(result.covered.length > 0 || result.misconceptions.length > 0) && (
@@ -488,7 +488,7 @@ export default function BlurtPage() {
                   <MonoLabel>What you wrote</MonoLabel>
                   <ul className="mt-3 space-y-2">
                     {result.covered.map((item, i) => (
-                      <li key={`c${i}`} className="flex gap-2.5 rounded-lg border border-subtle bg-surface p-2.5 text-caption text-content-muted">
+                      <li key={`c${i}`} className="flex gap-2.5 rounded-lg border border-subtle bg-surface p-2.5 text-[13px] text-content-muted">
                         <CheckCircle2 className="mt-px h-4 w-4 shrink-0 text-success" aria-label="Correct" />
                         {item}
                       </li>
@@ -496,7 +496,7 @@ export default function BlurtPage() {
                     {result.misconceptions.map((item, i) => (
                       <li
                         key={`m${i}`}
-                        className="flex gap-2.5 rounded-lg border border-warning/30 bg-warning-muted p-2.5 text-caption text-warning"
+                        className="flex gap-2.5 rounded-lg border border-warning/30 bg-warning-muted p-2.5 text-[13px] text-warning"
                       >
                         <AlertTriangle className="mt-px h-4 w-4 shrink-0" aria-label="Needs correcting" />
                         {item}
@@ -511,7 +511,7 @@ export default function BlurtPage() {
                   <MonoLabel>You missed</MonoLabel>
                   <ul className="mt-3 space-y-2">
                     {result.missed.map((item, i) => (
-                      <li key={i} className="flex gap-2.5 text-caption text-content-muted">
+                      <li key={i} className="flex gap-2.5 text-[13px] text-content-muted">
                         <CircleDashed className="mt-px h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />
                         {item}
                       </li>
@@ -524,7 +524,7 @@ export default function BlurtPage() {
                 <Panel>
                   <div className="flex items-center justify-between">
                     <MonoLabel>Key words</MonoLabel>
-                    <span className="font-mono text-[11px] text-content-subtle">
+                    <span className="font-mono text-xs text-content-subtle">
                       {usedTerms} / {keyTerms.length} used
                     </span>
                   </div>
@@ -574,11 +574,11 @@ export default function BlurtPage() {
               </div>
               {blurtBadge && (
                 <div className="mt-3 border-t border-subtle pt-3">
-                  <div className="flex items-center justify-between gap-2 text-caption">
+                  <div className="flex items-center justify-between gap-2 text-[13px]">
                     <span className="flex items-center gap-1.5 text-content-muted">
                       <Trophy className="h-3.5 w-3.5 text-warning" /> Next badge: <span className="font-semibold text-content">{blurtBadge.name}</span>
                     </span>
-                    <span className="font-mono text-[11px] text-content-subtle">
+                    <span className="font-mono text-xs text-content-subtle">
                       {blurtBadge.progress} / {blurtBadge.threshold}
                     </span>
                   </div>

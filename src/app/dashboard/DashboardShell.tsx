@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useUserSubjects } from "@/hooks/useUserSubjects";
 import { useGamification, useRefreshOnXp } from "@/hooks/useGamification";
+import { useDueFlashcards } from "@/hooks/useDueFlashcards";
 import { createClient } from "@/lib/supabase-client";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -14,17 +15,19 @@ import {
   LogOut,
   Menu,
   Moon,
-  Orbit,
   ShieldAlert,
   ShieldCheck,
   Sun,
   X,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { SectionBreadcrumb } from "@/components/SectionBreadcrumb";
 import { RankPanel } from "@/components/gamification/RankPanel";
 import { LeagueChip } from "@/components/gamification/LeagueChip";
 import { XpToast } from "@/components/gamification/XpToast";
+import { CommandPalette, SearchButton } from "@/components/CommandPalette";
+import { NotificationBell } from "@/components/NotificationBell";
 import { MonoLabel } from "@/components/ui/telemetry";
 import { levelForXp } from "@/lib/gamification/levels";
 import {
@@ -38,19 +41,25 @@ import {
 } from "@/lib/nav";
 
 const itemClass = (active: boolean) =>
-  `group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
-    active ? "bg-accent text-accent-fg shadow-card" : "text-content-muted hover:bg-surface-sunken hover:text-content"
+  `group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
+    active ? "bg-linear-to-r from-accent to-accent-2 text-accent-fg shadow-raised" : "text-content-muted hover:bg-surface-sunken hover:text-content"
   }`;
 
 const iconClass = (active: boolean) =>
   `h-4 w-4 shrink-0 ${active ? "text-accent-fg" : "text-content-subtle group-hover:text-content-muted"}`;
 
-/** Small mono count on the right of a nav item ("6 active", "Lvl 12"). */
-function NavCount({ active, children }: { active: boolean; children: React.ReactNode }) {
+type NavCountValue = { text: string; tone: "xp" | "warning" };
+
+/** Small mono count on the right of a nav item ("6 active", "14 due"). */
+function NavCount({ active, tone, children }: { active: boolean; tone: NavCountValue["tone"]; children: React.ReactNode }) {
   return (
     <span
-      className={`ml-auto rounded px-1.5 py-px font-mono text-[10px] font-medium ${
-        active ? "bg-accent-fg/15 text-accent-fg" : "border border-xp/25 bg-xp-muted text-xp"
+      className={`ml-auto rounded px-1.5 py-px font-mono text-[11px] font-medium ${
+        active
+          ? "bg-accent-fg/15 text-accent-fg"
+          : tone === "warning"
+          ? "border border-warning/25 bg-warning-muted text-warning"
+          : "border border-xp/25 bg-xp-muted text-xp"
       }`}
     >
       {children}
@@ -64,12 +73,16 @@ function GroupFlyout({
   items,
   pathname,
   onNavigate,
+  count,
+  countFor,
 }: {
   label: string;
   icon: LucideIcon;
   items: NavItem[];
   pathname: string;
   onNavigate?: () => void;
+  count: NavCountValue | null;
+  countFor: (href: string) => NavCountValue | null;
 }) {
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,7 +118,12 @@ function GroupFlyout({
       <div tabIndex={0} className={`${itemClass(groupActive)} cursor-default`}>
         <GroupIcon className={iconClass(groupActive)} />
         {label}
-        <ChevronRight className={`ml-auto h-3 w-3 shrink-0 ${groupActive ? "text-accent-fg/70" : "text-content-subtle"}`} />
+        {count && (
+          <NavCount active={groupActive} tone={count.tone}>
+            {count.text}
+          </NavCount>
+        )}
+        <ChevronRight className={`${count ? "" : "ml-auto "}h-3 w-3 shrink-0 ${groupActive ? "text-accent-fg/70" : "text-content-subtle"}`} />
       </div>
 
       {position &&
@@ -120,10 +138,16 @@ function GroupFlyout({
             {items.map((item) => {
               const Icon = item.icon;
               const active = isActiveRoute(item, pathname);
+              const itemCount = countFor(item.href);
               return (
                 <Link key={item.href} href={item.href} onClick={onNavigate} className={itemClass(active)}>
                   <Icon className={iconClass(active)} />
                   {item.label}
+                  {itemCount && (
+                    <NavCount active={active} tone={itemCount.tone}>
+                      {itemCount.text}
+                    </NavCount>
+                  )}
                 </Link>
               );
             })}
@@ -145,6 +169,49 @@ const bySection = (groups: NavGroup[]) => {
   }
   return sections;
 };
+
+/** Small square sign-out, at the end of the account card's row: quiet until
+ *  hovered, then eases into the danger tint with the arrow sliding out. */
+function SignOutButton({ onSignOut }: { onSignOut: () => Promise<void> }) {
+  const [signingOut, setSigningOut] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        setSigningOut(true);
+        try {
+          await onSignOut();
+        } catch {
+          setSigningOut(false);
+        }
+      }}
+      disabled={signingOut}
+      aria-label={signingOut ? "Signing out" : "Sign out"}
+      title="Sign out"
+      className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface text-content-subtle transition-all duration-300 ease-out hover:border-transparent hover:bg-danger hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger active:scale-90 disabled:cursor-wait disabled:opacity-60"
+    >
+      <LogOut className="h-3.5 w-3.5 transition-transform duration-300 ease-out group-hover:translate-x-0.5" />
+    </button>
+  );
+}
+
+/** Sidebar footer: who is signed in, and the way out. */
+function AccountCard({ name, email, onSignOut }: { name: string; email: string; onSignOut: () => Promise<void> }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-subtle bg-surface-sunken p-2.5">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-accent to-accent-2 text-sm font-bold uppercase text-accent-fg">
+        {(name || email)[0] ?? "?"}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-semibold leading-tight text-content">{name}</p>
+        <p className="truncate text-[11px] leading-tight text-content-subtle" title={email}>
+          {email}
+        </p>
+      </div>
+      <SignOutButton onSignOut={onSignOut} />
+    </div>
+  );
+}
 
 function AccountMenu({
   email,
@@ -184,7 +251,7 @@ function AccountMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account"
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-xs font-bold uppercase text-accent-fg transition-opacity hover:opacity-85"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-br from-accent to-accent-2 text-xs font-bold uppercase text-accent-fg transition-opacity hover:opacity-85"
       >
         {email[0] ?? "?"}
       </button>
@@ -201,7 +268,7 @@ function AccountMenu({
               onToggleTheme();
               setOpen(false);
             }}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-content-muted hover:bg-surface-sunken hover:text-content"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium text-content-muted hover:bg-surface-sunken hover:text-content"
           >
             {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             {theme === "dark" ? "Light mode" : "Dark mode"}
@@ -210,7 +277,7 @@ function AccountMenu({
             type="button"
             role="menuitem"
             onClick={onSignOut}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-danger hover:bg-danger-muted"
+            className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium text-danger hover:bg-danger-muted"
           >
             <LogOut className="h-3.5 w-3.5" />
             Sign out
@@ -239,6 +306,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const { subjects } = useUserSubjects({ enabled: isStudent });
   const { data: gamification } = useGamification();
+  const { data: dueFlashcards } = useDueFlashcards({ enabled: isStudent });
   useRefreshOnXp();
 
   useEffect(() => {
@@ -323,12 +391,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (error) console.error("Failed to save theme preference:", error.message);
   };
 
-  const countFor = (href: string): string | null => {
+  const countFor = (href: string): NavCountValue | null => {
     if (!isStudent) return null;
-    if (href === "/dashboard/subjects" && subjects.length > 0) return `${subjects.length} active`;
-    if (href === "/dashboard/progress" && gamification) return `Lvl ${levelForXp(gamification.totalXp)}`;
+    if (href === "/dashboard/subjects" && subjects.length > 0) return { text: `${subjects.length} active`, tone: "xp" };
+    if (href === "/dashboard/progress" && gamification) return { text: `Lvl ${levelForXp(gamification.totalXp)}`, tone: "xp" };
+    if (href === "/dashboard/daily-review" && dueFlashcards) return { text: `${dueFlashcards} due`, tone: "warning" };
     return null;
   };
+
+  /** A collapsed group shows the count of whatever inside it has one. */
+  const groupCount = (group: NavGroup): NavCountValue | null =>
+    group.items.map((item) => countFor(item.href)).find((value) => value !== null) ?? null;
 
   const renderItem = (item: NavItem, onNavigate?: () => void) => {
     const Icon = item.icon;
@@ -338,7 +411,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <Link key={item.href + item.label} href={item.href} onClick={onNavigate} className={itemClass(active)}>
         <Icon className={iconClass(active)} />
         {item.label}
-        {count && <NavCount active={active}>{count}</NavCount>}
+        {count && (
+          <NavCount active={active} tone={count.tone}>
+            {count.text}
+          </NavCount>
+        )}
       </Link>
     );
   };
@@ -359,12 +436,14 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   items={group.items}
                   pathname={pathname}
                   onNavigate={onNavigate}
+                  count={groupCount(group)}
+                  countFor={countFor}
                 />
               );
             }
             return (
               <div key={group.label ?? `group-${groupIndex}`} className={group.label ? "pt-1.5" : undefined}>
-                {group.label && <p className="px-2.5 pb-0.5 text-[11px] font-semibold text-content-subtle">{group.label}</p>}
+                {group.label && <p className="px-2.5 pb-0.5 text-xs font-semibold text-content-subtle">{group.label}</p>}
                 <div className="space-y-0.5">{group.items.map((item) => renderItem(item, onNavigate))}</div>
               </div>
             );
@@ -388,11 +467,17 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   if (!session) return null;
 
   const email = session.user.email ?? "";
+  const name =
+    profile?.full_name?.trim() ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
+    profile?.username?.trim() ||
+    email.split("@")[0] ||
+    "Your account";
 
   const brand = (
     <Link href={homeHref} className="flex items-center gap-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-fg">
-        <Orbit className="h-4.5 w-4.5" />
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-accent to-accent-2 text-accent-fg shadow-raised dark:animate-glow-pulse">
+        <Zap className="h-5 w-5 fill-white text-white" />
       </span>
       <span className="text-[17px] font-bold leading-none text-content">AIDemic</span>
     </Link>
@@ -402,16 +487,15 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     <div className="min-h-screen bg-canvas">
 
       {/* Fixed sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-subtle bg-surface max-lg:hidden print:hidden">
+      <aside className="fixed inset-y-0 left-0 z-40 flex w-80 flex-col border-r border-subtle bg-surface max-lg:hidden print:hidden">
         <div className="flex h-14 items-center px-5">{brand}</div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">{renderNavLinks()}</nav>
+        <nav className="scrollbar-none flex-1 overflow-y-auto px-3 py-4">{renderNavLinks()}</nav>
 
-        {isStudent && (
-          <div className="p-3">
-            <RankPanel />
-          </div>
-        )}
+        <div className="space-y-2 p-3">
+          {isStudent && <RankPanel />}
+          <AccountCard name={name} email={email} onSignOut={handleSignOut} />
+        </div>
       </aside>
 
       {/* Mobile top bar */}
@@ -429,7 +513,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           </button>
           {brand}
         </div>
-        <AccountMenu email={email} theme={theme} onToggleTheme={handleThemeToggle} onSignOut={handleSignOut} />
+        <div className="flex items-center gap-2">
+          <SearchButton />
+          {isStudent && <NotificationBell />}
+          <AccountMenu email={email} theme={theme} onToggleTheme={handleThemeToggle} onSignOut={handleSignOut} />
+        </div>
       </div>
 
       {/* Mobile nav drawer */}
@@ -443,7 +531,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           />
           <div
             id="mobile-nav-drawer"
-            className="animate-slide-in-left absolute inset-y-0 left-0 flex w-72 max-w-[80vw] flex-col bg-surface shadow-overlay"
+            className="animate-slide-in-left absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col bg-surface shadow-overlay"
           >
             <div className="flex h-14 items-center justify-between border-b border-subtle px-5">
               {brand}
@@ -457,23 +545,26 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto px-3 py-4">{renderNavLinks(() => setIsMobileNavOpen(false), false)}</nav>
-            {isStudent && (
-              <div className="p-3">
-                <RankPanel onNavigate={() => setIsMobileNavOpen(false)} />
-              </div>
-            )}
+            <div className="space-y-2 p-3">
+              {isStudent && <RankPanel onNavigate={() => setIsMobileNavOpen(false)} />}
+              <AccountCard name={name} email={email} onSignOut={handleSignOut} />
+            </div>
           </div>
         </div>
       )}
 
-      <div className="lg:pl-64 print:pl-0">
+      <div className="lg:pl-80 print:pl-0">
         {/* Desktop top bar */}
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-subtle bg-canvas/85 px-6 backdrop-blur-xl max-lg:hidden print:hidden">
           <div className="flex min-w-0 items-center gap-4">
             <SectionBreadcrumb groups={navGroups} />
             {isStudent && <LeagueChip />}
           </div>
-          <AccountMenu email={email} theme={theme} onToggleTheme={handleThemeToggle} onSignOut={handleSignOut} />
+          <div className="flex items-center gap-2">
+            <SearchButton />
+            {isStudent && <NotificationBell />}
+            <AccountMenu email={email} theme={theme} onToggleTheme={handleThemeToggle} onSignOut={handleSignOut} />
+          </div>
         </header>
 
         <main className="mx-auto max-w-6xl px-4 pt-16 pb-10 sm:px-6 lg:pt-8 print:mx-0 print:max-w-none print:p-0">
@@ -481,6 +572,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         </main>
       </div>
 
+      <CommandPalette groups={navGroups} />
       {isStudent && <XpToast />}
     </div>
   );

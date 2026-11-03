@@ -148,7 +148,7 @@ All TypeScript interfaces are in [src/types.ts](src/types.ts). Add new shared ty
 
 Tailwind CSS 4 with PostCSS. Dark/light theme is stored in `localStorage` under the key `aidemic-theme` and managed by [src/hooks/useTheme.ts](src/hooks/useTheme.ts). Icons come from Lucide React.
 
-The look follows the **orbital workspace** mock in [docs/design/orbital-workspace/](docs/design/orbital-workspace/): monochrome tokens (`accent` is near-black in light mode and near-white in dark), with colour reserved for state (`success`/`warning`/`danger`) and for gamification (`xp`, an indigo token). Because `accent` inverts between themes, text on `bg-accent` must be `text-accent-fg`, never `text-white`. The mono labels, chips, meters and panels are in [src/components/ui/telemetry.tsx](src/components/ui/telemetry.tsx).
+Layout follows the **orbital workspace** mock in [docs/design/orbital-workspace/](docs/design/orbital-workspace/), but **not its monochrome palette** — the user kept the indigo → purple brand (`accent` → `accent-2`, as a gradient on the active nav item, logo and avatar). Gamification has its own violet `xp` token so XP chips and bars never read as ordinary accent controls. The mock's text sizes were also too small; the shell uses 14px nav items and the mono labels, chips, meters and panels in [src/components/ui/telemetry.tsx](src/components/ui/telemetry.tsx) start at 11px. Text on `bg-accent` uses `text-accent-fg`.
 
 ## Paper attempts
 
@@ -205,6 +205,8 @@ Leagues are Duolingo-style: on their first XP of a UTC week, a student joins a c
 - Section headings may be space-themed ("Mission rank", "Mission report"); numbers, buttons and badge names are plain English.
 
 **UI.** The rank panel (sidebar), league chip (top bar), [Progress page](src/app/dashboard/progress/page.tsx) and `ClassLeaderboard` (student and teacher class pages) read through SWR hooks in [src/hooks/useGamification.ts](src/hooks/useGamification.ts), all keyed under `'gamification'`. A page that gets an `xp` object back from a marking route passes it to `announceXp()` ([src/lib/gamification/client.ts](src/lib/gamification/client.ts)); the shell then shows `XpToast` and revalidates every `'gamification'` key. Nothing adds XP client-side. [rules.ts](src/lib/gamification/rules.ts) mirrors `award_xp()`'s rates for the "How XP works" panel only, and `rules.test.ts` pins it to the SQL.
+
+**Top bar.** The bell reads `my_notifications()` (migration `20261103020000`), a SECURITY DEFINER feed **derived** from existing rows (badges earned, settled league weeks, pending parent link requests). There is no notifications table, and the RPC returns facts only — the wording lives in [src/lib/notifications.ts](src/lib/notifications.ts). "Seen" is per device in `localStorage`. Search is [CommandPalette](src/components/CommandPalette.tsx) (Ctrl/⌘+K) over the role's own nav items. It is mounted **once**, and each top bar holds only a `SearchButton`, because the shell renders a desktop and a mobile bar and two palettes would cancel each other's Ctrl+K. The Review nav item's "N due" comes from [useDueFlashcards](src/hooks/useDueFlashcards.ts), a head count that matches `isCardDue()` because `next_review_date` is a timestamptz.
 
 **`cachedAiFetch` never stores `xp`.** `mark-answers` and `blurt-review` are cached client-side to save tokens, but a cached award replayed would announce XP that was never paid, so the field is stripped before writing. A cache hit returns the marks and earns nothing.
 

@@ -19,7 +19,7 @@ export function LeagueChip() {
   return (
     <Link
       href="/dashboard/progress"
-      className="hidden items-center gap-2 rounded-md border border-subtle bg-surface px-2.5 py-1 font-mono text-[11px] text-content-muted transition-colors hover:border-strong hover:text-content md:flex"
+      className="hidden items-center gap-2 rounded-md border border-subtle bg-surface px-2.5 py-1 font-mono text-xs text-content-muted transition-colors hover:border-strong hover:text-content md:flex"
     >
       <span className={`h-1.5 w-1.5 rounded-full ${league.placed ? 'bg-success' : 'bg-content-subtle'}`} aria-hidden="true" />
       {leagueLabel(league.name)}

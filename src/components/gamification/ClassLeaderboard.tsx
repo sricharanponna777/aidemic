@@ -36,7 +36,7 @@ export function ClassLeaderboard({ classId }: { classId: string }) {
               type="button"
               onClick={() => setPeriod(p)}
               aria-pressed={period === p}
-              className={`rounded-md px-2.5 py-1 text-caption font-medium transition-colors ${
+              className={`rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors ${
                 period === p ? 'bg-accent text-accent-fg' : 'text-content-subtle hover:text-content'
               }`}
             >
@@ -58,15 +58,15 @@ export function ClassLeaderboard({ classId }: { classId: string }) {
             const level = levelForXp(row.totalXp);
             return (
               <li key={row.studentId} className={`flex items-center gap-3 px-3 py-2 text-sm ${row.isMe ? 'bg-accent-muted' : ''}`}>
-                <span className="w-6 font-mono text-caption text-content-subtle">{row.rank}</span>
+                <span className="w-6 font-mono text-[13px] text-content-subtle">{row.rank}</span>
                 <span className={`min-w-0 flex-1 truncate ${row.isMe ? 'font-semibold text-content' : 'text-content'}`}>
                   {row.displayName}
-                  {row.isMe && <span className="ml-1.5 text-caption font-normal text-content-subtle">(you)</span>}
+                  {row.isMe && <span className="ml-1.5 text-[13px] font-normal text-content-subtle">(you)</span>}
                 </span>
-                <span className="hidden font-mono text-[11px] text-content-subtle sm:inline">
+                <span className="hidden font-mono text-xs text-content-subtle sm:inline">
                   Lvl {level} · {rankTitle(level)}
                 </span>
-                <span className="w-20 text-right font-mono text-caption text-content-muted">{row.xp.toLocaleString('en-GB')} XP</span>
+                <span className="w-20 text-right font-mono text-[13px] text-content-muted">{row.xp.toLocaleString('en-GB')} XP</span>
               </li>
             );
           })}

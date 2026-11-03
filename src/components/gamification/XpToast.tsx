@@ -72,7 +72,7 @@ export function XpToast() {
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="mt-2 space-y-1 text-caption text-content-muted">
+        <div className="mt-2 space-y-1 text-[13px] text-content-muted">
           {shown.multiplier > 1 && (
             <p className="flex items-center gap-1.5 text-warning">
               <Flame className="h-3.5 w-3.5" aria-hidden="true" /> Streak bonus x{shown.multiplier}

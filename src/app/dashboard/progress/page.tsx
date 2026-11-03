@@ -42,7 +42,7 @@ function LeagueTable({ league }: { league: LeagueSnapshot }) {
 
   return (
     <>
-      <p className="mb-3 text-caption text-content-subtle">
+      <p className="mb-3 text-[13px] text-content-subtle">
         {league.promoteCount > 0 && up && (
           <>
             Top {league.promoteCount} move up to the <span className="font-semibold text-success">{leagueLabel(up.name)}</span>.{' '}
@@ -62,14 +62,14 @@ function LeagueTable({ league }: { league: LeagueSnapshot }) {
               m.zone === 'promote' ? 'border-l-2 border-l-success' : m.zone === 'demote' ? 'border-l-2 border-l-danger' : 'border-l-2 border-l-transparent'
             }`}
           >
-            <span className="w-6 font-mono text-caption text-content-subtle">{m.rank}</span>
+            <span className="w-6 font-mono text-[13px] text-content-subtle">{m.rank}</span>
             <span className="min-w-0 flex-1 truncate text-content">
               {m.displayName}
-              {m.isMe && <span className="ml-1.5 text-caption font-normal text-content-subtle">(you)</span>}
+              {m.isMe && <span className="ml-1.5 text-[13px] font-normal text-content-subtle">(you)</span>}
             </span>
             {m.zone === 'promote' && <ArrowUp className="h-3.5 w-3.5 text-success" aria-label="Moving up" />}
             {m.zone === 'demote' && <ArrowDown className="h-3.5 w-3.5 text-danger" aria-label="Moving down" />}
-            <span className="w-20 text-right font-mono text-caption text-content-muted">{fmt(m.weeklyXp)} XP</span>
+            <span className="w-20 text-right font-mono text-[13px] text-content-muted">{fmt(m.weeklyXp)} XP</span>
           </li>
         ))}
       </ol>
@@ -132,7 +132,7 @@ export default function ProgressPage() {
               <div>
                 <MonoLabel>This week&apos;s league</MonoLabel>
                 <p className="mt-1 text-title text-content">{leagueLabel(summary.league.name)}</p>
-                <p className="text-caption text-content-subtle">{leagueTier(currentTier).blurb}</p>
+                <p className="text-[13px] text-content-subtle">{leagueTier(currentTier).blurb}</p>
               </div>
               <Chip>
                 <Clock className="h-3 w-3" /> Ends in {timeUntil(summary.league.weekEndsAt, now)}
@@ -152,14 +152,14 @@ export default function ProgressPage() {
                     key={t.tier}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2 ${here ? 'bg-accent text-accent-fg' : ''}`}
                   >
-                    <span className={`w-5 font-mono text-[11px] ${here ? 'text-accent-fg/70' : 'text-content-subtle'}`}>{t.tier}</span>
+                    <span className={`w-5 font-mono text-xs ${here ? 'text-accent-fg/70' : 'text-content-subtle'}`}>{t.tier}</span>
                     <span className={`w-28 shrink-0 text-sm font-semibold ${here ? '' : passed ? 'text-content-muted' : 'text-content'}`}>
                       {t.name}
                     </span>
-                    <span className={`min-w-0 flex-1 truncate text-caption ${here ? 'text-accent-fg/80' : 'text-content-subtle'}`}>
+                    <span className={`min-w-0 flex-1 truncate text-[13px] ${here ? 'text-accent-fg/80' : 'text-content-subtle'}`}>
                       {t.blurb}
                     </span>
-                    {here && <span className="font-mono text-[10px] uppercase tracking-wider">You</span>}
+                    {here && <span className="font-mono text-[11px] uppercase tracking-wider">You</span>}
                   </li>
                 );
               })}
@@ -174,21 +174,21 @@ export default function ProgressPage() {
               <div>
                 <MonoLabel>Mission rank</MonoLabel>
                 <p className="mt-1 text-title text-content">{progress.title}</p>
-                <p className="text-caption text-content-subtle">{progress.blurb}</p>
+                <p className="text-[13px] text-content-subtle">{progress.blurb}</p>
               </div>
               <span className="rounded-md border border-strong px-2 py-1 font-mono text-sm font-semibold text-content">
                 Lvl {progress.level}
               </span>
             </div>
             <Meter fraction={progress.fraction} className="mt-4" label="Progress to next level" />
-            <div className="mt-2 flex justify-between font-mono text-[11px] text-content-subtle">
+            <div className="mt-2 flex justify-between font-mono text-xs text-content-subtle">
               <span>
                 {fmt(progress.xpIntoLevel)} / {fmt(progress.xpForNextLevel)} XP
               </span>
               <span>Level {progress.level + 1} next</span>
             </div>
             {upcoming && (
-              <p className="mt-3 text-caption text-content-muted">
+              <p className="mt-3 text-[13px] text-content-muted">
                 Next title: <span className="font-semibold text-content">{upcoming.title}</span> at level {upcoming.fromLevel}.
               </p>
             )}
@@ -206,7 +206,7 @@ export default function ProgressPage() {
                     <span className={`flex-1 ${current ? 'font-semibold text-content' : unlocked ? 'text-content-muted' : 'text-content-subtle'}`}>
                       {rank.title}
                     </span>
-                    <span className="font-mono text-[11px] text-content-subtle">Lvl {rank.fromLevel}</span>
+                    <span className="font-mono text-xs text-content-subtle">Lvl {rank.fromLevel}</span>
                   </li>
                 );
               })}
@@ -217,15 +217,15 @@ export default function ProgressPage() {
             <MonoLabel>Streak bonus</MonoLabel>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="rounded-lg border border-subtle p-3">
-                <p className="text-caption text-content-subtle">Current streak</p>
-                <p className="mt-0.5 text-title text-warning">{summary.currentStreak} days</p>
+                <p className="text-[13px] text-content-subtle">Current streak</p>
+                <p className="mt-0.5 text-title text-warning">{summary.currentStreak} {summary.currentStreak === 1 ? 'day' : 'days'}</p>
               </div>
               <div className="rounded-lg border border-subtle p-3">
-                <p className="text-caption text-content-subtle">Best ever</p>
-                <p className="mt-0.5 text-title text-content">{summary.longestStreak} days</p>
+                <p className="text-[13px] text-content-subtle">Best ever</p>
+                <p className="mt-0.5 text-title text-content">{summary.longestStreak} {summary.longestStreak === 1 ? 'day' : 'days'}</p>
               </div>
             </div>
-            <p className="mt-3 text-caption text-content-muted">
+            <p className="mt-3 text-[13px] text-content-muted">
               Earn XP every day to keep your streak going. A longer streak multiplies all the XP you earn. Days end at
               midnight UK winter time (1am in summer).
             </p>
@@ -244,13 +244,13 @@ export default function ProgressPage() {
               {XP_RATES.map((rate) => (
                 <li key={rate.source} className="flex justify-between gap-3">
                   <span className="text-content-muted">{rate.label}</span>
-                  <span className="font-mono text-caption text-content">
+                  <span className="font-mono text-[13px] text-content">
                     {rate.perMark ? `${rate.xp} per mark` : `up to ${rate.xp}`}
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-caption text-content-subtle">
+            <p className="mt-3 text-[13px] text-content-subtle">
               Better answers earn more: full marks earns five times as much as zero marks. You can earn up to{' '}
               {fmt(DAILY_XP_CAP)} XP a day.
             </p>
@@ -263,7 +263,7 @@ export default function ProgressPage() {
         <div className="flex items-center justify-between gap-3">
           <MonoLabel>Badges</MonoLabel>
           {badges && (
-            <span className="font-mono text-[11px] text-content-subtle">
+            <span className="font-mono text-xs text-content-subtle">
               {earned} / {badges.length} earned
             </span>
           )}
@@ -286,18 +286,18 @@ export default function ProgressPage() {
                   </span>
                   <div className="min-w-0">
                     <p className={`truncate text-sm font-semibold ${done ? 'text-content' : 'text-content-muted'}`}>{badge.name}</p>
-                    <p className="truncate text-caption text-content-subtle">{badge.description}</p>
+                    <p className="truncate text-[13px] text-content-subtle">{badge.description}</p>
                   </div>
                 </div>
                 {done ? (
-                  <p className="mt-2.5 flex items-center gap-1 font-mono text-[11px] text-success">
+                  <p className="mt-2.5 flex items-center gap-1 font-mono text-xs text-success">
                     <Trophy className="h-3 w-3" /> Earned{' '}
                     {new Date(badge.earnedAt as string).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   </p>
                 ) : (
                   <div className="mt-2.5">
                     <Meter fraction={badge.progress / badge.threshold} tone="xp" label={`${badge.name} progress`} />
-                    <p className="mt-1 font-mono text-[11px] text-content-subtle">
+                    <p className="mt-1 font-mono text-xs text-content-subtle">
                       {fmt(badge.progress)} / {fmt(badge.threshold)}
                     </p>
                   </div>

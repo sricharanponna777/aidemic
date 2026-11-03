@@ -2,13 +2,14 @@ import type { ReactNode } from 'react';
 
 /**
  * The orbital-workspace visual language (docs/design/orbital-workspace):
- * mono uppercase labels, small bordered chips, thin meters. Monochrome by
- * default; colour only ever means a state (success / warning / danger) or XP.
+ * mono uppercase labels, small bordered chips, thin meters. Neutral by
+ * default; colour means brand (accent), a state (success / warning / danger)
+ * or XP.
  */
 
 export function MonoLabel({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <p className={`font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-content-subtle ${className}`.trim()}>
+    <p className={`font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-content-subtle ${className}`.trim()}>
       {children}
     </p>
   );
@@ -38,7 +39,7 @@ export function Chip({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium ${
         mono ? 'font-mono' : ''
       } ${CHIP_TONES[tone]} ${className}`.trim()}
     >

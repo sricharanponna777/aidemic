@@ -29,12 +29,12 @@ export function RankPanel({ onNavigate }: { onNavigate?: () => void }) {
           <MonoLabel>Mission rank</MonoLabel>
           <p className="mt-0.5 truncate text-sm font-semibold text-content">{progress.title}</p>
         </div>
-        <span className="shrink-0 rounded-md border border-strong bg-surface px-1.5 py-0.5 font-mono text-[11px] font-semibold text-content">
+        <span className="shrink-0 rounded-md border border-strong bg-surface px-1.5 py-0.5 font-mono text-xs font-semibold text-content">
           Lvl {progress.level}
         </span>
       </div>
       <Meter fraction={progress.fraction} className="mt-3" label="Progress to next level" />
-      <div className="mt-2 flex items-center justify-between font-mono text-[11px] text-content-subtle">
+      <div className="mt-2 flex items-center justify-between font-mono text-xs text-content-subtle">
         <span>
           {fmt(data.totalXp)} / {fmt(progress.nextLevelAt)} XP
         </span>
