@@ -21,12 +21,14 @@ const fetchUserSubjects = async (userId: string): Promise<UserSubject[]> => {
   return ((data as unknown as StudentSubjectRow[]) ?? []).map(mapStudentSubjectRow);
 };
 
-export function useUserSubjects() {
+/** `enabled: false` fetches nothing -- the shell uses it for the subject count
+ *  badge, which only students have. */
+export function useUserSubjects({ enabled = true }: { enabled?: boolean } = {}) {
   const { session } = useAuth();
   const userId = session?.user?.id;
 
   const { data, error, isLoading } = useSWR(
-    userId ? ['student-subjects', userId] : null,
+    enabled && userId ? ['student-subjects', userId] : null,
     () => fetchUserSubjects(userId as string)
   );
 

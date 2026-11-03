@@ -144,7 +144,17 @@ export const cachedAiFetch = async (url: string, request: unknown): Promise<Resp
 
   if (key && response.ok) {
     try {
-      writeAiCache(key, await response.clone().json());
+      // An `xp` award is the one part of a marking response that is an effect
+      // rather than an answer. Replayed from the cache it would announce XP the
+      // server never paid, so it is never stored: a hit returns the marks only.
+      const body: unknown = await response.clone().json();
+      if (body && typeof body === 'object' && !Array.isArray(body) && 'xp' in body) {
+        const rest: Record<string, unknown> = { ...body };
+        delete rest.xp;
+        writeAiCache(key, rest);
+      } else {
+        writeAiCache(key, body);
+      }
     } catch {
       // Not JSON: hand it back uncached.
     }

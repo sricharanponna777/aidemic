@@ -82,6 +82,17 @@ describe('cachedAiFetch', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('never replays an XP award from the cache', async () => {
+    fetchMock.mockResolvedValueOnce(okJson({ report: { percentage: 80 }, xp: { xpAwarded: 120 } }));
+
+    const first = await cachedAiFetch('/api/ai/mark-answers', { answers: ['a'] });
+    const replay = await cachedAiFetch('/api/ai/mark-answers', { answers: ['a'] });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((await first.json()).xp).toEqual({ xpAwarded: 120 });
+    expect(await replay.json()).toEqual({ report: { percentage: 80 } });
+  });
+
   it('caches nothing when nobody is signed in', async () => {
     userId = null;
     fetchMock.mockImplementation(async () => okJson({ reply: 'x' }));

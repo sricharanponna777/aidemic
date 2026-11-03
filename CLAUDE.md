@@ -148,6 +148,8 @@ All TypeScript interfaces are in [src/types.ts](src/types.ts). Add new shared ty
 
 Tailwind CSS 4 with PostCSS. Dark/light theme is stored in `localStorage` under the key `aidemic-theme` and managed by [src/hooks/useTheme.ts](src/hooks/useTheme.ts). Icons come from Lucide React.
 
+The look follows the **orbital workspace** mock in [docs/design/orbital-workspace/](docs/design/orbital-workspace/): monochrome tokens (`accent` is near-black in light mode and near-white in dark), with colour reserved for state (`success`/`warning`/`danger`) and for gamification (`xp`, an indigo token). Because `accent` inverts between themes, text on `bg-accent` must be `text-accent-fg`, never `text-white`. The mono labels, chips, meters and panels are in [src/components/ui/telemetry.tsx](src/components/ui/telemetry.tsx).
+
 ## Paper attempts
 
 The loop the product is built around closes on paper: generate → **print → write by hand → photograph → upload** → transcribe → mark → weakness → mastery → review queue. The last five steps of that were already live for typed attempts; the paper arc is `printed_papers`, [src/app/dashboard/ai-questions/paper/[paperId]/page.tsx](src/app/dashboard/ai-questions/paper/[paperId]/page.tsx), and [src/app/api/ai/transcribe-scan/route.ts](src/app/api/ai/transcribe-scan/route.ts). Five things are load-bearing:
@@ -193,7 +195,18 @@ Migration `20261103000000`. **XP is server-authoritative**: every table has RLS 
 - **Levels are not stored.** [src/lib/gamification/levels.ts](src/lib/gamification/levels.ts) derives level and rank title from `total_xp` (level L at `50·L·(L−1)` XP), so changing the curve needs no migration.
 - **Two privacy rules, by design.** `class_leaderboard()` shows **real names**, but only to active members of that class and its teacher. Weekly leagues mix schools, so `my_league()` shows **usernames only** (a `Cadet-XXXX` callsign when there is none), and only `role = 'student'` accounts are ever placed — no adult is ranked alongside minors.
 
-Leagues are Duolingo-style: on their first XP of a UTC week, a student joins a cohort of up to 30 at their tier (Launchpad → Stratosphere → Orbit → Lunar → Martian → Jovian → Nebula → Pulsar → Quasar → Singularity). `close_finished_league_weeks()` settles finished weeks, scaling `promote_count`/`demote_count` from a full 30 down to the actual cohort size so a three-person cohort is not all relegated. It runs from pg_cron at Monday 00:00 UTC, and lazily from `award_xp()` *before* that function takes its user row lock, so the close never waits behind an award that is waiting on it. Badge criteria live in the `badges` table; `badge_progress()` is shared by awarding and the `my_badges()` progress bars so the two cannot disagree.
+Leagues are Duolingo-style: on their first XP of a UTC week, a student joins a cohort of up to 30 at their tier. `close_finished_league_weeks()` settles finished weeks, scaling `promote_count`/`demote_count` from a full 30 down to the actual cohort size so a three-person cohort is not all relegated. It runs from pg_cron at Monday 00:00 UTC, and lazily from `award_xp()` *before* that function takes its user row lock, so the close never waits behind an award that is waiting on it. Badge criteria live in the `badges` table; `badge_progress()` is shared by awarding and the `my_badges()` progress bars so the two cannot disagree.
+
+**Naming (migration `20261103010000`).** Every name must be readable by a Year 10 with little general knowledge, and its rank must be obvious. Leagues and level titles are therefore two ladders that **never share a word**:
+
+- **League tiers are a size ladder**: Rock → Asteroid → Moon → Planet → Giant Planet → Star → Giant Star → Star Cluster → Galaxy → Universe. Names live in `league_tiers`; [src/lib/gamification/leagues.ts](src/lib/gamification/leagues.ts) mirrors them only to add a one-line `blurb`, and `leagues.test.ts` pins the mirror to the migration.
+- **Level titles are a technology ladder**: Rover (L1) → Satellite (5) → Probe (10) → Shuttle (15) → Space Station (20) → Starship (30) → Warp Drive (40) → Dyson Sphere (50), in `RANK_TITLES` with a `blurb` each.
+- **Badge names state what earned them** ("5 Blurts", "7-Day Streak"). Badge **ids are unchanged** from the original names (`void-blurter`, `jovian-ascent`): `user_badges` references them without `ON UPDATE CASCADE`, and ids are never shown.
+- Section headings may be space-themed ("Mission rank", "Mission report"); numbers, buttons and badge names are plain English.
+
+**UI.** The rank panel (sidebar), league chip (top bar), [Progress page](src/app/dashboard/progress/page.tsx) and `ClassLeaderboard` (student and teacher class pages) read through SWR hooks in [src/hooks/useGamification.ts](src/hooks/useGamification.ts), all keyed under `'gamification'`. A page that gets an `xp` object back from a marking route passes it to `announceXp()` ([src/lib/gamification/client.ts](src/lib/gamification/client.ts)); the shell then shows `XpToast` and revalidates every `'gamification'` key. Nothing adds XP client-side. [rules.ts](src/lib/gamification/rules.ts) mirrors `award_xp()`'s rates for the "How XP works" panel only, and `rules.test.ts` pins it to the SQL.
+
+**`cachedAiFetch` never stores `xp`.** `mark-answers` and `blurt-review` are cached client-side to save tokens, but a cached award replayed would announce XP that was never paid, so the field is stripped before writing. A cache hit returns the marks and earns nothing.
 
 ## Rate limiting
 

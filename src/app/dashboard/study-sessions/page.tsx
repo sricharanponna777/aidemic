@@ -13,6 +13,7 @@ import { PageHero } from '@/components/ui/feedback';
 import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
 import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
 import { isCardDue } from '@/lib/flashcardsDue';
+import { announceXp } from '@/lib/gamification/client';
 
 type Session = Pick<
   StudySession,
@@ -360,7 +361,9 @@ export default function StudySessions() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cardId: card.id, quality }),
     });
-    const updated = response.ok ? (await response.json()).update : null;
+    const body = response.ok ? await response.json() : null;
+    const updated = body?.update ?? null;
+    announceXp(body?.xp);
 
     if (updated) {
       setCardsToReview((prevCards) =>

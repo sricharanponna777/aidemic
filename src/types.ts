@@ -632,3 +632,61 @@ export interface LeagueStanding {
   isMe: boolean;
   zone: LeagueZone;
 }
+
+/** `my_gamification()`: the rank panel. */
+export interface GamificationSummary {
+  totalXp: number;
+  /** Already zeroed by the RPC once a whole UTC day has been missed. */
+  currentStreak: number;
+  longestStreak: number;
+  todayXp: number;
+  dailyCap: number;
+  /** What the next award will be multiplied by. */
+  nextMultiplier: number;
+  league: {
+    tier: number;
+    slug: string;
+    name: string;
+    /** False until the first XP of the UTC week. */
+    placed: boolean;
+    weeklyXp: number;
+    rank: number | null;
+    cohortSize: number | null;
+    weekEndsAt: string;
+  };
+}
+
+/** `my_league()`: this week's cohort table. */
+export interface LeagueSnapshot {
+  placed: boolean;
+  tier: number;
+  slug: string;
+  name: string;
+  weekEndsAt: string;
+  promoteCount: number;
+  demoteCount: number;
+  members: LeagueStanding[];
+}
+
+/** One row of `my_badges()`. */
+export interface BadgeProgress {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  criterion: string;
+  threshold: number;
+  /** Capped at `threshold`. */
+  progress: number;
+  earnedAt: string | null;
+}
+
+/** One row of `class_leaderboard()`. Real names: classmates only. */
+export interface ClassLeaderboardRow {
+  rank: number;
+  studentId: string;
+  displayName: string;
+  xp: number;
+  totalXp: number;
+  isMe: boolean;
+}

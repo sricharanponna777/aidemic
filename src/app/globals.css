@@ -19,111 +19,122 @@
   :root.light,
   :root:not(.dark) {
     /* Backgrounds */
-    --t-canvas: #eef2fb;
+    --t-canvas: #f7f7f8;
     --t-surface: #ffffff;
     --t-surface-raised: #ffffff;
-    --t-surface-sunken: #f1f5f9;
+    --t-surface-sunken: #f4f4f5;
 
     /* Borders */
-    --t-subtle: #dde4f0;
-    --t-strong: #c3cee0;
+    --t-subtle: #e4e4e7;
+    --t-strong: #d4d4d8;
 
     /* Text */
-    --t-content: #0f172a;
-    --t-content-muted: #475569;
-    --t-content-subtle: #64748b;
+    --t-content: #09090b;
+    --t-content-muted: #3f3f46;
+    --t-content-subtle: #71717a;
 
-    /* Brand */
-    --t-accent: #4f46e5;
-    --t-accent-hover: #4338ca;
+    /* Brand: monochrome. Colour is reserved for state and for XP. */
+    --t-accent: #09090b;
+    --t-accent-hover: #27272a;
     --t-accent-fg: #ffffff;
-    --t-accent-muted: #eef2ff;
-    --t-accent-ring: rgba(79, 70, 229, 0.45);
+    --t-accent-muted: #f4f4f5;
+    --t-accent-ring: rgba(9, 9, 11, 0.35);
     /* Gradient end-stop, reserved for brand moments (logo, active nav) */
-    --t-accent-2: #9333ea;
+    --t-accent-2: #52525b;
+
+    /* Gamification: XP chips, highlights, streak and level bars */
+    --t-xp: #4f46e5;
+    --t-xp-muted: #eef2ff;
 
     /* Semantic state */
-    --t-success: #059669;
-    --t-success-muted: #ecfdf5;
-    --t-warning: #d97706;
+    --t-success: #15803d;
+    --t-success-muted: #f0fdf4;
+    --t-warning: #b45309;
     --t-warning-muted: #fffbeb;
     --t-danger: #dc2626;
     --t-danger-muted: #fef2f2;
-    --t-info: #0284c7;
-    --t-info-muted: #f0f9ff;
+    --t-info: #2563eb;
+    --t-info-muted: #eff6ff;
 
     /* Elevation */
-    --t-shadow-card: 0 1px 3px 0 rgba(99, 102, 241, 0.06), 0 1px 2px -1px rgba(99, 102, 241, 0.04);
-    --t-shadow-raised: 0 8px 24px -8px rgba(79, 70, 229, 0.18), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
-    --t-shadow-overlay: 0 24px 48px -12px rgba(15, 23, 42, 0.24);
+    --t-shadow-card: 0 1px 2px 0 rgba(9, 9, 11, 0.04);
+    --t-shadow-raised: 0 8px 24px -12px rgba(9, 9, 11, 0.14), 0 2px 6px -2px rgba(9, 9, 11, 0.05);
+    --t-shadow-overlay: 0 24px 48px -12px rgba(9, 9, 11, 0.22);
   }
 
   :root.dark {
-    --t-canvas: #0A0F1E;
-    --t-surface: #131B2E;
-    --t-surface-raised: #1a2338;
-    --t-surface-sunken: #0d1424;
+    --t-canvas: #09090b;
+    --t-surface: #111113;
+    --t-surface-raised: #18181b;
+    --t-surface-sunken: #0c0c0e;
 
-    --t-subtle: rgba(255, 255, 255, 0.06);
-    --t-strong: rgba(255, 255, 255, 0.14);
+    --t-subtle: rgba(255, 255, 255, 0.08);
+    --t-strong: rgba(255, 255, 255, 0.16);
 
-    --t-content: #F8FAFC;
-    --t-content-muted: #cbd5e1;
-    --t-content-subtle: #94A3B8;
+    --t-content: #fafafa;
+    --t-content-muted: #d4d4d8;
+    --t-content-subtle: #a1a1aa;
 
-    --t-accent: #6366f1;
-    --t-accent-hover: #818cf8;
-    --t-accent-fg: #ffffff;
-    --t-accent-muted: rgba(99, 102, 241, 0.16);
-    --t-accent-ring: rgba(129, 140, 248, 0.55);
-    --t-accent-2: #a855f7;
+    --t-accent: #fafafa;
+    --t-accent-hover: #e4e4e7;
+    --t-accent-fg: #09090b;
+    --t-accent-muted: rgba(255, 255, 255, 0.08);
+    --t-accent-ring: rgba(255, 255, 255, 0.5);
+    --t-accent-2: #a1a1aa;
 
-    --t-success: #34d399;
-    --t-success-muted: rgba(16, 185, 129, 0.14);
+    --t-xp: #818cf8;
+    --t-xp-muted: rgba(99, 102, 241, 0.16);
+
+    --t-success: #4ade80;
+    --t-success-muted: rgba(34, 197, 94, 0.12);
     --t-warning: #fbbf24;
-    --t-warning-muted: rgba(245, 158, 11, 0.14);
+    --t-warning-muted: rgba(245, 158, 11, 0.12);
     --t-danger: #f87171;
-    --t-danger-muted: rgba(239, 68, 68, 0.14);
-    --t-info: #38bdf8;
-    --t-info-muted: rgba(14, 165, 233, 0.14);
+    --t-danger-muted: rgba(239, 68, 68, 0.12);
+    --t-info: #60a5fa;
+    --t-info-muted: rgba(59, 130, 246, 0.14);
 
-    --t-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-    --t-shadow-raised: 0 8px 28px -8px rgba(99, 102, 241, 0.35), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
-    --t-shadow-overlay: 0 24px 56px -12px rgba(0, 0, 0, 0.7);
+    --t-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+    --t-shadow-raised: 0 8px 28px -12px rgba(0, 0, 0, 0.8), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+    --t-shadow-overlay: 0 24px 56px -12px rgba(0, 0, 0, 0.8);
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light):not(.dark) {
-      --t-canvas: #0A0F1E;
-      --t-surface: #131B2E;
-      --t-surface-raised: #1a2338;
-      --t-surface-sunken: #0d1424;
+      --t-canvas: #09090b;
+      --t-surface: #111113;
+      --t-surface-raised: #18181b;
+      --t-surface-sunken: #0c0c0e;
 
-      --t-subtle: rgba(255, 255, 255, 0.06);
-      --t-strong: rgba(255, 255, 255, 0.14);
+      --t-subtle: rgba(255, 255, 255, 0.08);
+      --t-strong: rgba(255, 255, 255, 0.16);
 
-      --t-content: #F8FAFC;
-      --t-content-muted: #cbd5e1;
-      --t-content-subtle: #94A3B8;
+      --t-content: #fafafa;
+      --t-content-muted: #d4d4d8;
+      --t-content-subtle: #a1a1aa;
 
-      --t-accent: #6366f1;
-      --t-accent-hover: #818cf8;
-      --t-accent-fg: #ffffff;
-      --t-accent-muted: rgba(99, 102, 241, 0.16);
-      --t-accent-ring: rgba(129, 140, 248, 0.55);
+      --t-accent: #fafafa;
+      --t-accent-hover: #e4e4e7;
+      --t-accent-fg: #09090b;
+      --t-accent-muted: rgba(255, 255, 255, 0.08);
+      --t-accent-ring: rgba(255, 255, 255, 0.5);
+      --t-accent-2: #a1a1aa;
 
-      --t-success: #34d399;
-      --t-success-muted: rgba(16, 185, 129, 0.14);
+      --t-xp: #818cf8;
+      --t-xp-muted: rgba(99, 102, 241, 0.16);
+
+      --t-success: #4ade80;
+      --t-success-muted: rgba(34, 197, 94, 0.12);
       --t-warning: #fbbf24;
-      --t-warning-muted: rgba(245, 158, 11, 0.14);
+      --t-warning-muted: rgba(245, 158, 11, 0.12);
       --t-danger: #f87171;
-      --t-danger-muted: rgba(239, 68, 68, 0.14);
-      --t-info: #38bdf8;
-      --t-info-muted: rgba(14, 165, 233, 0.14);
+      --t-danger-muted: rgba(239, 68, 68, 0.12);
+      --t-info: #60a5fa;
+      --t-info-muted: rgba(59, 130, 246, 0.14);
 
-      --t-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-      --t-shadow-raised: 0 8px 28px -8px rgba(99, 102, 241, 0.35), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
-      --t-shadow-overlay: 0 24px 56px -12px rgba(0, 0, 0, 0.7);
+      --t-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+      --t-shadow-raised: 0 8px 28px -12px rgba(0, 0, 0, 0.8), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+      --t-shadow-overlay: 0 24px 56px -12px rgba(0, 0, 0, 0.8);
     }
   }
 }
@@ -161,6 +172,10 @@
   --color-accent-muted: var(--t-accent-muted);
   --color-accent-ring: var(--t-accent-ring);
   --color-accent-2: var(--t-accent-2);
+
+  /* Gamification — `text-xp` / `bg-xp` / `bg-xp-muted` */
+  --color-xp: var(--t-xp);
+  --color-xp-muted: var(--t-xp-muted);
 
   /* Semantic state */
   --color-success: var(--t-success);
@@ -219,22 +234,6 @@ body {
   color: var(--foreground);
   font-family: var(--font-space-grotesk), "Segoe UI", sans-serif;
   min-height: 100vh;
-  background-image:
-    linear-gradient(rgba(99, 102, 241, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.025) 1px, transparent 1px),
-    radial-gradient(1000px 600px at 5% -15%, rgba(99, 102, 241, 0.13), transparent 50%),
-    radial-gradient(800px 500px at 95% 5%, rgba(139, 92, 246, 0.09), transparent 45%);
-  background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
-  background-attachment: fixed;
-}
-
-.dark body {
-  background-image:
-    linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
-    radial-gradient(900px 600px at 10% -10%, rgba(99, 102, 241, 0.18), transparent 50%),
-    radial-gradient(700px 500px at 90% 10%, rgba(139, 92, 246, 0.12), transparent 50%);
-  background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
 }
 
 @keyframes gradient-shift {
@@ -285,22 +284,14 @@ h3 {
   letter-spacing: -0.01em;
 }
 
-.dark h1 {
-  text-shadow: 0 0 40px rgba(129, 140, 248, 0.25);
-}
-
-.dark h2 {
-  text-shadow: 0 0 28px rgba(129, 140, 248, 0.15);
-}
-
 ::selection {
-  background: rgba(37, 99, 235, 0.2);
-  color: #0f172a;
+  background: rgba(79, 70, 229, 0.18);
+  color: #09090b;
 }
 
 .dark ::selection {
-  background: rgba(96, 165, 250, 0.35);
-  color: #e2e8f0;
+  background: rgba(129, 140, 248, 0.35);
+  color: #fafafa;
 }
 
 .prose img,

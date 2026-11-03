@@ -191,7 +191,7 @@ function LoginContent() {
 
       <div className="relative w-full max-w-md rounded-card border border-subtle bg-surface p-8 shadow-raised">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-control bg-linear-to-br from-accent to-accent-2 text-white shadow-raised">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-control bg-linear-to-br from-accent to-accent-2 text-accent-fg shadow-raised">
             <Zap className="h-6 w-6" />
           </span>
           <h1 className="text-display text-content">AIDemic</h1>

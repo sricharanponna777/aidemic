@@ -23,6 +23,7 @@ import { isPdf, pdfToJpegPages } from '@/lib/papers/pdfPages';
 import { MAX_PAPER_PAGES, PAPER_SCANS_BUCKET } from '@/lib/papers/constants';
 import { countAnsweredEntries, LOW_CONFIDENCE } from '@/lib/papers/transcript';
 import type { PaperTranscriptEntry, StudentSafePaper } from '@/types';
+import { announceXp } from '@/lib/gamification/client';
 
 /**
  * One printed paper, through its whole life: print it, photograph what you
@@ -250,6 +251,7 @@ export default function PaperPage() {
         setStatus({ tone: 'error', text: body.error || 'Marking failed.' });
         return;
       }
+      announceXp(body.xp);
       // The marked attempt is a normal practice attempt from here on, so the
       // existing attempt view renders it -- there is no separate paper report.
       if (typeof body.attemptId === 'string' && body.attemptId) {

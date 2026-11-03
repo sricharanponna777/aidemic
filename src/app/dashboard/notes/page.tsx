@@ -32,6 +32,7 @@ import {
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { cachedAiFetch } from '@/lib/aiCache';
 import { PageHero } from '@/components/ui/feedback';
+import { announceXp } from '@/lib/gamification/client';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -139,6 +140,7 @@ function UnderstandingCheck({ topicId }: { topicId: string | null }) {
         return;
       }
       setResult(body as CheckResult);
+      announceXp(body.xp);
     } catch {
       setSelected('');
       setErrorMessage('Network error while marking your answer.');

@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
 import { PageHero } from '@/components/ui/feedback';
+import { ClassLeaderboard } from '@/components/gamification/ClassLeaderboard';
 
 type ClassInfo = { id: string; name: string };
 type AssignmentRow = {
@@ -130,6 +131,8 @@ export default function StudentClassPage() {
           })}
         </div>
       )}
+
+      <ClassLeaderboard classId={classId} />
     </div>
   );
 }

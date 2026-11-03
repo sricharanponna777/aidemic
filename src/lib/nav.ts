@@ -16,6 +16,7 @@ import {
   Sparkles,
   Target,
   TrendingUp,
+  Trophy,
   Users,
   UserPlus,
   type LucideIcon,
@@ -30,19 +31,25 @@ export type NavItem = {
 
 export type NavGroup = {
   label: string | null;
+  /** Sidebar heading this group sits under. Consecutive groups sharing one
+   *  are drawn under a single heading. */
+  section?: string;
   items: NavItem[];
 };
 
 export const STUDENT_NAV_GROUPS: NavGroup[] = [
   {
     label: null,
+    section: "Workspace",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
+      { href: "/dashboard/progress", label: "Progress", icon: Trophy },
     ],
   },
   {
     label: "Learn",
+    section: "Missions",
     items: [
       { href: "/dashboard/notes", label: "Notes", icon: BookOpen },
       { href: "/dashboard/podcasts", label: "Podcasts", icon: Headphones },
@@ -51,6 +58,7 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Review",
+    section: "Missions",
     items: [
       { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
       { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
@@ -60,6 +68,7 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Practice",
+    section: "Missions",
     items: [
       { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
       { href: "/dashboard/blurt", label: "Blurting", icon: PenLine },
@@ -67,12 +76,14 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Improve",
+    section: "Missions",
     items: [
       { href: "/dashboard/exam-coach", label: "Exam Coach", icon: Compass },
     ],
   },
   {
     label: null,
+    section: "Configuration",
     items: [
       { href: "/dashboard/classes", label: "My Classes", icon: Users },
       { href: "/dashboard/family", label: "Link Parent", icon: UserPlus },
@@ -112,6 +123,7 @@ export const PARENT_NAV_ITEMS: NavItem[] = [
  *  or already gated by its own prefix check. */
 export const STUDENT_ONLY_PREFIXES = [
   "/dashboard/subjects",
+  "/dashboard/progress",
   "/dashboard/notes",
   "/dashboard/podcasts",
   "/dashboard/flashcards",

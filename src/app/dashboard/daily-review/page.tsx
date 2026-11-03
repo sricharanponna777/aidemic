@@ -25,6 +25,7 @@ import { MASTERY_LABEL, masteryBadgeTone } from '@/lib/masteryTone';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import type { MasteryBand } from '@/lib/mastery';
 import type { Flashcard } from '@/types';
+import { announceXp } from '@/lib/gamification/client';
 
 const MAX_WEAK_TOPICS = 3;
 const FLASHCARDS_PER_MICROQUESTION = 3;
@@ -485,22 +486,24 @@ export default function DailyReviewPage() {
       const card = item.card;
       // Graded server-side so the review can also emit Learning Spine evidence,
       // which needs the service role the browser client does not have.
-      await fetch('/api/flashcards/review', {
+      const response = await fetch('/api/flashcards/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardId: card.id, quality }),
       });
+      if (response.ok) announceXp((await response.json().catch(() => null))?.xp);
       deckCountsRef.current.set(card.deck_id, (deckCountsRef.current.get(card.deck_id) || 0) + 1);
     } else {
       // Only server-stored questions produce evidence. The server re-marks the
       // selection against the question it saved, so `quality` here stays purely
       // a local display stat.
       if (item.itemId && selectedOption) {
-        await fetch('/api/review-queue/answer', {
+        const response = await fetch('/api/review-queue/answer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: item.itemId, selectedOption }),
         });
+        if (response.ok) announceXp((await response.json().catch(() => null))?.xp);
       }
       microStatsRef.current = {
         attempted: microStatsRef.current.attempted + 1,

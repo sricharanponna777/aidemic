@@ -35,6 +35,7 @@ import { buildStudentStats, buildClassStats, buildTopicStats, buildAssignmentSta
 import { ParentLinksPanel } from '@/components/teacher/ParentLinksPanel';
 import { AssignmentStatusBadge } from '@/components/teacher/AssignmentStatusBadge';
 import type { TeacherClass, TeacherAssignment, TeacherAttempt, TeacherStudent } from '@/hooks/useTeacherClassData';
+import { ClassLeaderboard } from '@/components/gamification/ClassLeaderboard';
 
 type ClassInfo = {
   id: string;
@@ -483,6 +484,8 @@ export default function TeacherClassPage() {
           </div>
         </section>
       )}
+
+      <ClassLeaderboard classId={classId} />
 
       <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">

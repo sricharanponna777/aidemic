@@ -26,24 +26,44 @@ type BlurtPayload = {
   specification?: string;
 };
 
+type KeyTermStatus = 'recalled' | 'wrong' | 'missed';
+
 type BlurtResult = {
   covered: string[];
   missed: string[];
   misconceptions: string[];
+  /** The topic's key vocabulary and whether the student used each term. The
+   *  page highlights recalled terms in the student's own text, so a term must
+   *  be spelled as the course spells it. */
+  keyTerms: { term: string; status: KeyTermStatus }[];
   coverageScore: number;
   summary: string;
 };
+
+const KEY_TERM_STATUSES: ReadonlySet<string> = new Set(['recalled', 'wrong', 'missed']);
 
 const MAX_DUMP_CHARS = 8000;
 
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['covered', 'missed', 'misconceptions', 'coverageScore', 'summary'],
+  required: ['covered', 'missed', 'misconceptions', 'keyTerms', 'coverageScore', 'summary'],
   properties: {
     covered: { type: 'array', items: { type: 'string' } },
     missed: { type: 'array', items: { type: 'string' } },
     misconceptions: { type: 'array', items: { type: 'string' } },
+    keyTerms: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['term', 'status'],
+        properties: {
+          term: { type: 'string' },
+          status: { type: 'string', enum: ['recalled', 'wrong', 'missed'] },
+        },
+      },
+    },
     coverageScore: { type: 'number' },
     summary: { type: 'string' },
   },
@@ -63,6 +83,14 @@ const coerceResult = (value: unknown): BlurtResult | null => {
       covered: strArr(v.covered),
       missed: strArr(v.missed),
       misconceptions: strArr(v.misconceptions),
+      // Optional on the way in: a model without strict JSON schema may omit it,
+      // and the rest of the review is still worth showing.
+      keyTerms: (Array.isArray(v.keyTerms) ? v.keyTerms : []).flatMap((k) => {
+        const item = k as { term?: unknown; status?: unknown };
+        return typeof item?.term === 'string' && item.term.trim() && typeof item.status === 'string' && KEY_TERM_STATUSES.has(item.status)
+          ? [{ term: item.term.trim(), status: item.status as KeyTermStatus }]
+          : [];
+      }),
       coverageScore: Number.isFinite(v.coverageScore as number) ? Math.max(0, Math.min(100, Math.round(v.coverageScore as number))) : 0,
       summary: v.summary,
     };
@@ -105,6 +133,7 @@ export async function POST(request: Request) {
         '- "covered": the key points they correctly recalled. Each item names one point. 0-10 items; never pad it.',
         '- "missed": important points this course requires on this topic that they did not mention, most important first. 0-10 items.',
         '- "misconceptions": anything they wrote that is wrong or imprecise for this course. Each item names the error and gives the correction. 0-6 items.',
+        '- "keyTerms": the 6-12 key technical terms this course expects in an answer on this topic, most important first. Each "term" is 1-4 words, spelled as this course spells it. "status" is "recalled" if the student used the term correctly, "wrong" if they used it incorrectly, "missed" if they did not use it.',
         '- "coverageScore": a whole number 0-100: the share of the topic\'s required content (weighted by importance) that they recalled correctly.',
         '- "summary": one encouraging sentence naming the single most useful next step.',
       ]),
@@ -115,6 +144,7 @@ export async function POST(request: Request) {
         '- A point that is stated wrongly goes in "misconceptions", not "covered". A point that is right but vague is "covered" only if this course would credit it.',
         '- Every item in "missed" and every correction in "misconceptions" must be factually correct for this course. If unsure, leave it out.',
         '- Keep the arrays consistent: a point never appears in both "covered" and "missed".',
+        '- A keyTerm is "recalled" only if the student wrote that term (or an exact plural/singular of it) in their text.',
         '- coverageScore must agree with the arrays: lots covered and little missed scores high; little covered scores low; an empty or off-topic dump scores 0-10.',
         '- Be warm in tone but honest about gaps.',
       ]),
@@ -197,6 +227,11 @@ export async function POST(request: Request) {
       .map((s) => txt(s, 200))
       .filter((s) => !coveredKeys.has(s.trim().toLowerCase()));
     const misconceptions = result.misconceptions.slice(0, 6).map((s) => txt(s, 240));
+    const seenTerms = new Set<string>();
+    const keyTerms = result.keyTerms
+      .map((k) => ({ term: txt(k.term, 60), status: k.status }))
+      .filter((k) => k.term && !seenTerms.has(k.term.toLowerCase()) && seenTerms.add(k.term.toLowerCase()))
+      .slice(0, 12);
 
     // Dual-write to the Learning Spine. Deferred with after() because it makes a
     // classification model call the student must not wait on, and skipped
@@ -230,6 +265,7 @@ export async function POST(request: Request) {
       covered,
       missed,
       misconceptions,
+      keyTerms,
       coverageScore: result.coverageScore,
       summary: txt(result.summary, 240),
       xp,
