@@ -200,7 +200,7 @@ Leagues are Duolingo-style: on their first XP of a UTC week, a student joins a c
 **Naming (migration `20261103010000`).** Every name must be readable by a Year 10 with little general knowledge, and its rank must be obvious. Leagues and level titles are therefore two ladders that **never share a word**:
 
 - **League tiers are a size ladder**: Rock → Asteroid → Moon → Planet → Giant Planet → Star → Giant Star → Star Cluster → Galaxy → Universe. Names live in `league_tiers`; [src/lib/gamification/leagues.ts](src/lib/gamification/leagues.ts) mirrors them only to add a one-line `blurb`, and `leagues.test.ts` pins the mirror to the migration.
-- **Level titles are a technology ladder**: Rover (L1) → Satellite (5) → Probe (10) → Shuttle (15) → Space Station (20) → Starship (30) → Warp Drive (40) → Dyson Sphere (50), in `RANK_TITLES` with a `blurb` each.
+- **Level titles are a skill ladder**: Novice (L1) → Beginner (5) → Practitioner (10) → Specialist (15) → Expert (20) → Master (25) → Grandmaster (30) → Legend (40) → Apex (50), in `RANK_TITLES` with a `blurb` each.
 - **Badge names state what earned them** ("5 Blurts", "7-Day Streak"). Badge **ids are unchanged** from the original names (`void-blurter`, `jovian-ascent`): `user_badges` references them without `ON UPDATE CASCADE`, and ids are never shown.
 - Section headings may be space-themed ("Mission rank", "Mission report"); numbers, buttons and badge names are plain English.
 

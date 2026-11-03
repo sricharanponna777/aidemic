@@ -43,24 +43,25 @@ export interface LevelProgress {
 }
 
 /**
- * Rank title, by the lowest level it is held from: a ladder of space
- * technology, each a bigger leap than the last. Deliberately no word in common
- * with the league tiers (leagues.ts), which are a ladder of object SIZE -- a
- * student is "a Probe in the Moon league", never two things with one name.
+ * Rank title, by the lowest level it is held from: a ladder of skill, each a
+ * step up from the last. Deliberately no word in common with the league tiers
+ * (leagues.ts), which are a ladder of object SIZE -- a student is "an Expert in
+ * the Moon league", never two things with one name.
  *
  * `blurb` is the plain-English line shown beside the title. The test for both
  * is that a Year 10 with little general knowledge can see why each title
  * outranks the one before it.
  */
 export const RANK_TITLES: ReadonlyArray<{ fromLevel: number; title: string; blurb: string }> = [
-  { fromLevel: 1, title: 'Rover', blurb: 'Drives across the ground of another world.' },
-  { fromLevel: 5, title: 'Satellite', blurb: 'Leaves the ground and circles a planet.' },
-  { fromLevel: 10, title: 'Probe', blurb: 'Flies out alone to explore distant planets.' },
-  { fromLevel: 15, title: 'Shuttle', blurb: 'Carries a crew into space and brings them home.' },
-  { fromLevel: 20, title: 'Space Station', blurb: 'A base in orbit where a crew lives and works.' },
-  { fromLevel: 30, title: 'Starship', blurb: 'Crosses the whole solar system with a crew aboard.' },
-  { fromLevel: 40, title: 'Warp Drive', blurb: 'Bends space to travel faster than light.' },
-  { fromLevel: 50, title: 'Dyson Sphere', blurb: 'A shell built around a star to capture all of its power.' },
+  { fromLevel: 1, title: 'Novice', blurb: 'Just starting out.' },
+  { fromLevel: 5, title: 'Beginner', blurb: 'Has the basics and is building habits.' },
+  { fromLevel: 10, title: 'Practitioner', blurb: 'Practises regularly and it shows.' },
+  { fromLevel: 15, title: 'Specialist', blurb: 'Knows some topics really well.' },
+  { fromLevel: 20, title: 'Expert', blurb: 'Strong across most topics.' },
+  { fromLevel: 25, title: 'Master', blurb: 'Rarely caught out by a question.' },
+  { fromLevel: 30, title: 'Grandmaster', blurb: 'One of the best on the platform.' },
+  { fromLevel: 40, title: 'Legend', blurb: 'Others look up to this record.' },
+  { fromLevel: 50, title: 'Apex', blurb: 'The very top. Nothing higher to reach.' },
 ];
 
 const rankIndex = (level: number): number => {

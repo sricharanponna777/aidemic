@@ -38,16 +38,16 @@ describe('levelProgress', () => {
     expect(progress.xpIntoLevel).toBe(900);
     expect(progress.xpForNextLevel).toBe(1800);
     expect(progress.fraction).toBe(0.5);
-    expect(progress.title).toBe('Shuttle');
+    expect(progress.title).toBe('Specialist');
   });
 });
 
 describe('rankTitle', () => {
   it('holds a title from its starting level until the next one', () => {
-    expect(rankTitle(1)).toBe('Rover');
-    expect(rankTitle(4)).toBe('Rover');
-    expect(rankTitle(5)).toBe('Satellite');
-    expect(rankTitle(99)).toBe('Dyson Sphere');
+    expect(rankTitle(1)).toBe('Novice');
+    expect(rankTitle(4)).toBe('Novice');
+    expect(rankTitle(5)).toBe('Beginner');
+    expect(rankTitle(99)).toBe('Apex');
   });
 
   it('starts at level 1 and climbs strictly', () => {
@@ -60,8 +60,8 @@ describe('rankTitle', () => {
 
 describe('nextRank', () => {
   it('names the title still to come, and nothing past the top', () => {
-    expect(nextRank(1)).toMatchObject({ title: 'Satellite', fromLevel: 5 });
-    expect(nextRank(17)).toMatchObject({ title: 'Space Station', fromLevel: 20 });
+    expect(nextRank(1)).toMatchObject({ title: 'Beginner', fromLevel: 5 });
+    expect(nextRank(17)).toMatchObject({ title: 'Expert', fromLevel: 20 });
     expect(nextRank(50)).toBeNull();
   });
 });
