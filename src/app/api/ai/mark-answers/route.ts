@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { createAdminClient, tryCreateAdminClient } from '@/lib/supabase-admin';
 import { recordMarkingEvidence } from '@/lib/mastery/fromMarking';
+import { awardXp } from '@/lib/gamification/award';
 import { loadOwnedPaper } from '@/lib/papers/loadPaper';
 import { coerceTranscript, countAnsweredEntries, transcriptToAnswers } from '@/lib/papers/transcript';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
@@ -1074,6 +1075,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // Paid from the marks computed above, never from the request. Self-practice
+    // has no row yet to key on, so it is bounded by the AI rate limit and the
+    // XP daily cap instead; papers and assignments are paid once.
+    const xp = await awardXp(spineClient, authData.user.id, {
+      source: paperId ? 'homework_scan' : assignmentId ? 'assignment' : attemptMode === 'mock' ? 'mock' : 'exam_practice',
+      score: report.totalAvailableMarks > 0 ? report.totalMarksAwarded / report.totalAvailableMarks : 0,
+      marksAvailable: report.totalAvailableMarks,
+      awardKey: paperId ? `paper:${paperId}` : assignmentId ? `assignment:${assignmentId}` : null,
+    });
+
     timer.done({
       mode: paperId ? 'paper' : assignmentId ? 'assignment' : 'practice',
       questions: payload.questions.length,
@@ -1087,6 +1098,7 @@ export async function POST(request: Request) {
       // Paper attempts are persisted here rather than by the browser, so the
       // client needs the row id back to link to the marked attempt.
       ...(paperAttemptId ? { attemptId: paperAttemptId } : {}),
+      xp,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to mark answers.';

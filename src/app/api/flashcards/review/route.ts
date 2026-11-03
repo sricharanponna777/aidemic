@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { tryCreateAdminClient } from '@/lib/supabase-admin';
 import { recordMasteryEvents } from '@/lib/mastery/record';
+import { awardXp, utcDay } from '@/lib/gamification/award';
 import { outcomeFromReviewQuality } from '@/lib/mastery';
 import { hasCloze } from '@/lib/cloze';
 import { updateSpacedRepetition, type CardSRState } from '@/lib/spacedRepetition';
@@ -72,16 +73,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to save your review.' }, { status: 500 });
     }
 
+    // A cloze card is the same card reviewed with its deletions masked, so it
+    // comes through this route too. Recording it as its own source keeps
+    // gap-filling separable from front/back recall in analytics; the two carry
+    // the same EVIDENCE_WEIGHTS, so the belief maths is unaffected either way.
+    const source = hasCloze(card.front ?? '') ? 'cloze' : 'flashcard';
+    const spineClient = tryCreateAdminClient();
+
+    // Once per card per UTC day, or re-rating one card would be an XP tap.
+    const xp = await awardXp(spineClient, authData.user.id, {
+      source,
+      score: outcomeFromReviewQuality(quality),
+      awardKey: `flashcard:${cardId}:${utcDay()}`,
+    });
+
     if (card.subtopic_id) {
-      const spineClient = tryCreateAdminClient();
       if (spineClient) {
         const userId = authData.user.id;
         const subtopicId = card.subtopic_id;
-        // A cloze card is the same card reviewed with its deletions masked, so it
-        // comes through this route too. Recording it as its own source keeps
-        // gap-filling separable from front/back recall in analytics; the two carry
-        // the same EVIDENCE_WEIGHTS, so the belief maths is unaffected either way.
-        const source = hasCloze(card.front ?? '') ? 'cloze' : 'flashcard';
         after(async () => {
           const result = await recordMasteryEvents(spineClient, userId, [
             {
@@ -96,7 +105,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, update });
+    return NextResponse.json({ success: true, update, xp });
   } catch {
     return NextResponse.json({ error: 'Failed to save your review.' }, { status: 500 });
   }

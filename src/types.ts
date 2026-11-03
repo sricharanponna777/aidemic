@@ -583,3 +583,52 @@ export interface PaperSummary {
   pageCount: number;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Gamification (migration 20261103000000). XP is server-authoritative: every
+// shape below is read back from an RPC, never written by the client.
+// ---------------------------------------------------------------------------
+
+/** Mirrors the CHECK on `xp_events.source`. */
+export type XpSource =
+  | 'exam_practice'
+  | 'mock'
+  | 'assignment'
+  | 'homework_scan'
+  | 'blurt'
+  | 'flashcard'
+  | 'cloze'
+  | 'review'
+  | 'tutor';
+
+export interface EarnedBadge {
+  id: string;
+  name: string;
+  /** Lucide icon name. */
+  icon: string;
+}
+
+/** What `award_xp()` returns, and what marking routes echo back as `xp`. */
+export interface XpAward {
+  xpAwarded: number;
+  baseXp: number;
+  multiplier: number;
+  /** The daily cap clipped this award. */
+  capped: boolean;
+  /** The award key was already spent; nothing was paid. */
+  duplicate: boolean;
+  totalXp: number;
+  currentStreak: number;
+  newBadges: EarnedBadge[];
+}
+
+export type LeagueZone = 'promote' | 'safe' | 'demote';
+
+export interface LeagueStanding {
+  rank: number;
+  /** Username only -- leagues mix schools, so never a real name. */
+  displayName: string;
+  weeklyXp: number;
+  isMe: boolean;
+  zone: LeagueZone;
+}

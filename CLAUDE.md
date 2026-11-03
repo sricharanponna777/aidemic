@@ -183,6 +183,18 @@ Both spec types interleave the question with its answer key, so stripping `corre
 - **Plot inputs may not derive axes or defaults from `correct*` fields.** They read the stored `yAxisMax`/`yAxisStep` instead, which `normalizeBar`/`normalizeLine` compute from exactly those values, so the axis is identical without reading the answer. `PlotScatterData` gained `xAxisStep`/`yAxisStep` for this reason: its y-axis step is chosen so every correct point lands on a snappable minor gridline, and re-deriving it from blanked coordinates would put the answer out of reach.
 - **`frequencyPolygon` has nothing to strip.** Its correct points are `((classStart+classEnd)/2, frequency)` — all given data. Histogram density is likewise recomputed from `frequency / (classEnd - classStart)` in the component.
 
+## Gamification (XP, streaks, leagues, badges)
+
+Migration `20261103000000`. **XP is server-authoritative**: every table has RLS on and no client write policy, and the only write path is `award_xp()`, executable by `service_role` alone and called through [src/lib/gamification/award.ts](src/lib/gamification/award.ts) from the four routes that compute a score themselves — `mark-answers`, `blurt-review`, `flashcards/review`, `review-queue/answer`. Each echoes the result back as `xp` so the UI can show what was earned. Never pass a score taken from the request body. Five things are load-bearing:
+
+- **It does not hang off `mastery_events`.** That log only gets a row once a question resolves onto a subtopic, and it is written in `after()` behind a classifier call. Self-practice on an unresolved topic would silently earn nothing, and the response could never say how much was earned.
+- **`award_key` is the idempotency guard**: `paper:<id>`, `assignment:<id>`, `review:<item>`, `flashcard:<card>:<utc-day>`. Self-practice and blurts have no row to key on when they are marked, so they are bounded by the AI daily rate limit and the **3000 XP daily cap** instead. Self-ratings earn nothing.
+- **Days and weeks are UTC**, for streaks, the cap and leagues alike. This streak is *not* the one the dashboard computes from `study_sessions` with `calculateStudyStreak`; the two can disagree until the UI moves onto `my_gamification()`.
+- **Levels are not stored.** [src/lib/gamification/levels.ts](src/lib/gamification/levels.ts) derives level and rank title from `total_xp` (level L at `50·L·(L−1)` XP), so changing the curve needs no migration.
+- **Two privacy rules, by design.** `class_leaderboard()` shows **real names**, but only to active members of that class and its teacher. Weekly leagues mix schools, so `my_league()` shows **usernames only** (a `Cadet-XXXX` callsign when there is none), and only `role = 'student'` accounts are ever placed — no adult is ranked alongside minors.
+
+Leagues are Duolingo-style: on their first XP of a UTC week, a student joins a cohort of up to 30 at their tier (Launchpad → Stratosphere → Orbit → Lunar → Martian → Jovian → Nebula → Pulsar → Quasar → Singularity). `close_finished_league_weeks()` settles finished weeks, scaling `promote_count`/`demote_count` from a full 30 down to the actual cohort size so a three-person cohort is not all relegated. It runs from pg_cron at Monday 00:00 UTC, and lazily from `award_xp()` *before* that function takes its user row lock, so the close never waits behind an award that is waiting on it. Badge criteria live in the `badges` table; `badge_progress()` is shared by awarding and the `my_badges()` progress bars so the two cannot disagree.
+
 ## Rate limiting
 
 Two separate limiters, both able to run without Redis but meaningfully weaker that way:

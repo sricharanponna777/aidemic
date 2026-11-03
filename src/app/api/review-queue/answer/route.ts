@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { createAdminClient } from '@/lib/supabase-admin';
 import { recordMasteryEvents } from '@/lib/mastery/record';
+import { awardXp } from '@/lib/gamification/award';
 import type { MasterySource } from '@/lib/mastery';
 
 /**
@@ -84,7 +85,16 @@ export async function POST(request: Request) {
       for (const error of result.errors) console.error(`[spine] ${error}`);
     });
 
+    // The claim above already makes the item single-use; the key makes the
+    // award single-use too, should a retry reach this point twice.
+    const xp = await awardXp(admin, authData.user.id, {
+      source: source === 'tutor' ? 'tutor' : 'review',
+      score: outcome,
+      awardKey: `review:${itemId}`,
+    });
+
     return NextResponse.json({
+      xp,
       correct,
       correctOption: question.correctOption ?? '',
       explanation: question.explanation ?? '',

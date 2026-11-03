@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { tryCreateAdminClient } from '@/lib/supabase-admin';
 import { recordBlurtEvidence } from '@/lib/mastery/fromBlurt';
+import { awardXp } from '@/lib/gamification/award';
 import { buildAIHeaders, getAIConfig, getMissingHostedKeyError } from '@/lib/ai/config';
 import {
   extractFromResponsesBody,
@@ -218,12 +219,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // Unlike the spine write, paid with or without an exam board: XP rewards
+    // the recall itself, not its attribution to a subtopic.
+    const xp = await awardXp(spineClient ?? tryCreateAdminClient(), authData.user.id, {
+      source: 'blurt',
+      score: result.coverageScore / 100,
+    });
+
     return NextResponse.json({
       covered,
       missed,
       misconceptions,
       coverageScore: result.coverageScore,
       summary: txt(result.summary, 240),
+      xp,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to review your recall.';
