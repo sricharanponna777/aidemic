@@ -8,21 +8,21 @@ import {
   CheckCircle2,
   CircleDashed,
   Clock,
-  Flame,
+  // GAMIFICATION PAUSED: Flame,
   PenLine,
   Radar,
   RotateCcw,
   Sparkles,
   Trophy,
-  Zap,
+  // GAMIFICATION PAUSED: Zap,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cachedAiFetch } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
-import { useBadges, useGamification } from '@/hooks/useGamification';
-import { announceXp, nextBadge } from '@/lib/gamification/client';
-import { xpRate } from '@/lib/gamification/rules';
+// GAMIFICATION PAUSED: import { useBadges, useGamification } from '@/hooks/useGamification';
+// GAMIFICATION PAUSED: import { announceXp, nextBadge } from '@/lib/gamification/client';
+// GAMIFICATION PAUSED: import { xpRate } from '@/lib/gamification/rules';
 import { highlightTerms } from '@/lib/blurtHighlight';
 import { buttonStyles } from '@/components/ui/button';
 import { Alert, fieldStyles } from '@/components/ui/field';
@@ -30,7 +30,7 @@ import { PageHero, EmptyState } from '@/components/ui/feedback';
 import { Chip, Meter, MonoLabel, Panel } from '@/components/ui/telemetry';
 import { getExamTypeLabel, getSavedSpecLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { getExamBoardLabel } from '@/lib/ai/qualifications';
-import type { XpAward } from '@/types';
+// GAMIFICATION PAUSED: import type { XpAward } from '@/types';
 
 type KeyTerm = { term: string; status: 'recalled' | 'wrong' | 'missed' };
 
@@ -49,7 +49,7 @@ type Draft = { subjectIndex: number; topic: string; dump: string; minutes: numbe
 const DURATIONS = [5, 10, 15] as const;
 const STRONG = 80;
 const SOLID = 55;
-const BLURT_XP = xpRate('blurt')?.xp ?? 150;
+// GAMIFICATION PAUSED: const BLURT_XP = xpRate('blurt')?.xp ?? 150;
 
 const formatClock = (seconds: number) => {
   const s = Math.max(0, seconds);
@@ -82,8 +82,8 @@ export default function BlurtPage() {
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
   const { subjects, isLoading: subjectsLoading } = useUserSubjects();
-  const { data: gamification } = useGamification();
-  const { data: badges } = useBadges();
+  // GAMIFICATION PAUSED: const { data: gamification } = useGamification();
+  // GAMIFICATION PAUSED: const { data: badges } = useBadges();
 
   // Read in the initialisers: the shell renders children only once the
   // session has loaded, so this page never renders on the server and the
@@ -97,7 +97,7 @@ export default function BlurtPage() {
   );
   const [phase, setPhase] = useState<'writing' | 'reviewing' | 'result'>('writing');
   const [result, setResult] = useState<BlurtResult | null>(null);
-  const [award, setAward] = useState<XpAward | null>(null);
+  // GAMIFICATION PAUSED: const [award, setAward] = useState<XpAward | null>(null);
   const [error, setError] = useState('');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -131,8 +131,8 @@ export default function BlurtPage() {
   const lines = useMemo(() => dump.split('\n'), [dump]);
   const keyTerms = result?.keyTerms ?? [];
   const usedTerms = keyTerms.filter((k) => k.status === 'recalled').length;
-  const maxXp = Math.round(BLURT_XP * (gamification?.nextMultiplier ?? 1));
-  const blurtBadge = badges ? nextBadge(badges, (b) => b.id === 'void-blurter') ?? nextBadge(badges) : null;
+  // GAMIFICATION PAUSED: const maxXp = Math.round(BLURT_XP * (gamification?.nextMultiplier ?? 1));
+  // GAMIFICATION PAUSED: const blurtBadge = badges ? nextBadge(badges, (b) => b.id === 'void-blurter') ?? nextBadge(badges) : null;
 
   const courseLine = selectedSubject
     ? `${getExamBoardLabel(selectedSubject.exam_board)} ${getExamTypeLabel(selectedSubject.exam_type)} ${getSubjectLabel(selectedSubject.subject)}`
@@ -162,8 +162,8 @@ export default function BlurtPage() {
         return;
       }
       setResult(data as BlurtResult);
-      setAward(data.xp ?? null);
-      announceXp(data.xp);
+      // GAMIFICATION PAUSED: setAward(data.xp ?? null);
+      // GAMIFICATION PAUSED: announceXp(data.xp);
       setPhase('result');
       if (userId) writeDraft(userId, null);
 
@@ -194,7 +194,7 @@ export default function BlurtPage() {
   const reset = () => {
     setPhase('writing');
     setResult(null);
-    setAward(null);
+    // GAMIFICATION PAUSED: setAward(null);
     setDump('');
     setStartedAt(null);
     setError('');
@@ -243,9 +243,11 @@ export default function BlurtPage() {
               <Trophy className="h-3 w-3" /> {getExamBoardLabel(selectedSubject.exam_board)} {getExamTypeLabel(selectedSubject.exam_type)}
             </Chip>
           )}
+          {/* GAMIFICATION PAUSED:
           <Chip tone="xp">
             <Zap className="h-3 w-3" /> Up to +{maxXp} XP
           </Chip>
+          */}
           <Chip tone="danger">
             <Clock className="h-3 w-3" /> Timer: {formatClock(minutes * 60)}
           </Chip>
@@ -421,7 +423,8 @@ export default function BlurtPage() {
                   className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
                 >
                   <Sparkles className="h-4 w-4" />
-                  {phase === 'reviewing' ? 'Checking your recall…' : `Check my recall (up to +${maxXp} XP)`}
+                  {/* GAMIFICATION PAUSED: {phase === 'reviewing' ? 'Checking your recall…' : `Check my recall (up to +${maxXp} XP)`} */}
+                  {phase === 'reviewing' ? 'Checking your recall…' : 'Check my recall'}
                 </button>
               </>
             )}
@@ -548,6 +551,7 @@ export default function BlurtPage() {
             </>
           )}
 
+          {/* GAMIFICATION PAUSED: streak bonus, XP earned and next-badge panel.
           {gamification && (
             <Panel>
               <div className="flex items-center justify-between gap-2">
@@ -587,6 +591,7 @@ export default function BlurtPage() {
               )}
             </Panel>
           )}
+          */}
         </aside>
       </div>
     </div>

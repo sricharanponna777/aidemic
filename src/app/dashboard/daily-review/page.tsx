@@ -25,7 +25,8 @@ import { MASTERY_LABEL, masteryBadgeTone } from '@/lib/masteryTone';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import type { MasteryBand } from '@/lib/mastery';
 import type { Flashcard } from '@/types';
-import { announceXp } from '@/lib/gamification/client';
+// GAMIFICATION PAUSED: import { announceXp } from '@/lib/gamification/client';
+import { mutate } from 'swr';
 
 const MAX_WEAK_TOPICS = 3;
 const FLASHCARDS_PER_MICROQUESTION = 3;
@@ -491,19 +492,20 @@ export default function DailyReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardId: card.id, quality }),
       });
-      if (response.ok) announceXp((await response.json().catch(() => null))?.xp);
+      // GAMIFICATION PAUSED: if (response.ok) announceXp((await response.json().catch(() => null))?.xp);
+      if (response.ok) void mutate((key) => Array.isArray(key) && key[0] === 'due-flashcards');
       deckCountsRef.current.set(card.deck_id, (deckCountsRef.current.get(card.deck_id) || 0) + 1);
     } else {
       // Only server-stored questions produce evidence. The server re-marks the
       // selection against the question it saved, so `quality` here stays purely
       // a local display stat.
       if (item.itemId && selectedOption) {
-        const response = await fetch('/api/review-queue/answer', {
+        /* GAMIFICATION PAUSED: const response = */ await fetch('/api/review-queue/answer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: item.itemId, selectedOption }),
         });
-        if (response.ok) announceXp((await response.json().catch(() => null))?.xp);
+        // GAMIFICATION PAUSED: if (response.ok) announceXp((await response.json().catch(() => null))?.xp);
       }
       microStatsRef.current = {
         attempted: microStatsRef.current.attempted + 1,

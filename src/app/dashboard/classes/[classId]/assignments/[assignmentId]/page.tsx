@@ -11,7 +11,7 @@ import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
 import { useAuth } from '@/hooks/useAuth';
 import { PageLoader } from '@/components/PageLoader';
 import type { DiagramSpec, DiagramTemplateSelection, PlotSpec } from '@/types';
-import { announceXp } from '@/lib/gamification/client';
+// GAMIFICATION PAUSED: import { announceXp } from '@/lib/gamification/client';
 
 type AssignmentQuestion = {
   questionType: 'open' | 'mcq' | 'plot' | 'diagram';
@@ -146,7 +146,7 @@ export default function TakeAssignmentPage() {
       }
 
       setReport(body.report as MarkingReport);
-      announceXp(body.xp);
+      // GAMIFICATION PAUSED: announceXp(body.xp);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit answers.');
     } finally {

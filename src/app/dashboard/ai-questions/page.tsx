@@ -48,7 +48,7 @@ import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { gradeBadgeTone } from '@/lib/gradeTone';
 import { isDiagramCompletionTopic } from '@/lib/ai/text';
 import type { DiagramSpec, DiagramTemplateSelection, PaperSummary, PlotSpec } from '@/types';
-import { announceXp } from '@/lib/gamification/client';
+// GAMIFICATION PAUSED: import { announceXp } from '@/lib/gamification/client';
 
 
 type Subject =
@@ -798,7 +798,7 @@ export default function AIQuestionsPage() {
 
       const markedReport = body.report as MarkingReport;
       setReport({ ...markedReport, sourceMaterial });
-      announceXp(body.xp);
+      // GAMIFICATION PAUSED: announceXp(body.xp);
       setStatus({ tone: 'success', text: 'Attempt marked with predicted grade and next-step advice.' });
 
       if (session?.user?.id && meta.subject) {

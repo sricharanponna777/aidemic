@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useUserSubjects } from "@/hooks/useUserSubjects";
-import { useGamification, useRefreshOnXp } from "@/hooks/useGamification";
+// GAMIFICATION PAUSED: import { useGamification, useRefreshOnXp } from "@/hooks/useGamification";
 import { useDueFlashcards } from "@/hooks/useDueFlashcards";
 import { createClient } from "@/lib/supabase-client";
 import { usePathname, useRouter } from "next/navigation";
@@ -23,13 +23,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { SectionBreadcrumb } from "@/components/SectionBreadcrumb";
-import { RankPanel } from "@/components/gamification/RankPanel";
-import { LeagueChip } from "@/components/gamification/LeagueChip";
-import { XpToast } from "@/components/gamification/XpToast";
+// GAMIFICATION PAUSED: import { RankPanel } from "@/components/gamification/RankPanel";
+// GAMIFICATION PAUSED: import { LeagueChip } from "@/components/gamification/LeagueChip";
+// GAMIFICATION PAUSED: import { XpToast } from "@/components/gamification/XpToast";
 import { CommandPalette, SearchButton } from "@/components/CommandPalette";
 import { NotificationBell } from "@/components/NotificationBell";
 import { MonoLabel } from "@/components/ui/telemetry";
-import { levelForXp } from "@/lib/gamification/levels";
+// GAMIFICATION PAUSED: import { levelForXp } from "@/lib/gamification/levels";
 import {
   GROUP_ICONS,
   PARENT_NAV_ITEMS,
@@ -305,9 +305,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   const { subjects } = useUserSubjects({ enabled: isStudent });
-  const { data: gamification } = useGamification();
+  // GAMIFICATION PAUSED: const { data: gamification } = useGamification();
   const { data: dueFlashcards } = useDueFlashcards({ enabled: isStudent });
-  useRefreshOnXp();
+  // GAMIFICATION PAUSED: useRefreshOnXp();
 
   useEffect(() => {
     if (!session) return;
@@ -394,7 +394,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const countFor = (href: string): NavCountValue | null => {
     if (!isStudent) return null;
     if (href === "/dashboard/subjects" && subjects.length > 0) return { text: `${subjects.length} active`, tone: "xp" };
-    if (href === "/dashboard/progress" && gamification) return { text: `Lvl ${levelForXp(gamification.totalXp)}`, tone: "xp" };
+    // GAMIFICATION PAUSED: if (href === "/dashboard/progress" && gamification) return { text: `Lvl ${levelForXp(gamification.totalXp)}`, tone: "xp" };
     if (href === "/dashboard/daily-review" && dueFlashcards) return { text: `${dueFlashcards} due`, tone: "warning" };
     return null;
   };
@@ -493,7 +493,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <nav className="scrollbar-none flex-1 overflow-y-auto px-3 py-4">{renderNavLinks()}</nav>
 
         <div className="space-y-2 p-3">
-          {isStudent && <RankPanel />}
+          {/* GAMIFICATION PAUSED: {isStudent && <RankPanel />} */}
           <AccountCard name={name} email={email} onSignOut={handleSignOut} />
         </div>
       </aside>
@@ -546,7 +546,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
             </div>
             <nav className="flex-1 overflow-y-auto px-3 py-4">{renderNavLinks(() => setIsMobileNavOpen(false), false)}</nav>
             <div className="space-y-2 p-3">
-              {isStudent && <RankPanel onNavigate={() => setIsMobileNavOpen(false)} />}
+              {/* GAMIFICATION PAUSED: {isStudent && <RankPanel onNavigate={() => setIsMobileNavOpen(false)} />} */}
               <AccountCard name={name} email={email} onSignOut={handleSignOut} />
             </div>
           </div>
@@ -558,7 +558,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-subtle bg-canvas/85 px-6 backdrop-blur-xl max-lg:hidden print:hidden">
           <div className="flex min-w-0 items-center gap-4">
             <SectionBreadcrumb groups={navGroups} />
-            {isStudent && <LeagueChip />}
+            {/* GAMIFICATION PAUSED: {isStudent && <LeagueChip />} */}
           </div>
           <div className="flex items-center gap-2">
             <SearchButton />
@@ -573,7 +573,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       </div>
 
       <CommandPalette groups={navGroups} />
-      {isStudent && <XpToast />}
+      {/* GAMIFICATION PAUSED: {isStudent && <XpToast />} */}
     </div>
   );
 }

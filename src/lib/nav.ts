@@ -16,7 +16,7 @@ import {
   Sparkles,
   Target,
   TrendingUp,
-  Trophy,
+  // GAMIFICATION PAUSED: Trophy,
   Users,
   UserPlus,
   type LucideIcon,
@@ -44,7 +44,7 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
-      { href: "/dashboard/progress", label: "Progress", icon: Trophy },
+      // GAMIFICATION PAUSED: { href: "/dashboard/progress", label: "Progress", icon: Trophy },
     ],
   },
   {

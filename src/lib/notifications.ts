@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { leagueLabel } from '@/lib/gamification/leagues';
+// GAMIFICATION PAUSED: import { leagueLabel } from '@/lib/gamification/leagues';
 
 /**
  * The bell's feed: `my_notifications()` rows (migration 20261103020000) turned
@@ -22,41 +22,43 @@ export interface AppNotification {
 
 type Row = { id: string; kind: string; at: string; data: Record<string, unknown> | null };
 
-const ordinal = (n: number) => {
-  const tens = n % 100;
-  if (tens >= 11 && tens <= 13) return `${n}th`;
-  return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th'}`;
-};
+// GAMIFICATION PAUSED: only league notifications used this.
+// const ordinal = (n: number) => {
+//   const tens = n % 100;
+//   if (tens >= 11 && tens <= 13) return `${n}th`;
+//   return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th'}`;
+// };
 
 export function describeNotification(row: Row): AppNotification | null {
-  const data = row.data ?? {};
+  // GAMIFICATION PAUSED: const data = row.data ?? {};
   const base = { id: row.id, at: row.at };
 
-  if (row.kind === 'badge') {
-    return {
-      ...base,
-      kind: 'badge',
-      title: `Badge earned: ${String(data.name ?? '')}`,
-      body: String(data.description ?? ''),
-      href: '/dashboard/progress',
-      icon: String(data.icon ?? 'award'),
-    };
-  }
+  // GAMIFICATION PAUSED: badge and league rows are dropped, so the bell shows parent link requests only.
+  // if (row.kind === 'badge') {
+  //   return {
+  //     ...base,
+  //     kind: 'badge',
+  //     title: `Badge earned: ${String(data.name ?? '')}`,
+  //     body: String(data.description ?? ''),
+  //     href: '/dashboard/progress',
+  //     icon: String(data.icon ?? 'award'),
+  //   };
+  // }
 
-  if (row.kind === 'league') {
-    const to = leagueLabel(String(data.to_tier ?? ''));
-    const title =
-      data.result === 'promoted' ? `You moved up to the ${to}` : data.result === 'demoted' ? `You moved down to the ${to}` : `You stayed in the ${to}`;
-    const rank = Number(data.rank);
-    const size = Number(data.cohort_size);
-    return {
-      ...base,
-      kind: 'league',
-      title,
-      body: Number.isFinite(rank) && Number.isFinite(size) ? `You finished ${ordinal(rank)} of ${size} last week.` : 'Last week is over.',
-      href: '/dashboard/progress',
-    };
-  }
+  // if (row.kind === 'league') {
+  //   const to = leagueLabel(String(data.to_tier ?? ''));
+  //   const title =
+  //     data.result === 'promoted' ? `You moved up to the ${to}` : data.result === 'demoted' ? `You moved down to the ${to}` : `You stayed in the ${to}`;
+  //   const rank = Number(data.rank);
+  //   const size = Number(data.cohort_size);
+  //   return {
+  //     ...base,
+  //     kind: 'league',
+  //     title,
+  //     body: Number.isFinite(rank) && Number.isFinite(size) ? `You finished ${ordinal(rank)} of ${size} last week.` : 'Last week is over.',
+  //     href: '/dashboard/progress',
+  //   };
+  // }
 
   if (row.kind === 'parent_link') {
     return {

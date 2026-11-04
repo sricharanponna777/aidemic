@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { Bell, TrendingUp, UserPlus } from 'lucide-react';
+import { Bell, /* GAMIFICATION PAUSED: TrendingUp, */ UserPlus } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { fetchNotifications, readSeenAt, writeSeenAt, type AppNotification } from '@/lib/notifications';
-import { BadgeIcon } from '@/components/gamification/BadgeIcon';
+// GAMIFICATION PAUSED: import { BadgeIcon } from '@/components/gamification/BadgeIcon';
 import { MonoLabel } from '@/components/ui/telemetry';
 
 const ago = (iso: string, now: number) => {
@@ -20,8 +20,9 @@ const ago = (iso: string, now: number) => {
 
 function ItemIcon({ item }: { item: AppNotification }) {
   const cls = 'h-4 w-4';
-  if (item.kind === 'badge') return <BadgeIcon name={item.icon ?? 'award'} className={cls} />;
-  if (item.kind === 'league') return <TrendingUp className={cls} aria-hidden="true" />;
+  // GAMIFICATION PAUSED: if (item.kind === 'badge') return <BadgeIcon name={item.icon ?? 'award'} className={cls} />;
+  // GAMIFICATION PAUSED: if (item.kind === 'league') return <TrendingUp className={cls} aria-hidden="true" />;
+  void item;
   return <UserPlus className={cls} aria-hidden="true" />;
 }
 
@@ -106,7 +107,8 @@ export function NotificationBell() {
             <div className="m-4 h-12 animate-pulse rounded bg-surface-sunken" />
           ) : items.length === 0 ? (
             <p className="px-4 py-6 text-center text-body text-content-subtle">
-              Nothing yet. Badges you earn and your weekly league results show up here.
+              {/* GAMIFICATION PAUSED: Nothing yet. Badges you earn and your weekly league results show up here. */}
+              Nothing yet. Parent link requests show up here.
             </p>
           ) : (
             <ul className="max-h-96 divide-y divide-subtle overflow-y-auto">

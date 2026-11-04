@@ -4,7 +4,8 @@ import { describeNotification } from './notifications';
 const at = '2026-11-02T00:00:00Z';
 
 describe('describeNotification', () => {
-  it('words a league result with the league moved to', () => {
+  // GAMIFICATION PAUSED: badge and league notifications are commented out in notifications.ts.
+  it.skip('words a league result with the league moved to', () => {
     expect(
       describeNotification({
         id: 'league:2026-10-26',
@@ -19,7 +20,8 @@ describe('describeNotification', () => {
     ).toMatchObject({ title: 'You stayed in the Moon League', body: 'You finished 11th of 30 last week.' });
   });
 
-  it('words badges and parent requests, and drops unknown kinds', () => {
+  // GAMIFICATION PAUSED: see above.
+  it.skip('words badges and parent requests, and drops unknown kinds', () => {
     expect(
       describeNotification({ id: 'badge:void-blurter', kind: 'badge', at, data: { name: '5 Blurts', description: 'Finish 5 blurting sessions.', icon: 'brain' } })
     ).toMatchObject({ title: 'Badge earned: 5 Blurts', href: '/dashboard/progress', icon: 'brain' });

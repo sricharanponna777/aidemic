@@ -13,7 +13,8 @@ import { PageHero } from '@/components/ui/feedback';
 import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
 import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
 import { isCardDue } from '@/lib/flashcardsDue';
-import { announceXp } from '@/lib/gamification/client';
+// GAMIFICATION PAUSED: import { announceXp } from '@/lib/gamification/client';
+import { mutate } from 'swr';
 
 type Session = Pick<
   StudySession,
@@ -363,7 +364,8 @@ export default function StudySessions() {
     });
     const body = response.ok ? await response.json() : null;
     const updated = body?.update ?? null;
-    announceXp(body?.xp);
+    // GAMIFICATION PAUSED: announceXp(body?.xp);
+    void mutate((key) => Array.isArray(key) && key[0] === 'due-flashcards');
 
     if (updated) {
       setCardsToReview((prevCards) =>

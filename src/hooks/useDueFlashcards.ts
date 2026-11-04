@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+// GAMIFICATION PAUSED: import { useEffect } from 'react';
 import useSWR from 'swr';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
-import { XP_AWARDED_EVENT } from '@/lib/gamification/client';
+// GAMIFICATION PAUSED: import { XP_AWARDED_EVENT } from '@/lib/gamification/client';
 
 /**
  * How many of the student's own flashcards are due, for the "N due" count on
@@ -28,14 +28,15 @@ export function useDueFlashcards({ enabled }: { enabled: boolean }) {
   const userId = enabled ? session?.user?.id ?? null : null;
   const swr = useSWR(userId ? ['due-flashcards', userId] : null, () => countDue(userId as string));
 
-  // Reviewing a card pays XP, so an award is also the moment the count drops.
-  const { mutate } = swr;
-  useEffect(() => {
-    if (!userId) return;
-    const refresh = () => void mutate();
-    window.addEventListener(XP_AWARDED_EVENT, refresh);
-    return () => window.removeEventListener(XP_AWARDED_EVENT, refresh);
-  }, [userId, mutate]);
+  // GAMIFICATION PAUSED: the review pages now revalidate the 'due-flashcards' key directly.
+  // // Reviewing a card pays XP, so an award is also the moment the count drops.
+  // const { mutate } = swr;
+  // useEffect(() => {
+  //   if (!userId) return;
+  //   const refresh = () => void mutate();
+  //   window.addEventListener(XP_AWARDED_EVENT, refresh);
+  //   return () => window.removeEventListener(XP_AWARDED_EVENT, refresh);
+  // }, [userId, mutate]);
 
   return swr;
 }
