@@ -290,7 +290,9 @@ export default function StudySessions() {
       .sort((a, b) => dateValue(a.next_review_date) - dateValue(b.next_review_date));
 
     if (due.length === 0) {
-      setNotice({ tone: 'warning', text: 'No cards are due in that deck. Choose another deck or come back later.' });
+      // The deck's due count was stale. Refreshing it shows the "nothing due"
+      // message under the deck picker and disables the button.
+      await loadDecks();
       setPhase('choosing');
       return;
     }
@@ -514,6 +516,9 @@ export default function StudySessions() {
                 <p className="font-mono text-xs text-content-muted">
                   {selectedDeck.name} · {selectedDeck.due_count || 0} due of {selectedDeck.card_count || 0} cards
                 </p>
+              ) : null}
+              {selectedDeck && !selectedDeck.due_count ? (
+                <Alert tone="warning">No cards are due in that deck. Choose another deck or come back later.</Alert>
               ) : null}
             </div>
 
