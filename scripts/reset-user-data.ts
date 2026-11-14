@@ -118,7 +118,7 @@ const NEVER_TOUCH = [
   'curricula', 'qualifications', 'exam_boards', 'subjects', 'specifications',
   'topics', 'subtopics', 'learning_objectives', 'subtopic_prerequisites',
   'questions', 'misconceptions', 'app_config', 'schools',
-  'user_profiles', 'platform_admins',
+  'user_profiles',
 ];
 
 const isMissingTable = (error: { code?: string; message?: string } | null) =>

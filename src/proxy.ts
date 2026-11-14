@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { getOptionalSupabaseEnv } from './lib/supabase-env';
-import { STUDENT_ONLY_PREFIXES } from './lib/nav';
+import { SCHOOL_ADMIN_PREFIX, STUDENT_ONLY_PREFIXES } from './lib/nav';
 import { readCachedRole, writeCachedRole } from './lib/roleCache';
 import { buildContentSecurityPolicy, usesStrictCsp } from './lib/csp';
 
@@ -102,7 +102,10 @@ export async function proxy(request: NextRequest) {
 
     // Defense-in-depth only: RLS is the real authorization backstop. These
     // checks just stop an unauthorized user from ever rendering the page.
-    const isTeacherRoute = pathname.startsWith('/dashboard/teacher');
+    // The school admin workspace is a teacher route first: every school admin
+    // is a teacher, so the role check below covers the cheap half of the gate.
+    const isSchoolAdminRoute = pathname === SCHOOL_ADMIN_PREFIX || pathname.startsWith(`${SCHOOL_ADMIN_PREFIX}/`);
+    const isTeacherRoute = pathname.startsWith('/dashboard/teacher') || isSchoolAdminRoute;
     const isParentRoute = pathname.startsWith('/dashboard/parent');
     const isStudentRoute = STUDENT_ONLY_PREFIXES.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -139,10 +142,17 @@ export async function proxy(request: NextRequest) {
       if (freshLookup) await writeCachedRole(response, userId!, role);
     }
 
-    if (pathname.startsWith('/dashboard/admin')) {
-      const { data: adminRow } = await supabase.from('platform_admins').select('user_id').eq('user_id', userId!).maybeSingle();
-      if (!adminRow) {
-        return withCsp(NextResponse.redirect(new URL('/dashboard', request.url)));
+    // Not cached with the role: admin rights change from inside the app (a
+    // co-admin promotes or demotes you), and a stale cookie would keep a demoted
+    // admin in the workspace until it expired. Same rule as my_admin_school_id().
+    if (isSchoolAdminRoute) {
+      const { data: teacherRow } = await supabase
+        .from('teachers')
+        .select('is_school_admin, verification_status')
+        .eq('user_id', userId!)
+        .maybeSingle();
+      if (!teacherRow?.is_school_admin || teacherRow.verification_status !== 'approved') {
+        return withCsp(NextResponse.redirect(new URL('/dashboard/teacher', request.url)));
       }
     }
   }

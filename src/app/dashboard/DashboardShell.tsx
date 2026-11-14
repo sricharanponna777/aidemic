@@ -15,8 +15,8 @@ import {
   LogOut,
   Menu,
   Moon,
-  ShieldAlert,
-  ShieldCheck,
+  GraduationCap,
+  School,
   Sun,
   X,
   Zap,
@@ -33,6 +33,8 @@ import { MonoLabel } from "@/components/ui/telemetry";
 import {
   GROUP_ICONS,
   PARENT_NAV_ITEMS,
+  SCHOOL_ADMIN_NAV_ITEMS,
+  SCHOOL_ADMIN_PREFIX,
   STUDENT_NAV_GROUPS,
   TEACHER_NAV_ITEMS,
   isActiveRoute,
@@ -170,6 +172,26 @@ const bySection = (groups: NavGroup[]) => {
   return sections;
 };
 
+/** Teaching / School admin toggle at the top of a school admin's sidebar. */
+function WorkspaceSwitcher({ inSchool, onNavigate }: { inSchool: boolean; onNavigate?: () => void }) {
+  const option = (active: boolean) =>
+    `flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors ${
+      active ? "bg-surface text-content shadow-card" : "text-content-subtle hover:text-content"
+    }`;
+  return (
+    <div role="group" aria-label="Workspace" className="mb-4 flex gap-1 rounded-lg border border-subtle bg-surface-sunken p-1">
+      <Link href="/dashboard/teacher" onClick={onNavigate} aria-current={!inSchool ? "page" : undefined} className={option(!inSchool)}>
+        <GraduationCap className="h-3.5 w-3.5" />
+        Teaching
+      </Link>
+      <Link href={SCHOOL_ADMIN_PREFIX} onClick={onNavigate} aria-current={inSchool ? "page" : undefined} className={option(inSchool)}>
+        <School className="h-3.5 w-3.5" />
+        School admin
+      </Link>
+    </div>
+  );
+}
+
 /** Small square sign-out, at the end of the account card's row: quiet until
  *  hovered, then eases into the danger tint with the arrow sliding out. */
 function SignOutButton({ onSignOut }: { onSignOut: () => Promise<void> }) {
@@ -300,7 +322,6 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const homeHref = isTeacher ? "/dashboard/teacher" : isParent ? "/dashboard/parent" : "/dashboard";
 
   const [isSchoolAdmin, setIsSchoolAdmin] = useState(false);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [hasLinkedChild, setHasLinkedChild] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -313,9 +334,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     if (!session) return;
     let cancelled = false;
     const load = async () => {
-      const [{ data: teacherRow }, { data: adminRow }, { count: linkedChildren }] = await Promise.all([
-        supabase.from("teachers").select("is_school_admin").eq("user_id", session.user.id).maybeSingle(),
-        supabase.from("platform_admins").select("user_id").eq("user_id", session.user.id).maybeSingle(),
+      const [{ data: teacherRow }, { count: linkedChildren }] = await Promise.all([
+        supabase.from("teachers").select("is_school_admin, verification_status").eq("user_id", session.user.id).maybeSingle(),
         supabase
           .from("parent_links")
           .select("id", { count: "exact", head: true })
@@ -323,8 +343,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           .eq("status", "active"),
       ]);
       if (cancelled) return;
-      setIsSchoolAdmin(!!teacherRow?.is_school_admin);
-      setIsPlatformAdmin(!!adminRow);
+      // Same rule as my_admin_school_id(): a revoked admin keeps the flag until
+      // someone clears it, but has no workspace to switch to.
+      setIsSchoolAdmin(!!teacherRow?.is_school_admin && teacherRow.verification_status === "approved");
       setHasLinkedChild((linkedChildren ?? 0) > 0);
     };
     void load();
@@ -351,26 +372,20 @@ export default function DashboardShell({ children }: { children: React.ReactNode
     ? PARENT_NAV_ITEMS
     : PARENT_NAV_ITEMS.filter((item) => item.href === "/dashboard/parent" || item.href === "/dashboard/settings");
 
-  const baseNavGroups: NavGroup[] = isTeacher
-    ? [
-        {
-          label: null,
-          items: [
-            ...TEACHER_NAV_ITEMS,
-            ...(isSchoolAdmin ? [{ href: "/dashboard/teacher/school", label: "School", icon: ShieldCheck }] : []),
-          ],
-        },
-      ]
+  // A school admin is also a teacher with their own classes, so they get two
+  // workspaces and the sidebar follows whichever one the current page is in.
+  const inSchoolWorkspace = isTeacher && (pathname === SCHOOL_ADMIN_PREFIX || pathname.startsWith(`${SCHOOL_ADMIN_PREFIX}/`));
+  const teacherGroup: NavGroup = { label: null, items: TEACHER_NAV_ITEMS };
+  const schoolGroup: NavGroup = { label: null, section: "School admin", items: SCHOOL_ADMIN_NAV_ITEMS };
+
+  const navGroups: NavGroup[] = isTeacher
+    ? [inSchoolWorkspace ? schoolGroup : teacherGroup]
     : isParent
     ? [{ label: null, items: parentNavItems }]
     : STUDENT_NAV_GROUPS;
 
-  const navGroups: NavGroup[] = isPlatformAdmin
-    ? [
-        ...baseNavGroups,
-        { label: null, section: "Admin", items: [{ href: "/dashboard/admin/verification", label: "Admin", icon: ShieldAlert }] },
-      ]
-    : baseNavGroups;
+  // Search spans both workspaces, so Ctrl+K reaches the other one without the switcher.
+  const paletteGroups: NavGroup[] = isTeacher && isSchoolAdmin ? [teacherGroup, schoolGroup] : navGroups;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -419,6 +434,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       </Link>
     );
   };
+
+  const workspaceSwitcher = (onNavigate?: () => void) =>
+    isTeacher && isSchoolAdmin ? (
+      <WorkspaceSwitcher inSchool={inSchoolWorkspace} onNavigate={onNavigate} />
+    ) : null;
 
   const renderNavLinks = (onNavigate?: () => void, allowFlyouts = true) =>
     bySection(navGroups).map(({ section, groups }) => (
@@ -490,7 +510,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <aside className="fixed inset-y-0 left-0 z-40 flex w-80 flex-col border-r border-subtle bg-surface max-lg:hidden print:hidden">
         <div className="flex h-14 items-center px-5">{brand}</div>
 
-        <nav className="scrollbar-none flex-1 overflow-y-auto px-3 py-4">{renderNavLinks()}</nav>
+        <nav className="scrollbar-none flex-1 overflow-y-auto px-3 py-4">
+          {workspaceSwitcher()}
+          {renderNavLinks()}
+        </nav>
 
         <div className="space-y-2 p-3">
           {/* GAMIFICATION PAUSED: {isStudent && <RankPanel />} */}
@@ -544,7 +567,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <nav className="flex-1 overflow-y-auto px-3 py-4">{renderNavLinks(() => setIsMobileNavOpen(false), false)}</nav>
+            <nav className="flex-1 overflow-y-auto px-3 py-4">
+              {workspaceSwitcher(() => setIsMobileNavOpen(false))}
+              {renderNavLinks(() => setIsMobileNavOpen(false), false)}
+            </nav>
             <div className="space-y-2 p-3">
               {/* GAMIFICATION PAUSED: {isStudent && <RankPanel onNavigate={() => setIsMobileNavOpen(false)} />} */}
               <AccountCard name={name} email={email} onSignOut={handleSignOut} />
@@ -572,7 +598,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         </main>
       </div>
 
-      <CommandPalette groups={navGroups} />
+      <CommandPalette groups={paletteGroups} />
       {/* GAMIFICATION PAUSED: {isStudent && <XpToast />} */}
     </div>
   );

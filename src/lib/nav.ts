@@ -18,6 +18,7 @@ import {
   TrendingUp,
   // GAMIFICATION PAUSED: Trophy,
   Users,
+  UserCog,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -107,6 +108,17 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/teacher/ai-insights", label: "AI Insights", icon: Sparkles },
   { href: "/dashboard/teacher/question-bank", label: "Question Bank", icon: Layers },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
+];
+
+/** The school admin workspace. A school admin is also a teacher, so the shell
+ *  shows a Teaching / School switcher and picks this list by pathname. */
+export const SCHOOL_ADMIN_PREFIX = "/dashboard/school";
+
+export const SCHOOL_ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard/school", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/school/staff", label: "Staff", icon: UserCog },
+  { href: "/dashboard/school/classes", label: "Classes", icon: Users },
+  { href: "/dashboard/school/students", label: "Students", icon: GraduationCap },
 ];
 
 export const PARENT_NAV_ITEMS: NavItem[] = [

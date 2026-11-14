@@ -19,14 +19,13 @@ test.describe('role guards (student account)', () => {
     });
   }
 
-  // Gated on the platform_admins table rather than the role column, so it is a
-  // genuinely separate branch in the proxy. Points at /verification because
-  // /dashboard/admin/schools no longer exists -- the old target still redirected
-  // (the proxy matches the /dashboard/admin prefix before routing resolves), so
-  // this passed while covering nothing an admin could actually reach.
-  test('/dashboard/admin/verification redirects a non-admin', async ({ page }) => {
-    await page.goto('/dashboard/admin/verification');
-    await page.waitForURL('**/dashboard', { timeout: 20_000 });
-    expect(new URL(page.url()).pathname).toBe('/dashboard');
-  });
+  // The school admin workspace is a teacher route first, so a student is bounced
+  // by the role check before the is_school_admin lookup ever runs.
+  for (const route of ['/dashboard/school', '/dashboard/school/staff']) {
+    test(`${route} redirects a student to /dashboard`, async ({ page }) => {
+      await page.goto(route);
+      await page.waitForURL('**/dashboard', { timeout: 20_000 });
+      expect(new URL(page.url()).pathname).toBe('/dashboard');
+    });
+  }
 });

@@ -19,7 +19,7 @@ function isToday(date: Date) {
 
 export default function TeacherDashboardPage() {
   const data = useTeacherClassData();
-  const { loading, verificationStatus, schoolStatus, claimedSchoolAdmin, classes, assignments, attempts, students } = data;
+  const { loading, verificationStatus, schoolStatus, classes, assignments, attempts, students } = data;
 
   const classStats = useMemo(() => (loading ? [] : buildClassStats(data)), [loading, data]);
   const studentStats = useMemo(() => (loading ? [] : buildStudentStats(data)), [loading, data]);
@@ -76,7 +76,6 @@ export default function TeacherDashboardPage() {
       <VerificationBanner
         verificationStatus={verificationStatus}
         schoolStatus={schoolStatus}
-        claimedSchoolAdmin={claimedSchoolAdmin}
       />
 
       <PageHero

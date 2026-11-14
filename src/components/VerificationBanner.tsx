@@ -7,8 +7,6 @@ import { createClient } from '@/lib/supabase-client';
 interface VerificationBannerProps {
   verificationStatus: 'pending' | 'approved' | 'rejected';
   schoolStatus?: 'pending' | 'approved' | 'rejected' | null;
-  /** They claimed to run the school, so AIDemic is the approver, not a colleague. */
-  claimedSchoolAdmin?: boolean;
 }
 
 /** Shown on teacher dashboard pages while the teacher or their school hasn't
@@ -18,7 +16,6 @@ interface VerificationBannerProps {
 export function VerificationBanner({
   verificationStatus,
   schoolStatus,
-  claimedSchoolAdmin = false,
 }: VerificationBannerProps) {
   const [resubmitState, setResubmitState] = useState<'idle' | 'loading' | 'done'>('idle');
   const [resubmitError, setResubmitError] = useState('');
@@ -55,8 +52,6 @@ export function VerificationBanner({
     message = "Your school registration is awaiting approval. Students won't be able to join your classes until then.";
   } else if (schoolStatus === 'rejected') {
     message = 'Your school registration was not approved. Contact AIDemic support for help.';
-  } else if (verificationStatus === 'pending' && claimedSchoolAdmin) {
-    message = "AIDemic is verifying you as your school's administrator. Students won't be able to join your classes until then.";
   } else if (verificationStatus === 'pending') {
     message = "Your account is awaiting approval from your school admin, or from AIDemic if your school doesn't have one yet. Students won't be able to join your classes until then.";
   } else if (verificationStatus === 'rejected') {

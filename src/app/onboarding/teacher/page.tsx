@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Info, LogOut, MapPin, School as SchoolIcon, Search, ShieldCheck, Zap } from 'lucide-react';
+import { Info, LogOut, MapPin, School as SchoolIcon, Search, Zap } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
@@ -34,7 +34,6 @@ export default function TeacherOnboardingPage() {
   });
   const [selectedSchool, setSelectedSchool] = useState<SchoolSearchResult | null>(null);
   const [searchFailed, setSearchFailed] = useState(false);
-  const [claimSchoolAdmin, setClaimSchoolAdmin] = useState(false);
 
   const [department, setDepartment] = useState('');
   const [qualificationLevel, setQualificationLevel] = useState('');
@@ -110,23 +109,6 @@ export default function TeacherOnboardingPage() {
       return;
     }
 
-    if (claimSchoolAdmin) {
-      // Two routes. A school with a domain on record is gated on an email-domain
-      // match; one without (every DE NI school, most Welsh ones) cannot be, so it
-      // records the claim for a platform admin to judge instead of silently
-      // dropping it.
-      const { error: claimError } = selectedSchool.claimable
-        ? await supabase.rpc('claim_school_admin', { p_school_id: selectedSchool.id })
-        : await supabase.rpc('request_unverified_school_admin', { p_school_id: selectedSchool.id });
-      if (claimError) {
-        setIsSaving(false);
-        // The domain gate's message names the domain it saw, so it is worth
-        // showing verbatim rather than replacing.
-        setError(claimError.message || 'Could not submit your headteacher claim.');
-        return;
-      }
-    }
-
     setIsSaving(false);
     router.push('/onboarding/welcome');
   };
@@ -194,7 +176,6 @@ export default function TeacherOnboardingPage() {
                     type="button"
                     onClick={() => {
                       setSelectedSchool(null);
-                      setClaimSchoolAdmin(false);
                       setSchoolQuery('');
                     }}
                     className="shrink-0 text-xs font-medium text-accent hover:underline"
@@ -250,34 +231,6 @@ export default function TeacherOnboardingPage() {
               )}
             </div>
 
-            {selectedSchool ? (
-              <div className="rounded-lg border border-subtle p-3">
-                <label className="flex cursor-pointer items-start gap-2.5">
-                  <input
-                    type="checkbox"
-                    checked={claimSchoolAdmin}
-                    onChange={(event) => setClaimSchoolAdmin(event.target.checked)}
-                    // Not disabled when the school has no domain on record. It used
-                    // to be, while the copy said "continue anyway" -- so nothing was
-                    // recorded and the teacher reached the platform admin as an
-                    // indistinguishable orphan. Per the register's coverage this is
-                    // the ONLY route in for Welsh and Northern Irish schools.
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-subtle accent-indigo-600"
-                  />
-                  <span className="text-sm">
-                    <span className="flex items-center gap-1.5 font-semibold text-content">
-                      <ShieldCheck className="h-3.5 w-3.5 text-accent" />
-                      I&apos;m the headteacher or school administrator
-                    </span>
-                    <span className="mt-0.5 block text-xs text-content-subtle">
-                      {selectedSchool.claimable
-                        ? 'You’ll be able to approve the other teachers at your school once AIDemic has verified you. This needs an email address at your school’s official domain.'
-                        : 'No official web domain is on record for this school, so we can’t confirm this automatically. Tick it anyway and AIDemic will review your claim by hand.'}
-                    </span>
-                  </span>
-                </label>
-              </div>
-            ) : null}
 
             <div className="space-y-2">
               <label htmlFor="department" className="text-sm font-semibold text-content-muted">
@@ -312,8 +265,8 @@ export default function TeacherOnboardingPage() {
 
           <p className="mt-6 flex items-start gap-1.5 text-xs text-content-subtle">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Your account needs approving before students can join your classes — by your school&apos;s
-            administrator, or by AIDemic if your school has no verified administrator yet.
+            Your account needs approving by your school&apos;s administrator before students can join your
+            classes. If you run your school, contact AIDemic support to be set up as its administrator.
           </p>
 
           <button

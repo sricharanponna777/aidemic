@@ -122,10 +122,11 @@ export function hostOf(value: string | null | undefined): string | null {
 }
 
 /**
- * The domains a claim may be made from, de-duplicated and ordered so the result
- * is stable across re-seeds. Empty means the school cannot be claimed online --
- * a real outcome for every DE NI school and for English schools with no website
- * in GIAS, both of which route to the platform admin queue instead.
+ * The school's official email domains, de-duplicated and ordered so the result
+ * is stable across re-seeds. Empty is a real outcome for every DE NI school and
+ * for English schools with no website in GIAS. Nothing in the app gates on these
+ * since headteacher claims were removed (migration 20261114000000); they stay on
+ * record for AIDemic support to check a school admin request against by hand.
  */
 export function schoolDomains(values: (string | null | undefined)[]): string[] {
   const hosts = values.map(hostOf).filter((host): host is string => host !== null);

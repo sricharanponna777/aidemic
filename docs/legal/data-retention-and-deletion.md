@@ -61,7 +61,7 @@ tables, but **cascade is not a deletion policy** — each of these needs checkin
   decision, not a technical one. *This is the hardest case and is unresolved.*
 - **`class_students`** — removal from every class, and notification to teachers if
   the class is mid-assignment.
-- **`platform_admins`, `teachers`, `schools`** memberships.
+- **`teachers`, `schools`** memberships.
 - **Backups.** Supabase point-in-time recovery holds deleted rows until the backup
   window rolls off. Say so in the policy — claiming instant total erasure would be
   untrue — and state the window: **[N] days**.

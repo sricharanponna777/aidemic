@@ -95,7 +95,6 @@ export default function TeacherClassPage() {
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [schoolStatus, setSchoolStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
-  const [claimedSchoolAdmin, setClaimedSchoolAdmin] = useState(false);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [attempts, setAttempts] = useState<AttemptRow[]>([]);
@@ -122,7 +121,7 @@ export default function TeacherClassPage() {
 
       const { data: teacherRow } = await supabase
         .from('teachers')
-        .select('id, verification_status, claimed_school_admin, schools ( status )')
+        .select('id, verification_status, schools ( status )')
         .eq('user_id', session.user.id)
         .maybeSingle();
       if (cancelled) return;
@@ -133,12 +132,10 @@ export default function TeacherClassPage() {
       const typedTeacherRow = teacherRow as unknown as {
         id: string;
         verification_status: 'pending' | 'approved' | 'rejected';
-        claimed_school_admin: boolean;
         schools: { status: 'pending' | 'approved' | 'rejected' } | null;
       };
       setTeacherId(typedTeacherRow.id);
       setVerificationStatus(typedTeacherRow.verification_status);
-      setClaimedSchoolAdmin(typedTeacherRow.claimed_school_admin ?? false);
       setSchoolStatus(typedTeacherRow.schools?.status ?? null);
 
       const { data: classRow, error: classError } = await supabase
@@ -343,7 +340,6 @@ export default function TeacherClassPage() {
       <VerificationBanner
         verificationStatus={verificationStatus}
         schoolStatus={schoolStatus}
-        claimedSchoolAdmin={claimedSchoolAdmin}
       />
 
       <PageHero

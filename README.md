@@ -20,7 +20,7 @@ The package manager is **Bun**.
 - **Dashboard** — retention, streaks, configurable daily goal, activity charts, predicted grades per subject, and weak-spot tracking.
 
 ### For teachers
-Classes and rosters, assignments with AI-assisted marking and manual override, per-class and per-student reports, AI insights, a question bank, and school administration (with school verification).
+Classes and rosters, assignments with AI-assisted marking and manual override, per-class and per-student reports, AI insights, a question bank, and a separate school admin workspace (staff approvals, co-admins, classes, students and parent links, school analytics).
 
 ### For parents
 A read-only projection of a linked child: progress, subjects, activity, assignments, and a weekly email digest. Linking is parent-initiated and takes the child's consent — the parent sends a request, the child accepts it. Parents never get a write policy on any table.
@@ -143,7 +143,7 @@ AI_API_KEY=
 Next.js 16 App Router with TypeScript, Supabase, and an OpenAI-compatible API abstraction.
 
 ### Route protection
-Middleware in [`src/proxy.ts`](src/proxy.ts) guards `/dashboard/*` using `supabase.auth.getUser()`. Unauthenticated requests go to `/login`; role gating for `/dashboard/teacher/*`, `/dashboard/admin/*`, and `/dashboard/parent/*` is enforced here as defense-in-depth. **RLS is the real backstop.**
+Middleware in [`src/proxy.ts`](src/proxy.ts) guards `/dashboard/*` using `supabase.auth.getUser()`. Unauthenticated requests go to `/login`; role gating for `/dashboard/teacher/*`, `/dashboard/school/*`, and `/dashboard/parent/*` is enforced here as defense-in-depth. **RLS is the real backstop.**
 
 ### Roles
 `user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student, and the link is **parent-initiated**: a parent enters the student's email address or username (`request_parent_link()`), the student accepts or declines it on the Family page (`accept_parent_link_request()` / `decline_parent_link_request()`), and nothing is shared until they accept. Teachers can also create a link for a student on their roster with an invite code the parent redeems (`redeem_parent_invite_code()`); only a teacher can remove that variant. The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper drive every cross-role SELECT policy.
@@ -173,7 +173,7 @@ Apply the migrations in [`supabase/migrations/`](supabase/migrations) in order. 
 - **Practice:** `exam_practice_attempts` (with `attempt_mode` of `practice | mock | blurt`)
 - **Curriculum:** `curricula`, `qualifications`, `exam_boards`, `subjects`, `specifications`, `topics`, `subtopics`, `learning_objectives`, `student_subjects`
 - **Planner:** `academic_terms`, `study_plan_items`, `topic_confidence`
-- **Teacher/school:** `teachers`, `classes`, `class_students`, `assignments`, `assignment_attempts`, `schools`, `platform_admins`
+- **Teacher/school:** `teachers`, `classes`, `class_students`, `assignments`, `assignment_attempts`, `schools`
 - **Parent:** `parent_links`
 - **Infra:** `ai_request_counters` (rate limiting), `app_config`
 
@@ -211,7 +211,7 @@ src/
     api/ai/            # generate-notes, generate-flashcards, generate-questions,
                        # mark-answers, study-chat, generate-podcast,
                        # generate-class-summary, exam-coach, blurt-review
-    dashboard/         # student, teacher/, parent/, admin/ surfaces
+    dashboard/         # student, teacher/, school/, parent/ surfaces
       planner/  blurt/  daily-review/  study-sessions/  ai-questions/  …
     login/  onboarding/  manifest.ts  icon.svg
   components/

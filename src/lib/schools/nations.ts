@@ -3,9 +3,7 @@
  *
  * Shared because two screens need the same wording for the same value: teacher
  * onboarding, which shows it to tell 25 schools called "St Mary's" apart, and the
- * platform verification queue, where the nation is what says whether a claim
- * could have been domain-checked at all -- no Welsh or Northern Irish register
- * publishes a contact domain.
+ * school admin workspace header.
  */
 export const NATION_LABELS: Record<string, string> = {
   england: 'England',

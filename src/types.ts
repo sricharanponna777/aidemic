@@ -44,11 +44,11 @@ export interface Teacher {
   department?: string;
   qualification_level?: string;
   school_id?: string;
+  /** Granted by a school admin (school_admin_set_admin) or by AIDemic by hand
+   *  (grant_school_admin, SQL editor only). */
   is_school_admin?: boolean;
-  /** Set by claim_school_admin(); awaits a platform admin decision. */
-  claimed_school_admin?: boolean;
   verification_status: 'pending' | 'approved' | 'rejected';
-  /** When they last entered the verification queue. What platform_admin_queue()
+  /** When they last entered the verification queue. What school_admin_staff()
    *  orders on -- deliberately not updated_at, which every profile edit bumps. */
   verification_requested_at?: string;
   created_at?: string;
@@ -85,8 +85,90 @@ export interface SchoolSearchResult {
   local_authority: string | null;
   nation: 'england' | 'wales' | 'scotland' | 'northern-ireland' | null;
   phase: string | null;
-  /** False when no official domain is on record, so the claim gate cannot pass. */
+  /** True when an official domain is on record. Returned by search_schools();
+   *  nothing reads it since headteacher claims were removed. */
   claimable: boolean;
+}
+
+/** The school a school admin runs -- one row of school_admin_school(). */
+export interface AdminSchool {
+  id: string;
+  name: string;
+  town: string | null;
+  postcode: string | null;
+  nation: string | null;
+  local_authority: string | null;
+  phase: string | null;
+}
+
+/** One teacher at the admin's school -- a row of school_admin_staff(). */
+export interface SchoolStaffMember {
+  teacher_id: string;
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  department: string | null;
+  qualification_level: string | null;
+  verification_status: 'pending' | 'approved' | 'rejected';
+  is_school_admin: boolean;
+  is_self: boolean;
+  requested_at: string | null;
+  joined_at: string | null;
+  class_count: number;
+  student_count: number;
+}
+
+/** One class at the admin's school -- a row of school_admin_classes(). */
+export interface SchoolClassSummary {
+  class_id: string;
+  name: string;
+  status: 'active' | 'archived';
+  academic_year: string | null;
+  created_at: string | null;
+  teacher_id: string;
+  teacher_name: string | null;
+  subject_name: string | null;
+  qualification_name: string | null;
+  student_count: number;
+  published_assignments: number;
+  /** One per student per published assignment, current members only. */
+  completed_attempts: number;
+  /** student_count × published_assignments. */
+  expected_attempts: number;
+  average_percentage: number | null;
+  last_activity_at: string | null;
+}
+
+/** One student at the admin's school -- a row of school_admin_students(). */
+export interface SchoolStudentSummary {
+  student_id: string;
+  full_name: string | null;
+  email: string | null;
+  class_names: string[] | null;
+  active_parent_links: number;
+  pending_parent_links: number;
+  /** Assignments set at this school only. */
+  completed_assignments: number;
+  average_percentage: number | null;
+  last_active_at: string | null;
+}
+
+/** school_admin_analytics(). Counts arrive as JSON numbers. */
+export interface SchoolAnalytics {
+  teachers_approved: number;
+  teachers_pending: number;
+  admins: number;
+  classes_active: number;
+  students: number;
+  students_active_7d: number;
+  students_with_parent: number;
+  assignments_published: number;
+  completed_attempts: number;
+  expected_attempts: number;
+  average_percentage: number | null;
+  grades: { grade: string; count: number }[];
+  weak_topics: { topic: string; attempts: number; average_percentage: number }[];
+  weekly_completions: { week: string; count: number }[];
 }
 
 export interface Class {
