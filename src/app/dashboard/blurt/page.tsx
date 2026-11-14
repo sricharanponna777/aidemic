@@ -25,6 +25,7 @@ import { useUserSubjects } from '@/hooks/useUserSubjects';
 // GAMIFICATION PAUSED: import { xpRate } from '@/lib/gamification/rules';
 import { highlightTerms } from '@/lib/blurtHighlight';
 import { buttonStyles } from '@/components/ui/button';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { Alert, fieldStyles } from '@/components/ui/field';
 import { PageHero, PageHeader, EmptyState } from '@/components/ui/feedback';
 import { Chip, Meter, MonoLabel, Panel, PanelHeading, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
@@ -273,7 +274,7 @@ export default function BlurtPage() {
                 <span className="text-center">Solid {SOLID}%+</span>
                 <span className="text-right">Strong {STRONG}%+</span>
               </div>
-              <p className="mt-3 text-[13px] text-content-muted">{result.summary}</p>
+              <MarkdownContent className="mt-3 text-[13px] text-content-muted" content={result.summary} />
             </Panel>
 
             {(result.covered.length > 0 || result.misconceptions.length > 0) && (

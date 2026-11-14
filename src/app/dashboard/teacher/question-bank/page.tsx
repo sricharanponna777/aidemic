@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ChevronDown, ChevronRight, Layers, Sparkles } from 'lucide-react';
 import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
-import { MathContent } from '@/components/MathContent';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { AssignmentStatusBadge } from '@/components/teacher/AssignmentStatusBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { cachedAiFetch } from '@/lib/aiCache';
@@ -510,13 +510,13 @@ export default function TeacherQuestionBankPage() {
                         </div>
                       </div>
                       <div className="mt-2 text-sm text-content-muted dark:text-slate-200">
-                        <MathContent content={q.question} />
+                        <MarkdownContent content={q.question} />
                       </div>
                       {q.questionType === 'mcq' && q.options.length > 0 && (
                         <ul className="mt-3 space-y-1 text-sm text-content-muted">
                           {q.options.map((opt, oi) => (
                             <li key={oi} className={revealed.has(i) && ['A', 'B', 'C', 'D'][oi] === q.correctOption ? 'font-semibold text-emerald-600 dark:text-emerald-400' : ''}>
-                              {['A', 'B', 'C', 'D'][oi]}. <MathContent content={opt} inline />
+                              {['A', 'B', 'C', 'D'][oi]}. <MarkdownContent content={opt} inline />
                             </li>
                           ))}
                         </ul>
@@ -530,7 +530,7 @@ export default function TeacherQuestionBankPage() {
                             <ul className="list-disc space-y-1 pl-5 text-content-muted">
                               {q.markScheme.map((point, pi) => (
                                 <li key={pi}>
-                                  <MathContent content={point} inline />
+                                  <MarkdownContent content={point} inline />
                                 </li>
                               ))}
                             </ul>
@@ -538,7 +538,7 @@ export default function TeacherQuestionBankPage() {
                           {q.modelAnswer && (
                             <div className="mt-2 text-content-muted dark:text-slate-300">
                               <span className="font-semibold">Model answer: </span>
-                              <MathContent content={q.modelAnswer} inline />
+                              <MarkdownContent content={q.modelAnswer} inline />
                             </div>
                           )}
                         </div>

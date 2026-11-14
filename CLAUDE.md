@@ -151,8 +151,8 @@ All TypeScript interfaces are in [src/types.ts](src/types.ts). Add new shared ty
 
 ### Rich Content
 
-- **Math:** KaTeX via [src/components/MathContent.tsx](src/components/MathContent.tsx); LLM output normalization in [src/lib/ai/math.ts](src/lib/ai/math.ts)
-- **Markdown:** [src/components/MarkdownContent.tsx](src/components/MarkdownContent.tsx)
+- **Markdown + math:** one pure function, `renderRichText()` in [src/lib/richText.ts](src/lib/richText.ts), renders every formula with `katex.renderToString` (no auto-render, no DOM mutation, identical on server and client). Use [MarkdownContent](src/components/MarkdownContent.tsx) for AI/teacher text and [MathContent](src/components/MathContent.tsx) for a student's own answer (maths only, no markdown). **Never print AI text as a raw `{string}`.** Three rules are load-bearing and pinned in `richText.test.ts`: single `$` follows the pandoc rule so prices stay prices; a formula KaTeX rejects is retried with repairs and then shown as source in `.math-fallback`, never as a red error; HTML stripping touches known tag names only, so `a < b and c > d` survives.
+- **Server-side:** `normalizeMathNotation` in [src/lib/ai/math.ts](src/lib/ai/math.ts) runs on already-normalised text (review queue, marking), so every rule must be idempotent — `math.test.ts` pins it. `parseJsonLenient` in [json.ts](src/lib/ai/json.ts) repairs single-escaped LaTeX (`"\sqrt{2}"`) only after a plain `JSON.parse` fails.
 - **Rich text editing:** Tiptap 3 (primary) in [src/components/RichTextEditor.tsx](src/components/RichTextEditor.tsx)
 
 ### Styling

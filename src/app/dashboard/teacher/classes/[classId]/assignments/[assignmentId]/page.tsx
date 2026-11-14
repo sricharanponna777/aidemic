@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle, ClipboardList, Lock, Pencil, Send } from 'lucide-react';
 import { PageHero } from '@/components/ui/feedback';
 import { buttonStyles } from '@/components/ui/button';
-import { MathContent } from '@/components/MathContent';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
 import { PageLoader } from '@/components/PageLoader';
@@ -429,7 +429,7 @@ export default function TeacherAssignmentDetailPage() {
                 />
               ) : (
                 <div className="mt-2 text-sm text-content-muted dark:text-slate-200">
-                  <MathContent content={question.question} />
+                  <MarkdownContent content={question.question} />
                 </div>
               )}
 
@@ -467,7 +467,7 @@ export default function TeacherAssignmentDetailPage() {
                               : ''
                           }
                         >
-                          {OPTION_LETTERS[optionIndex]}. <MathContent content={option} inline />
+                          {OPTION_LETTERS[optionIndex]}. <MarkdownContent content={option} inline />
                         </li>
                       ))}
                     </ul>
@@ -525,7 +525,7 @@ export default function TeacherAssignmentDetailPage() {
                         <ul className="list-disc space-y-1 pl-5 text-content-muted">
                           {question.markScheme.map((point, pointIndex) => (
                             <li key={pointIndex}>
-                              <MathContent content={point} inline />
+                              <MarkdownContent content={point} inline />
                             </li>
                           ))}
                         </ul>
@@ -533,7 +533,7 @@ export default function TeacherAssignmentDetailPage() {
                       {question.modelAnswer && (
                         <div className="mt-2 text-content-muted dark:text-slate-300">
                           <span className="font-semibold">Model answer: </span>
-                          <MathContent content={question.modelAnswer} inline />
+                          <MarkdownContent content={question.modelAnswer} inline />
                         </div>
                       )}
                     </div>

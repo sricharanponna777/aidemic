@@ -211,7 +211,7 @@ export default function TakeAssignmentPage() {
           </Panel>
           <Panel>
             <PanelHeading as="h3">Summary</PanelHeading>
-            <p className="mt-2 text-[13px] text-content-muted">{report.summary}</p>
+            <MarkdownContent className="mt-2 text-[13px] text-content-muted" content={report.summary} />
           </Panel>
           {assignment.allow_reattempts && (
             <button
@@ -305,7 +305,7 @@ export default function TakeAssignmentPage() {
                               onChange={() => updateAnswer(index, letter)}
                             />
                             <span className={isReview && letter === question.correctOption ? 'font-semibold text-success' : ''}>
-                              <span className="font-mono">{letter}.</span> {option}
+                              <span className="font-mono">{letter}.</span> <MarkdownContent inline content={option} />
                             </span>
                           </label>
                         );
@@ -348,7 +348,7 @@ export default function TakeAssignmentPage() {
                     <p className="font-mono text-xs font-semibold text-content">
                       {marked.marksAwarded}/{marked.maxMarks} · {marked.band}
                     </p>
-                    <p className="mt-1 text-content-muted">{marked.feedback}</p>
+                    <MarkdownContent className="mt-1 text-content-muted" content={marked.feedback} />
                   </div>
                 ) : null}
               </article>

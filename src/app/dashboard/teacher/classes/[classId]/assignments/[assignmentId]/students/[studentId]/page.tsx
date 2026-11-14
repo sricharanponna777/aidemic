@@ -241,7 +241,7 @@ export default function TeacherStudentAnswersPage() {
             </button>
           )}
         </div>
-        <p className="mt-2 text-sm text-content-muted dark:text-slate-300">{displayedReport.summary}</p>
+        <MarkdownContent className="mt-2 text-sm text-content-muted dark:text-slate-300" content={displayedReport.summary} />
         {overriddenAt && (
           <p className="mt-2 text-xs text-content-subtle">
             Adjusted by you on {new Date(overriddenAt).toLocaleString()}.
@@ -270,7 +270,7 @@ export default function TeacherStudentAnswersPage() {
                         <label key={letter} className="flex items-center gap-2 text-sm text-content-muted dark:text-slate-300">
                           <input type="radio" checked={answers[index] === letter} disabled readOnly />
                           <span className={letter === question.correctOption ? 'font-semibold text-emerald-600 dark:text-emerald-400' : ''}>
-                            {letter}. {option}
+                            {letter}. <MarkdownContent inline content={option} />
                           </span>
                         </label>
                       );
@@ -331,7 +331,7 @@ export default function TeacherStudentAnswersPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-content-muted">{marked.feedback}</p>
+                  <MarkdownContent className="mt-1 text-content-muted" content={marked.feedback} />
                   {marked.strengths.length > 0 && (
                     <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-400">Strengths: {marked.strengths.join('; ')}</p>
                   )}
@@ -339,7 +339,7 @@ export default function TeacherStudentAnswersPage() {
                     <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Improvements: {marked.improvements.join('; ')}</p>
                   )}
                   {marked.exemplarAnswer && (
-                    <p className="mt-1 text-xs text-content-subtle">Exemplar: {marked.exemplarAnswer}</p>
+                    <div className="mt-1 text-xs text-content-subtle">Exemplar: <MarkdownContent inline content={marked.exemplarAnswer} /></div>
                   )}
                 </div>
               ) : null}

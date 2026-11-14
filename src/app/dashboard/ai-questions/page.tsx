@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { GenerationProgressPanel } from '@/components/ai/GenerationProgressPanel';
 import { MarkdownContent } from '@/components/MarkdownContent';
+import { MathContent } from '@/components/MathContent';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
 import { SearchSelect } from '@/components/SearchSelect';
@@ -1641,7 +1642,7 @@ export default function AIQuestionsPage() {
                   ) : answers[marked.questionIndex]?.trim() ? (
                     <div className="mt-3 rounded-lg border border-subtle bg-surface-sunken px-4 py-3">
                       <MonoLabel>Your answer</MonoLabel>
-                      <p className="mt-1.5 whitespace-pre-wrap text-sm text-content">{answers[marked.questionIndex]}</p>
+                      <MathContent className="mt-1.5 whitespace-pre-wrap text-sm text-content" content={answers[marked.questionIndex]} />
                     </div>
                   ) : (
                     <p className="mt-3 text-sm italic text-content-subtle">No answer entered.</p>

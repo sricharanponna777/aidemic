@@ -1,3 +1,5 @@
+import { repairJsonLatexBackslashes } from '@/lib/mathText';
+
 export type OpenAIResponseBody = {
   output_text?: string;
   output?: Array<{ content?: Array<{ json?: unknown; text?: string; type?: string }> }>;
@@ -15,6 +17,20 @@ export type ChatCompletionsResponseBody = {
 };
 
 type Coercer<T> = (value: unknown) => T | null;
+
+/**
+ * JSON.parse, retried once with LaTeX backslashes repaired. A model that writes "\sqrt{2}"
+ * inside a JSON string (one backslash: an invalid escape) otherwise fails the whole response.
+ */
+export const parseJsonLenient = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const repaired = repairJsonLatexBackslashes(text);
+    if (repaired === text) throw error;
+    return JSON.parse(repaired);
+  }
+};
 
 export const extractFirstJsonObject = (text: string) => {
   let start = -1;
@@ -61,12 +77,12 @@ export const extractJsonWithCoercer = <T>(rawText: string, coerce: Coercer<T>): 
   if (!trimmed) return null;
 
   try {
-    return coerce(JSON.parse(trimmed) as unknown);
+    return coerce(parseJsonLenient(trimmed));
   } catch {
     const fenceMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/i) || trimmed.match(/```\s*([\s\S]*?)\s*```/i);
     if (fenceMatch?.[1]) {
       try {
-        const coerced = coerce(JSON.parse(fenceMatch[1]) as unknown);
+        const coerced = coerce(parseJsonLenient(fenceMatch[1]));
         if (coerced) return coerced;
       } catch {
         // Continue to object extraction below.
@@ -77,7 +93,7 @@ export const extractJsonWithCoercer = <T>(rawText: string, coerce: Coercer<T>): 
     if (!candidate) return null;
 
     try {
-      return coerce(JSON.parse(candidate) as unknown);
+      return coerce(parseJsonLenient(candidate));
     } catch {
       return null;
     }

@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import { AlertTriangle, HelpCircle, Lightbulb, Repeat, Sparkles, TrendingDown, Users } from 'lucide-react';
 import { PageHero } from '@/components/ui/feedback';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
 import { cachedAiFetch } from '@/lib/aiCache';
 import { createClient } from '@/lib/supabase-client';
@@ -275,17 +276,17 @@ export default function TeacherAiInsightsPage() {
             ) : null}
             {summary && (
               <div className="mt-4 space-y-3">
-                <p className="text-sm font-medium text-content-muted dark:text-slate-200">{summary.headline}</p>
+                <MarkdownContent className="text-sm font-medium text-content-muted dark:text-slate-200" content={summary.headline} />
                 <ul className="list-disc space-y-1 pl-5 text-sm text-content-muted dark:text-slate-300">
                   {summary.priorities.map((priority, index) => (
-                    <li key={index}>{priority}</li>
+                    <li key={index}><MarkdownContent inline content={priority} /></li>
                   ))}
                 </ul>
                 {summary.classNotes.length > 0 && (
                   <div className="space-y-1.5 border-t border-slate-100 pt-3 dark:border-white/6">
                     {summary.classNotes.map((note) => (
                       <p key={note.className} className="text-xs text-content-muted">
-                        <span className="font-semibold text-content-muted dark:text-slate-200">{note.className}:</span> {note.note}
+                        <span className="font-semibold text-content-muted dark:text-slate-200">{note.className}:</span> <MarkdownContent inline content={note.note} />
                       </p>
                     ))}
                   </div>

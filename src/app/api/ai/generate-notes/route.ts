@@ -9,7 +9,8 @@ import { getMajorTopicsForQualification, getQualificationTopicError } from '@/li
 import { AI_DAILY_LIMITS, checkAiRateLimit } from '@/lib/ai/rateLimit';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { isDataAnalysisObjective } from '@/lib/ai/text';
-import { LATEX_COMMAND_PATTERN, normalizeLatexControlCharacters } from '@/lib/mathText';
+import { normalizeLatexControlCharacters } from '@/lib/mathText';
+import { parseJsonLenient } from '@/lib/ai/json';
 
 type NotesPayload = {
   flashcardId?: string;
@@ -290,7 +291,7 @@ async function generateNotes(
 
       const data = await response.json() as { choices: { message: { content: string } }[] };
       const rawContent = data.choices[0].message.content;
-      const parsed = parseGeneratedContent(rawContent) as {
+      const parsed = parseJsonLenient(rawContent) as {
         script: string;
         slides: string[];
       };
@@ -305,48 +306,6 @@ async function generateNotes(
     }
   }
   throw lastError instanceof Error ? lastError : new Error('Generation failed');
-}
-
-function parseGeneratedContent(content: string) {
-  try {
-    return JSON.parse(content) as unknown;
-  } catch {
-    const escapedLatex = escapeInvalidJsonBackslashes(escapeLooseLatexBackslashes(content));
-    return JSON.parse(escapedLatex) as unknown;
-  }
-}
-
-function escapeLooseLatexBackslashes(content: string) {
-  const pattern = new RegExp(`(^|[^\\\\])\\\\(?=${LATEX_COMMAND_PATTERN}\\b)`, 'g');
-  return content.replace(pattern, (_match, prefix: string) => `${prefix}\\\\`);
-}
-
-function escapeInvalidJsonBackslashes(content: string): string {
-  let result = '';
-  let i = 0;
-  while (i < content.length) {
-    if (content[i] !== '\\') {
-      result += content[i++];
-      continue;
-    }
-    const next = content[i + 1] ?? '';
-    if (next === '"' || next === '\\' || next === '/' ||
-        next === 'b' || next === 'f' || next === 'n' ||
-        next === 'r' || next === 't') {
-      // Valid 2-char JSON escape — copy both and advance past them
-      result += content[i] + next;
-      i += 2;
-    } else if (next === 'u' && /^[0-9a-fA-F]{4}/.test(content.slice(i + 2, i + 6))) {
-      // Valid unicode escape \uXXXX — copy all 6 chars
-      result += content.slice(i, i + 6);
-      i += 6;
-    } else {
-      // Invalid escape — double the backslash, don't consume the next char
-      result += '\\\\';
-      i++;
-    }
-  }
-  return result;
 }
 
 function stripTags(value: string) {
@@ -365,7 +324,8 @@ function normalizeGeneratedText(value: string) {
     })
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(?:p|div|li|h[1-6])>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
+    // Known tags only: a bare /<[^>]*>/ also deleted "< b and c >" from "a < b and c > d".
+    .replace(/<\/?(?:p|div|span|br|b|strong|i|em|u|s|sub|sup|ul|ol|li|h[1-6]|code|pre|blockquote|mark)\b[^<>]*>/gi, '')
     .replace(/[ \t]{3,}/g, '  ')
     .trim();
 

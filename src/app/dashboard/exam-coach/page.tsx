@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Compass, Radar, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
+import { MarkdownContent } from '@/components/MarkdownContent';
 import { PageHeader } from '@/components/ui/feedback';
 import { Chip, MonoLabel, Panel, PanelHeading, Stat, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { useAuth } from '@/hooks/useAuth';
@@ -273,7 +274,7 @@ export default function ExamCoachPage() {
                     </span>
                     <div>
                       <MonoLabel>Headline</MonoLabel>
-                      <p className="mt-1 text-body font-semibold text-content">{report.headline}</p>
+                      <MarkdownContent className="mt-1 text-body font-semibold text-content" content={report.headline} />
                     </div>
                   </div>
 
@@ -282,7 +283,7 @@ export default function ExamCoachPage() {
                     <ul className="mt-2 space-y-2">
                       {report.patterns.map((pattern, index) => (
                         <li key={index} className="rounded-lg border border-warning/30 bg-warning-muted p-3 text-sm text-content">
-                          {pattern}
+                          <MarkdownContent inline content={pattern} />
                         </li>
                       ))}
                     </ul>
@@ -294,7 +295,7 @@ export default function ExamCoachPage() {
                       {report.nextSteps.map((step, index) => (
                         <li key={index} className="flex items-start gap-2 rounded-lg border border-success/30 bg-success-muted p-3 text-sm text-content">
                           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
-                          {step}
+                          <MarkdownContent inline content={step} />
                         </li>
                       ))}
                     </ul>

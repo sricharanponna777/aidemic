@@ -197,7 +197,7 @@ function UnderstandingCheck({ topicId }: { topicId: string | null }) {
                   className={`flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left text-sm text-content transition disabled:cursor-default ${tone}`}
                 >
                   <span className="font-mono font-semibold">{letter}</span>
-                  <span className="min-w-0 flex-1">{option}</span>
+                  <MarkdownContent inline className="min-w-0 flex-1" content={option} />
                 </button>
               );
             })}
