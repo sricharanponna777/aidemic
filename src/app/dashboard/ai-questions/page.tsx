@@ -4,13 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowLeft,
   ArrowRight,
   Calculator,
-  CheckCircle2,
   ClipboardCheck,
+  Clock,
   Eye,
   LayoutDashboard,
+  Radar,
   RefreshCw,
   Rocket,
   Printer,
@@ -27,7 +27,9 @@ import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
 import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { fieldStyles } from '@/components/ui/field';
+import { Chip, Meter, MonoLabel, Panel, PanelHeading, Stat, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { useAuth } from '@/hooks/useAuth';
 import { useGenerationJob, type GenerationJobRow } from '@/hooks/useGenerationJob';
 import { useUserSubjects } from '@/hooks/useUserSubjects';
@@ -161,10 +163,10 @@ const defaultForm: AIGenerateForm = {
 };
 
 const statusStyles: Record<StatusTone, string> = {
-  info: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-700/70 dark:bg-blue-950/40 dark:text-blue-200',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/70 dark:bg-emerald-950/35 dark:text-emerald-200',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/35 dark:text-amber-200',
-  error: 'border-red-200 bg-red-50 text-red-800 dark:border-red-700/70 dark:bg-red-950/35 dark:text-red-200',
+  info: 'bg-info-muted text-info',
+  success: 'bg-success-muted text-success',
+  warning: 'bg-warning-muted text-warning',
+  error: 'bg-danger-muted text-danger',
 };
 
 const SS_QUESTIONS = 'exam-questions';
@@ -268,9 +270,9 @@ const formatCountdown = (seconds: number) => {
 };
 
 const reportTone = (percentage: number) => {
-  if (percentage >= 75) return 'text-emerald-700 dark:text-emerald-300';
-  if (percentage >= 50) return 'text-blue-700 dark:text-blue-300';
-  return 'text-red-700 dark:text-red-300';
+  if (percentage >= 75) return 'text-success';
+  if (percentage >= 50) return 'text-info';
+  return 'text-danger';
 };
 
 const getEnglishLanguagePaperLabel = (paper: 'paper1' | 'paper2') =>
@@ -321,14 +323,14 @@ function CalculationAnswerEditor({
   return (
     <div className="mt-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-content-muted dark:text-slate-300">Your answer</p>
+        <MonoLabel>Your answer</MonoLabel>
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             title="Inline math"
             aria-label="Insert inline math"
             onClick={() => insertSnippet('\\(x\\)', 3)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
           >
             <Sigma className="h-3.5 w-3.5" />
           </button>
@@ -337,7 +339,7 @@ function CalculationAnswerEditor({
             title="Power"
             aria-label="Insert power notation"
             onClick={() => insertSnippet('\\(x^{2}\\)', 3)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
           >
             x²
           </button>
@@ -346,7 +348,7 @@ function CalculationAnswerEditor({
             title="Fraction"
             aria-label="Insert fraction"
             onClick={() => insertSnippet('\\(\\frac{a}{b}\\)', 8)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
           >
             a/b
           </button>
@@ -355,7 +357,7 @@ function CalculationAnswerEditor({
             title="Square root"
             aria-label="Insert square root"
             onClick={() => insertSnippet('\\(\\sqrt{x}\\)', 8)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-surface/10"
+            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
           >
             √
           </button>
@@ -914,31 +916,14 @@ export default function AIQuestionsPage() {
     };
   }, [isMockExam, mockDeadline, report]);
 
-  return (
-    <div className="space-y-6" aria-labelledby="ai-questions-title">
-      <PageHero
-        icon={Rocket}
-        titleId="ai-questions-title"
-        title="Smart Practice"
-        description="Generate exam-board questions, answer them, then get marks, a predicted grade, and targeted upgrade advice."
-        actions={
-          <>
-            <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'secondary' })}>
-              <ArrowLeft className="h-4 w-4" />
-              Flashcard Revision
-            </Link>
-            <Link href="/dashboard" className={buttonStyles({ variant: 'primary' })}>
-              <LayoutDashboard className="h-4 w-4" />
-              Dashboard
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </>
-        }
-      />
-
-      {status && (inPractice || !setupValidationMessage) ? (
-        <div role="status" aria-live="polite" className={`rounded-xl border px-4 py-3 text-sm ${statusStyles[status.tone]}`}>{status.text}</div>
-      ) : null}
+  const reportColumn = (
+    <>
+      <PanelHeading
+        icon={Radar}
+        aside={report ? <Chip tone="success">Marked</Chip> : inPractice ? <Chip tone="success">● Live session</Chip> : null}
+      >
+        Report
+      </PanelHeading>
 
       {job.status ? (
         <GenerationProgressPanel
@@ -952,29 +937,36 @@ export default function AIQuestionsPage() {
         />
       ) : null}
 
+      {!inPractice && !job.status ? (
+        <Panel>
+          <p className="text-sm font-semibold text-content">Your report appears here</p>
+          <ul className="mt-2 space-y-1.5 text-[13px] text-content-subtle">
+            <li>Marks for every question</li>
+            <li>A predicted grade for this attempt</li>
+            <li>Feedback and an exemplar answer</li>
+            <li>What to do to move up a grade</li>
+          </ul>
+        </Panel>
+      ) : null}
+
       {!inPractice && pendingPapers.length > 0 ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-5 shadow-card">
-          <h2 className="flex items-center gap-2 text-title text-content">
-            <Printer className="h-5 w-5 text-accent" />
+        <Panel>
+          <PanelHeading icon={Printer} as="h3">
             Papers waiting for you
-          </h2>
-          <p className="mt-1 text-caption text-content-subtle">
-            Printed papers you have not uploaded and marked yet.
-          </p>
-          <ul className="mt-4 space-y-2">
+          </PanelHeading>
+          <p className="mt-1 text-[13px] text-content-subtle">Printed papers you have not uploaded and marked yet.</p>
+          <ul className="mt-3 space-y-2">
             {pendingPapers.map((paper) => (
               <li key={paper.id}>
                 <Link
                   href={`/dashboard/ai-questions/paper/${paper.id}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-subtle bg-surface-sunken px-4 py-3 transition-colors hover:border-strong"
+                  className="block rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 transition-colors hover:border-strong"
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate text-body font-semibold text-content">{paper.topic}</span>
-                    <span className="block text-caption text-content-subtle">
-                      {paper.paperCode} · {paper.questionCount} questions · {paper.totalMarks} marks
-                    </span>
+                  <span className="block truncate text-sm font-semibold text-content">{paper.topic}</span>
+                  <span className="mt-0.5 block font-mono text-[11px] text-content-subtle">
+                    {paper.paperCode} · {paper.questionCount} questions · {paper.totalMarks} marks
                   </span>
-                  <span className="text-caption font-semibold text-accent">
+                  <span className="mt-1 block text-xs font-semibold text-accent">
                     {paper.status === 'printed'
                       ? 'Upload your pages'
                       : paper.status === 'uploaded'
@@ -985,11 +977,156 @@ export default function AIQuestionsPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </Panel>
+      ) : null}
+
+      {inPractice && !report ? (
+        <>
+          <Panel>
+            <div className="flex items-baseline justify-between gap-2">
+              <MonoLabel>Answered</MonoLabel>
+              <span className="font-mono text-xs text-content-subtle">
+                {answeredCount} / {questions.length}
+              </span>
+            </div>
+            <Meter fraction={questions.length ? answeredCount / questions.length : 0} className="mt-3" label="Questions answered" />
+          </Panel>
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Questions" value={questions.length} />
+            <Stat label="Marks" value={totalAvailableMarks} />
+          </div>
+          {isMockExam && timeRemainingSeconds !== null ? (
+            <Stat
+              label="Time left"
+              value={formatCountdown(timeRemainingSeconds)}
+              tone={timeRemainingSeconds <= 60 ? 'danger' : 'default'}
+              hint="Marked automatically when time runs out"
+            />
+          ) : null}
+          <Panel>
+            <p className="text-sm font-semibold text-content">
+              {isMockExam ? 'Mock exam rules' : 'How marking works'}
+            </p>
+            <p className="mt-1 text-[13px] text-content-subtle">
+              {isMockExam
+                ? 'No feedback until you submit. Unanswered questions score zero.'
+                : 'Each answer is marked against the mark scheme. You can mark with some questions blank.'}
+            </p>
+          </Panel>
+        </>
+      ) : null}
+
+      {report ? (
+        <>
+          <Panel>
+            <div className="flex items-baseline justify-between gap-2">
+              <MonoLabel>Grade equivalent</MonoLabel>
+              <span className="font-mono text-[11px] text-content-subtle">This attempt only</span>
+            </div>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <p
+                className={`inline-flex rounded-lg px-3 py-1 font-mono text-4xl font-bold ${gradeBadgeTone({
+                  grade: report.predictedGrade,
+                  examType: selectedSubject?.exam_type,
+                  specTier: selectedSubject?.spec_tier,
+                })}`}
+              >
+                {report.predictedGrade}
+              </p>
+              <div className="text-right">
+                <p className="font-mono text-2xl font-semibold text-content">{report.percentage}%</p>
+                <p className="font-mono text-xs text-content-subtle">
+                  {report.totalMarksAwarded} / {report.totalAvailableMarks} marks
+                </p>
+              </div>
+            </div>
+            <Meter fraction={report.percentage / 100} className="mt-3" label="Score" />
+            <div className="mt-3">
+              {report.targetGrade ? (
+                <Chip tone="success">
+                  <TrendingUp className="h-3 w-3" />
+                  Target next: {report.targetGrade}
+                </Chip>
+              ) : (
+                <Chip tone="inverse">
+                  <Target className="h-3 w-3" />
+                  Top grade secured
+                </Chip>
+              )}
+            </div>
+            <p className="mt-3 text-xs text-content-subtle">{report.gradeBoundaryNote}</p>
+          </Panel>
+
+          <Panel>
+            <PanelHeading as="h3">Weakness analysis</PanelHeading>
+            <ul className="mt-3 space-y-2 text-[13px] text-content-muted">
+              {report.weaknessAnalysis.map((item) => (
+                <li key={item} className="flex gap-2">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-danger" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/dashboard/exam-coach" className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'mt-4' })}>
+              See patterns across all attempts
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Panel>
+
+          <Panel>
+            <PanelHeading as="h3">Grade upgrade advice</PanelHeading>
+            <ul className="mt-3 space-y-2 text-[13px] text-content-muted">
+              {report.gradeBoostAdvice.map((item) => (
+                <li key={item} className="flex gap-2">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        </>
+      ) : null}
+    </>
+  );
+
+  return (
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
+        icon={Rocket}
+        eyebrow="Practice / Exam questions"
+        titleId="ai-questions-title"
+        title="Smart Practice"
+        description="Generate exam-board questions, answer them, then get marks, a predicted grade, and targeted upgrade advice."
+        actions={
+          <>
+            <Chip>● Mode: {isPaperMode ? 'on paper' : isMockExam ? 'timed mock' : 'practice'}</Chip>
+            {inPractice ? (
+              <Chip tone="success">
+                {questions.length} questions · {totalAvailableMarks} marks
+              </Chip>
+            ) : null}
+            {isMockExam ? (
+              <Chip tone="danger">
+                <Clock className="h-3 w-3" /> Timer: {mockDurationMinutes} min
+              </Chip>
+            ) : null}
+          </>
+        }
+      />
+
+      <WorkspaceBody aside={reportColumn}>
+      {status && (inPractice || !setupValidationMessage) ? (
+        <div className="border-b border-subtle p-4">
+          <div role="status" aria-live="polite" className={`rounded-field px-3.5 py-2.5 text-body ${statusStyles[status.tone]}`}>
+            {status.text}
+          </div>
+        </div>
       ) : null}
 
       {!inPractice ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+        <>
+        <div className="flex-1 p-5">
           <SubjectSpecSelector
             subjects={userSubjects}
             isLoading={subjectsLoading}
@@ -1003,7 +1140,7 @@ export default function AIQuestionsPage() {
           <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
             {isEnglishLanguagePractice ? (
               <fieldset className="md:col-span-2">
-                <legend className="text-sm font-semibold text-content-muted dark:text-slate-300">Paper</legend>
+                <legend className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-content-subtle">Paper</legend>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
                   {(['paper1', 'paper2'] as const).map((paper) => {
                     const selected = form.englishLanguagePaper === paper;
@@ -1015,8 +1152,8 @@ export default function AIQuestionsPage() {
                         onClick={() => setForm((prev) => ({ ...prev, englishLanguagePaper: paper }))}
                         className={`rounded-lg border px-4 py-3 text-left transition ${
                           selected
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-500/10 dark:text-indigo-100'
-                            : 'border-subtle bg-surface text-content-muted hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-white/10 dark:bg-surface/5 dark:hover:bg-indigo-500/10'
+                            ? 'border-accent bg-accent-muted text-content'
+                            : 'border-subtle bg-surface text-content-muted hover:border-strong'
                         }`}
                       >
                         <span className="block text-sm font-semibold">{paper === 'paper1' ? 'Paper 1' : 'Paper 2'}</span>
@@ -1047,15 +1184,14 @@ export default function AIQuestionsPage() {
                   ...creationOptions.map((option) => ({ value: option, label: option })),
                 ]}
                 placeholder={`Search ${creationOptionLabel.toLowerCase()}...`}
-                className="text-sm text-content-muted dark:text-slate-300"
-                inputClassName="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                inputClassName={fieldStyles()}
               />
             ) : null}
 
             {isSelectedPoetryCluster ? (
               <>
-                <label className="text-sm text-content-muted dark:text-slate-300">
-                  First poem
+                <label className="block">
+                  <MonoLabel className="mb-1">First poem</MonoLabel>
                   <select
                     value={form.poemOne}
                     onChange={(event) => setForm((prev) => ({
@@ -1065,7 +1201,7 @@ export default function AIQuestionsPage() {
                       topic: '',
                       subtopic: '',
                     }))}
-                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                    className={fieldStyles()}
                   >
                     <option value="">Select first poem</option>
                     {poetryPoems.map((poem) => (
@@ -1073,13 +1209,13 @@ export default function AIQuestionsPage() {
                     ))}
                   </select>
                 </label>
-                <label className="text-sm text-content-muted dark:text-slate-300">
-                  Second poem <span className="text-content-subtle">(optional)</span>
+                <label className="block">
+                  <MonoLabel className="mb-1">Second poem (optional)</MonoLabel>
                   <select
                     value={form.poemTwo}
                     onChange={(event) => setForm((prev) => ({ ...prev, poemTwo: event.target.value, topic: '', subtopic: '' }))}
                     disabled={!form.poemOne}
-                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent disabled:disabled:text-content-subtle text-content dark:disabled:bg-surface/5"
+                    className={fieldStyles()}
                   >
                     <option value="">No comparison poem</option>
                     {poetryPoems.filter((poem) => poem !== form.poemOne).map((poem) => (
@@ -1101,8 +1237,7 @@ export default function AIQuestionsPage() {
                 suggestions={topicSuggestions}
                 isValidSelection={topicIsAllowed}
                 placeholder="Start typing a topic, or leave blank to generalise"
-                className="text-sm text-content-muted dark:text-slate-300"
-                inputClassName="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                inputClassName={fieldStyles()}
               />
             ) : null}
 
@@ -1113,18 +1248,17 @@ export default function AIQuestionsPage() {
                 onChange={(value) => setForm((prev) => ({ ...prev, subtopic: value }))}
                 suggestions={subtopicSuggestions}
                 placeholder="Narrow the focus within this topic"
-                className="text-sm text-content-muted dark:text-slate-300"
-                inputClassName="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                inputClassName={fieldStyles()}
               />
             ) : null}
 
             {!isEnglishLanguagePractice && learningObjectiveOptions.length > 0 ? (
-              <label className="text-sm text-content-muted dark:text-slate-300">
-                Learning objective (optional)
+              <label className="block">
+                <MonoLabel className="mb-1">Learning objective (optional)</MonoLabel>
                 <select
                   value={form.learningObjective}
                   onChange={(event) => setForm((prev) => ({ ...prev, learningObjective: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 >
                   <option value="">No specific focus</option>
                   {learningObjectiveOptions.map((objective) => (
@@ -1135,12 +1269,12 @@ export default function AIQuestionsPage() {
             ) : null}
 
             {!isEnglishLanguagePractice && paperOptions.length > 0 ? (
-              <label className="text-sm text-content-muted dark:text-slate-300">
-                Paper (optional)
+              <label className="block">
+                <MonoLabel className="mb-1">Paper (optional)</MonoLabel>
                 <select
                   value={form.paper}
                   onChange={(event) => setForm((prev) => ({ ...prev, paper: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 >
                   <option value="">General (any paper)</option>
                   {paperOptions.map((paper) => (
@@ -1151,8 +1285,8 @@ export default function AIQuestionsPage() {
             ) : null}
 
             {!isEnglishLanguagePractice ? (
-              <label className="text-sm text-content-muted dark:text-slate-300">
-                Question count
+              <label className="block">
+                <MonoLabel className="mb-1">Question count</MonoLabel>
                 <input
                   type="number"
                   min={MIN_QUESTIONS}
@@ -1166,13 +1300,13 @@ export default function AIQuestionsPage() {
                       questionCount: Math.min(Math.max(Math.floor(next), MIN_QUESTIONS), MAX_QUESTIONS),
                     }));
                   }}
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 />
               </label>
             ) : null}
 
             {!isEnglishLanguagePractice ? (
-              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
+              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle bg-surface px-3 text-sm font-medium text-content">
                 <input
                   type="checkbox"
                   checked={isMockExam}
@@ -1184,7 +1318,7 @@ export default function AIQuestionsPage() {
             ) : null}
 
             {!isEnglishLanguagePractice ? (
-              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
+              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle bg-surface px-3 text-sm font-medium text-content">
                 <input
                   type="checkbox"
                   checked={isPaperMode}
@@ -1200,12 +1334,12 @@ export default function AIQuestionsPage() {
             ) : null}
 
             {!isEnglishLanguagePractice && isMockExam ? (
-              <label className="text-sm text-content-muted dark:text-slate-300">
-                Duration
+              <label className="block">
+                <MonoLabel className="mb-1">Duration</MonoLabel>
                 <select
                   value={mockDurationMinutes}
                   onChange={(event) => setMockDurationMinutes(Number(event.target.value))}
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 >
                   {MOCK_DURATION_OPTIONS.map((mins) => (
                     <option key={mins} value={mins}>{mins} minutes</option>
@@ -1218,24 +1352,24 @@ export default function AIQuestionsPage() {
 
           {!isEnglishLanguagePractice ? (
           <div className="mt-5">
-            <fieldset className="rounded-lg border border-subtle p-4">
-              <legend className="px-1 text-sm font-semibold text-content-muted dark:text-slate-200">Question mix</legend>
+            <fieldset className="rounded-lg border border-subtle bg-surface-sunken p-4">
+              <legend className="px-1 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-content-subtle">Question mix</legend>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
+                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle bg-surface px-3 text-sm font-medium text-content">
                   <input
                     type="checkbox"
                     checked={form.allowMcq}
                     onChange={(event) => setForm((prev) => ({ ...prev, allowMcq: event.target.checked }))}
-                    className="h-4 w-4 rounded border-subtle text-blue-600"
+                    className="h-4 w-4 rounded border-subtle text-accent"
                   />
                   Allow MCQs
                 </label>
-                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle px-3 text-sm font-semibold text-content-muted dark:border-white/6 bg-surface">
+                <label className="flex min-h-11 items-center gap-3 rounded-lg border border-subtle bg-surface px-3 text-sm font-medium text-content">
                   <input
                     type="checkbox"
                     checked={form.allowCalculation}
                     onChange={(event) => setForm((prev) => ({ ...prev, allowCalculation: event.target.checked }))}
-                    className="h-4 w-4 rounded border-subtle text-emerald-600"
+                    className="h-4 w-4 rounded border-subtle text-accent"
                   />
                   Allow calculations
                 </label>
@@ -1245,92 +1379,73 @@ export default function AIQuestionsPage() {
           ) : null}
 
           {setupValidationMessage ? (
-            <p className={`mt-3 text-xs ${subjectsError ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'}`}>
+            <p className={`mt-3 text-xs ${subjectsError ? 'text-danger' : 'text-warning'}`}>
               {setupValidationMessage}
             </p>
           ) : null}
 
-          <div className="mt-5 flex justify-end">
-            <button
-              className={buttonStyles({ variant: 'primary' })}
-              onClick={handleGenerate}
-              disabled={isGenerating || !isGenerationValid || !selectedSubject || !subjectSpecComplete}
-            >
-              <Sparkles className="h-4 w-4" />
-              {isGenerating ? 'Generating...' : 'Generate exam questions'}
-            </button>
-          </div>
-        </section>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+          <p className="font-mono text-xs text-content-subtle max-sm:hidden">
+            {isPaperMode ? 'Paper mode: print, write, upload' : isMockExam ? `Timed: ${mockDurationMinutes} min` : 'Untimed practice'}
+          </p>
+          <button
+            className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
+            onClick={handleGenerate}
+            disabled={isGenerating || !isGenerationValid || !selectedSubject || !subjectSpecComplete}
+          >
+            <Sparkles className="h-4 w-4" />
+            {isGenerating ? 'Generating...' : 'Generate exam questions'}
+          </button>
+        </div>
+        </>
       ) : null}
 
       {inPractice && !report ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">
-                {questions.length} questions · {totalAvailableMarks} marks
-              </p>
-              <h2 className="mt-1 text-2xl font-bold text-content">
-                {isMockExam ? 'Timed Mock Exam' : 'Answer Practice'}
-              </h2>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {isMockExam && timeRemainingSeconds !== null ? (
-                <span
-                  role="status"
-                  aria-live="polite"
-                  className={`rounded-lg px-3 py-2 text-sm font-black tabular-nums ${
-                    timeRemainingSeconds <= 60
-                      ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-                      : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                  }`}
-                >
-                  {formatCountdown(timeRemainingSeconds)}
-                </span>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={resetToGenerator} className={buttonStyles({ variant: 'secondary' })}>
-                  New set
-                </button>
-                <button type="button" onClick={handleMarkAnswers} disabled={isMarking || answeredCount === 0} className={buttonStyles({ variant: 'primary' })}>
-                  <CheckCircle2 className="h-4 w-4" />
-                  {isMarking ? 'Marking...' : 'Mark responses'}
-                </button>
-              </div>
-            </div>
-          </div>
+        <>
+          <StatusBar>
+            <span className="font-semibold text-content">
+              {answeredCount} / {questions.length} answered
+            </span>
+            <span>
+              Marks: <span className="font-semibold text-content">{totalAvailableMarks}</span>
+            </span>
+            {isMockExam && timeRemainingSeconds !== null ? (
+              <span
+                role="status"
+                aria-live="polite"
+                className={`flex items-center gap-1.5 font-semibold tabular-nums ${timeRemainingSeconds <= 60 ? 'text-danger' : 'text-content'}`}
+              >
+                <Clock className="h-3.5 w-3.5" />
+                {formatCountdown(timeRemainingSeconds)} remaining
+              </span>
+            ) : null}
+          </StatusBar>
 
+          <div className="flex-1 space-y-5 p-5">
+          <h2 className="sr-only">{isMockExam ? 'Timed Mock Exam' : 'Answer Practice'}</h2>
           {sourceMaterial ? (
-            <section className="mt-5 rounded-lg border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-500/25 dark:bg-indigo-500/10">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">
-                Source Extract
-              </p>
-              <p className="mt-1 text-xs text-indigo-700/70 dark:text-indigo-300/70">Written for this practice paper. Not an extract from a real publication.</p>
+            <section className="rounded-lg border border-subtle bg-surface-sunken p-5">
+              <MonoLabel>Source extract</MonoLabel>
+              <p className="mt-1 text-xs text-content-subtle">Written for this practice paper. Not an extract from a real publication.</p>
               <MarkdownContent className="mt-3 max-h-136 overflow-y-auto pr-2 text-sm leading-7 text-content" content={sourceMaterial} />
             </section>
           ) : null}
 
-          <div className="mt-5 space-y-5">
+          <div className="space-y-5">
             {questions.map((question, index) => (
-              <article key={`${question.marks}-${index}`} className="rounded-lg border border-subtle p-5">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
-                  <span>Question {index + 1}</span>
-                  <span className="rounded-full bg-indigo-100 dark:bg-indigo-500/15 px-2.5 py-1 text-indigo-700 dark:text-indigo-300">
-                    {question.marks} marks
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-content-muted dark:bg-slate-800">
-                    {question.commandWord}
-                  </span>
-                  {question.questionType === 'mcq' ? (
-                    <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/45 dark:text-indigo-300">
-                      MCQ
-                    </span>
-                  ) : null}
+              <article key={`${question.marks}-${index}`} className="rounded-lg border border-subtle bg-surface p-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <MonoLabel className="mr-1">Question {String(index + 1).padStart(2, '0')}</MonoLabel>
+                  <Chip tone="inverse">{question.marks} marks</Chip>
+                  <Chip>{question.commandWord}</Chip>
+                  {question.questionType === 'mcq' ? <Chip>MCQ</Chip> : null}
                   {question.isCalculation ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700 dark:bg-emerald-950/45 dark:text-emerald-300">
-                      <Calculator className="h-3.5 w-3.5" />
+                    <Chip tone="success">
+                      <Calculator className="h-3 w-3" />
                       Calculation
-                    </span>
+                    </Chip>
                   ) : null}
                 </div>
 
@@ -1340,16 +1455,16 @@ export default function AIQuestionsPage() {
                   <img
                     src={question.figureUrl}
                     alt="Question figure"
-                    className="mt-4 max-h-72 w-full rounded-lg border border-subtle object-contain dark:border-white/6"
+                    className="mt-4 max-h-72 w-full rounded-lg border border-subtle object-contain"
                   />
                 ) : null}
 
                 {question.skillsAssessed.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {question.skillsAssessed.map((skill) => (
-                      <span key={skill} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-content-muted dark:bg-slate-800">
+                      <Chip key={skill} mono={false}>
                         {skill}
-                      </span>
+                      </Chip>
                     ))}
                   </div>
                 ) : null}
@@ -1368,14 +1483,14 @@ export default function AIQuestionsPage() {
                           onClick={() => updateAnswer(index, letter)}
                           className={`flex w-full items-center justify-start gap-3 rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
                             selected
-                              ? 'border-transparent bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white shadow-md shadow-indigo-500/20 brightness-125'
-                              : 'border-subtle bg-surface text-content-muted hover:border-slate-400 hover:dark:border-white/6 dark:text-slate-200 dark:hover:bg-surface/5'
+                              ? 'border-accent bg-accent-muted text-content'
+                              : 'border-subtle bg-surface text-content-muted hover:border-strong'
                           }`}
                         >
-                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border font-mono text-xs font-bold ${
                             selected
-                              ? 'border-white/50 text-white'
-                              : 'border-subtle text-content-subtle dark:border-white/20'
+                              ? 'border-accent bg-accent text-accent-fg'
+                              : 'border-subtle text-content-subtle'
                           }`}>{letter}</span>
                           <MarkdownContent inline content={option} />
                         </button>
@@ -1408,13 +1523,13 @@ export default function AIQuestionsPage() {
                     rows={question.marks >= 9 ? 9 : question.marks >= 6 ? 7 : 5}
                   />
                 ) : (
-                  <label className="mt-4 block text-sm font-semibold text-content-muted dark:text-slate-300">
-                    Your answer
+                  <label className="mt-4 block">
+                    <MonoLabel className="mb-1">Your answer</MonoLabel>
                     <textarea
                       value={answers[index] || ''}
                       onChange={(event) => updateAnswer(index, event.target.value)}
                       rows={question.marks >= 9 ? 9 : question.marks >= 6 ? 7 : 5}
-                      className="mt-2 w-full rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
+                      className={fieldStyles()}
                     />
                   </label>
                 )}
@@ -1422,105 +1537,46 @@ export default function AIQuestionsPage() {
             ))}
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-subtle pt-5">
-            <p className="text-sm text-content-muted">
-              {answeredCount} of {questions.length} answered
-            </p>
-            <button type="button" onClick={handleMarkAnswers} disabled={isMarking || answeredCount === 0} className={buttonStyles({ variant: 'primary', size: 'lg' })}>
-              <ClipboardCheck className="h-4 w-4" />
-              {isMarking ? 'Marking...' : 'Mark full attempt'}
-            </button>
           </div>
-        </section>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+            <button type="button" onClick={resetToGenerator} className={buttonStyles({ variant: 'secondary' })}>
+              New set
+            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="font-mono text-xs text-content-subtle max-sm:hidden">
+                {answeredCount} of {questions.length} answered
+              </p>
+              <button type="button" onClick={handleMarkAnswers} disabled={isMarking || answeredCount === 0} className={buttonStyles({ variant: 'primary' })}>
+                <ClipboardCheck className="h-4 w-4" />
+                {isMarking ? 'Marking...' : 'Mark full attempt'}
+              </button>
+            </div>
+          </div>
+        </>
       ) : null}
 
       {report ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-            <div className="rounded-lg border border-subtle p-5 bg-surface">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Grade Equivalent</p>
-              <p className={`mt-3 inline-flex rounded-xl px-4 py-2 text-6xl font-black ${gradeBadgeTone({
-                grade: report.predictedGrade,
-                examType: selectedSubject?.exam_type,
-                specTier: selectedSubject?.spec_tier,
-              })}`}>
-                {report.predictedGrade}
-              </p>
-              <p className="mt-2 text-sm text-content-muted">
-                {report.totalMarksAwarded} / {report.totalAvailableMarks} marks - {report.percentage}%
-              </p>
-              <p className="mt-1 text-xs text-content-subtle">This attempt only</p>
-              {report.targetGrade ? (
-                <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-semibold text-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-200">
-                  <TrendingUp className="h-4 w-4" />
-                  Target next: {report.targetGrade}
-                </p>
-              ) : (
-                <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-100 dark:bg-indigo-500/15 px-3 py-1.5 text-sm font-semibold text-indigo-800 dark:text-indigo-200">
-                  <Target className="h-4 w-4" />
-                  Top grade secured
-                </p>
-              )}
-              <p className="mt-4 text-xs text-content-subtle">{report.gradeBoundaryNote}</p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-2xl font-bold text-content">Marked Attempt</h2>
-                <MarkdownContent className="mt-2 text-sm text-content-muted dark:text-slate-300" content={report.summary} />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-subtle p-4">
-                  <h3 className="font-semibold text-content">Weakness Analysis</h3>
-                  <ul className="mt-3 space-y-2 text-sm text-content-muted dark:text-slate-300">
-                    {report.weaknessAnalysis.map((item) => (
-                      <li key={item} className="flex gap-2">
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/dashboard/exam-coach" className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'mt-4' })}>
-                    See patterns across all attempts
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
-
-                <div className="rounded-lg border border-subtle p-4">
-                  <h3 className="font-semibold text-content">Grade Upgrade Advice</h3>
-                  <ul className="mt-3 space-y-2 text-sm text-content-muted dark:text-slate-300">
-                    {report.gradeBoostAdvice.map((item) => (
-                      <li key={item} className="flex gap-2">
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
+        <>
+        <div className="flex-1 space-y-5 p-5">
+          <div>
+            <h2 className="text-title text-content">Marked attempt</h2>
+            <MarkdownContent className="mt-2 text-sm text-content-muted" content={report.summary} />
           </div>
 
-          <div className="mt-6 space-y-5">
+          <div className="space-y-5">
             {report.markedAnswers.map((marked) => {
               const question = questions[marked.questionIndex];
               if (!question) return null;
               return (
-                <article key={marked.questionIndex} className="rounded-lg border border-subtle p-5">
+                <article key={marked.questionIndex} className="rounded-lg border border-subtle bg-surface p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-content-muted dark:text-slate-300">Question {marked.questionIndex + 1}</span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-content-muted dark:bg-slate-800">
-                        {question.commandWord}
-                      </span>
-                      {question.questionType === 'mcq' ? (
-                        <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/45 dark:text-indigo-300">
-                          MCQ
-                        </span>
-                      ) : null}
+                      <MonoLabel className="mr-1">Question {String(marked.questionIndex + 1).padStart(2, '0')}</MonoLabel>
+                      <Chip>{question.commandWord}</Chip>
+                      {question.questionType === 'mcq' ? <Chip>MCQ</Chip> : null}
                     </div>
-                    <span className={`text-lg font-black ${reportTone(Math.round((marked.marksAwarded / Math.max(marked.maxMarks, 1)) * 100))}`}>
+                    <span className={`font-mono text-lg font-bold ${reportTone(Math.round((marked.marksAwarded / Math.max(marked.maxMarks, 1)) * 100))}`}>
                       {marked.marksAwarded} / {marked.maxMarks}
                     </span>
                   </div>
@@ -1571,10 +1627,10 @@ export default function AIQuestionsPage() {
                             key={letter}
                             className={`rounded-lg border px-3 py-2 text-sm ${
                               isCorrect
-                                ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-200'
+                                ? 'border-success bg-success-muted text-success'
                                 : isSelected
-                                  ? 'border-red-500 bg-red-50 text-red-900 dark:bg-red-950/35 dark:text-red-200'
-                                  : 'border-subtle text-content-muted dark:text-slate-300'
+                                  ? 'border-danger bg-danger-muted text-danger'
+                                  : 'border-subtle text-content-muted'
                             }`}
                           >
                             <span className="font-bold">{letter}.</span> <MarkdownContent inline content={option} />
@@ -1583,38 +1639,38 @@ export default function AIQuestionsPage() {
                       })}
                     </div>
                   ) : answers[marked.questionIndex]?.trim() ? (
-                    <div className="mt-3 rounded-lg border border-subtle px-4 py-3 bg-surface">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Your answer</p>
-                      <p className="mt-1.5 whitespace-pre-wrap text-sm text-content-muted dark:text-slate-200">{answers[marked.questionIndex]}</p>
+                    <div className="mt-3 rounded-lg border border-subtle bg-surface-sunken px-4 py-3">
+                      <MonoLabel>Your answer</MonoLabel>
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm text-content">{answers[marked.questionIndex]}</p>
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm italic text-content-subtle dark:text-content-subtle">No answer entered.</p>
+                    <p className="mt-3 text-sm italic text-content-subtle">No answer entered.</p>
                   )}
 
                   <div className="mt-4 grid gap-4 lg:grid-cols-2">
                     <div>
-                      <p className="text-sm font-semibold text-content">Feedback - {marked.band}</p>
-                      <MarkdownContent className="mt-2 text-sm text-content-muted dark:text-slate-300" content={marked.feedback} />
+                      <MonoLabel>Feedback · {marked.band}</MonoLabel>
+                      <MarkdownContent className="mt-2 text-sm text-content-muted" content={marked.feedback} />
                     </div>
 
                     <div>
-                      <p className="text-sm font-semibold text-content">Exemplar Answer</p>
-                      <MarkdownContent className="mt-2 text-sm text-content-muted dark:text-slate-300" content={marked.exemplarAnswer} />
+                      <MonoLabel>Exemplar answer</MonoLabel>
+                      <MarkdownContent className="mt-2 text-sm text-content-muted" content={marked.exemplarAnswer} />
                     </div>
                   </div>
 
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Strengths</p>
-                      <ul className="mt-2 space-y-1 text-sm text-content-muted dark:text-slate-300">
+                      <MonoLabel className="text-success">Strengths</MonoLabel>
+                      <ul className="mt-2 space-y-1 text-sm text-content-muted">
                         {(marked.strengths.length > 0 ? marked.strengths : ['No clear credit points were identified.']).map((item, index) => (
                           <li key={`${item}-${index}`}>{item}</li>
                         ))}
                       </ul>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">Improvements</p>
-                      <ul className="mt-2 space-y-1 text-sm text-content-muted dark:text-slate-300">
+                      <MonoLabel className="text-info">Improvements</MonoLabel>
+                      <ul className="mt-2 space-y-1 text-sm text-content-muted">
                         {(marked.improvements.length > 0
                           ? marked.improvements
                           : marked.marksAwarded >= marked.maxMarks
@@ -1631,22 +1687,27 @@ export default function AIQuestionsPage() {
             })}
           </div>
 
-          <div className="mt-6 flex flex-wrap justify-end gap-3">
-            <Link href="/dashboard" className={buttonStyles({ variant: 'primary', size: 'lg' })}>
-              <LayoutDashboard className="h-4 w-4" />
-              View dashboard progress
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <button type="button" onClick={retrySameQuestions} className={buttonStyles({ variant: 'secondary', size: 'lg' })}>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={resetToGenerator} className={buttonStyles({ variant: 'ghost' })}>
+              New set
+            </button>
+            <button type="button" onClick={retrySameQuestions} className={buttonStyles({ variant: 'secondary' })}>
               <RefreshCw className="h-4 w-4" />
               Retry
             </button>
-            <button type="button" onClick={resetToGenerator} className={buttonStyles({ variant: 'ghost', size: 'lg' })}>
-              New set
-            </button>
           </div>
-        </section>
+          <Link href="/dashboard" className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}>
+            <LayoutDashboard className="h-4 w-4" />
+            View dashboard progress
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        </>
       ) : null}
-    </div>
+      </WorkspaceBody>
+    </Workspace>
   );
 }

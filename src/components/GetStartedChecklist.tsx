@@ -39,7 +39,7 @@ export function GetStartedChecklist({ items, loading = false }: { items: Checkli
   };
 
   return (
-    <section className="overflow-hidden rounded-card border border-subtle bg-surface shadow-card">
+    <section className="overflow-hidden rounded-lg border border-subtle bg-surface">
       <div className="flex flex-wrap items-center gap-3 border-b border-subtle bg-surface-sunken px-5 py-4">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-field bg-accent-muted text-accent">
           <Rocket className="h-4.5 w-4.5" />

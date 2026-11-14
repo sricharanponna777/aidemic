@@ -1,5 +1,6 @@
 'use client';
 
+import { fieldStyles } from '@/components/ui/field';
 import { useId, useMemo, useState } from 'react';
 
 type SearchSelectOption = {
@@ -24,7 +25,7 @@ export function SearchSelect({
   onChange,
   placeholder = 'Search...',
   className = 'block text-sm font-medium text-content-muted dark:text-slate-300',
-  inputClassName = 'mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content',
+  inputClassName = fieldStyles(),
 }: SearchSelectProps) {
   const inputId = useId();
   const [isFocused, setIsFocused] = useState(false);
@@ -48,7 +49,9 @@ export function SearchSelect({
 
   return (
     <div className={className}>
-      <label htmlFor={inputId}>{label}</label>
+      <label htmlFor={inputId} className="mb-1 block font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-content-subtle">
+        {label}
+      </label>
       <div className="relative">
         <input
           id={inputId}

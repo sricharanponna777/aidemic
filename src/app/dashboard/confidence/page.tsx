@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Gauge, GraduationCap, ListChecks } from 'lucide-react';
+import { ChevronDown, ChevronRight, Gauge, GraduationCap, ListChecks, Radar } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ToastProvider';
 import { createClient } from '@/lib/supabase-client';
 import { buttonStyles } from '@/components/ui/button';
-import { EmptyState, PageHero } from '@/components/ui/feedback';
+import { EmptyState, PageHeader } from '@/components/ui/feedback';
+import { Chip, Meter, MonoLabel, Panel, PanelHeading, Stat, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 import { readStudentMastery, type SubtopicMastery } from '@/lib/mastery/read';
@@ -53,11 +54,11 @@ const ratingTone = (rating: SelfRating, selected: boolean): string => {
   if (!selected) return 'border-subtle bg-surface text-content-subtle hover:border-strong';
   switch (rating) {
     case 'green':
-      return 'border-emerald-500 bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300';
+      return 'border-success bg-success-muted text-success';
     case 'amber':
-      return 'border-amber-500 bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
+      return 'border-warning bg-warning-muted text-warning';
     default:
-      return 'border-red-500 bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300';
+      return 'border-danger bg-danger-muted text-danger';
   }
 };
 
@@ -253,150 +254,206 @@ export default function ConfidencePage() {
     [ratings, showToast]
   );
 
+  const ratingCounts = SELF_RATINGS.map((rating) => ({
+    rating,
+    count: subtopics.filter((subtopic) => ratings.get(subtopic.id) === rating).length,
+  }));
+  const hasSpec = !isLoading && subjects.length > 0 && !isLoadingSpec && topics.length > 0;
+
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Confidence report</PanelHeading>
+      {hasSpec ? (
+        <>
+          <Panel>
+            <div className="flex items-baseline justify-between gap-2">
+              <MonoLabel>Rated</MonoLabel>
+              <span className="font-mono text-xs text-content-subtle">
+                {ratedCount} / {subtopics.length}
+              </span>
+            </div>
+            <Meter fraction={subtopics.length ? ratedCount / subtopics.length : 0} className="mt-3" label="Subtopics rated" />
+          </Panel>
+          <div className="grid grid-cols-3 gap-2">
+            {ratingCounts.map(({ rating, count }) => (
+              <Stat
+                key={rating}
+                label={RATING_LABEL[rating]}
+                value={count}
+                tone={rating === 'green' ? 'success' : rating === 'amber' ? 'warning' : 'danger'}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+      <Panel>
+        <p className="text-sm font-semibold text-content">How ratings are used</p>
+        <ul className="mt-2 space-y-1.5 text-[13px] text-content-subtle">
+          {SELF_RATINGS.map((rating) => (
+            <li key={rating}>
+              <span className="font-semibold text-content">{RATING_LABEL[rating]}</span>: {RATING_HINT[rating]}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-[13px] text-content-subtle">Your reds go to the front of the review queue.</p>
+        <Link
+          href="/dashboard/daily-review"
+          className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'mt-3 w-full justify-center' })}
+        >
+          <ListChecks className="h-4 w-4" />
+          Daily Review
+        </Link>
+      </Panel>
+    </>
+  );
+
   return (
-    <div className="space-y-6">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={Gauge}
+        eyebrow="Review / Self-rating"
         title="Topic Confidence"
         description="Rate each part of your specification red, amber or green. Your reds go to the front of the review queue."
         actions={
-          <Link href="/dashboard/daily-review" className={buttonStyles({ variant: 'secondary' })}>
-            <ListChecks className="h-4 w-4" />
-            Daily Review
-          </Link>
+          <>
+            <Chip>● Mode: red / amber / green</Chip>
+            {activeSubject ? <Chip tone="success">{activeSubject.label}</Chip> : null}
+          </>
         }
       />
 
-      {isLoading ? (
-        <p className="text-body text-content-subtle">Loading your specification…</p>
-      ) : subjects.length === 0 ? (
-        <EmptyState
-          icon={GraduationCap}
-          title="No subjects yet"
-          description="Add a subject and we'll pull in its specification so you can rate every topic."
-          action={
-            <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'primary' })}>
-              Add subjects
-            </Link>
-          }
-        />
-      ) : (
-        <>
-          {subjects.length > 1 && (
-            <div className="flex flex-wrap gap-2">
-              {subjects.map((subject) => (
-                <button
-                  key={subject.id}
-                  type="button"
-                  onClick={() => setActiveSubjectId(subject.id)}
-                  aria-pressed={subject.id === activeSubjectId}
-                  className={`rounded-full border px-3.5 py-1.5 text-caption font-semibold transition ${
-                    subject.id === activeSubjectId
-                      ? 'border-accent bg-accent-muted text-accent'
-                      : 'border-subtle bg-surface text-content-subtle hover:border-strong'
-                  }`}
-                >
-                  {subject.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {isLoadingSpec ? (
-            <p className="text-body text-content-subtle">Loading topics…</p>
-          ) : topics.length === 0 ? (
+      <WorkspaceBody aside={reportColumn}>
+        {isLoading ? (
+          <p className="p-5 text-body text-content-subtle">Loading your specification…</p>
+        ) : subjects.length === 0 ? (
+          <div className="p-5">
             <EmptyState
               icon={GraduationCap}
-              title="No topics for this specification"
-              description="This specification has no seeded topics yet, so there is nothing to rate."
+              title="No subjects yet"
+              description="Add a subject and we'll pull in its specification so you can rate every topic."
+              action={
+                <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'primary' })}>
+                  Add subjects
+                </Link>
+              }
             />
-          ) : (
-            <>
-              <div className="rounded-card border border-subtle bg-surface px-4 py-3 shadow-card">
-                <p className="text-body text-content-muted">
-                  <span className="font-semibold text-content">{ratedCount}</span> of{' '}
-                  <span className="font-semibold text-content">{subtopics.length}</span> subtopics rated
-                </p>
+          </div>
+        ) : (
+          <>
+            {subjects.length > 1 && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-subtle p-5">
+                <MonoLabel className="mr-1">Subject</MonoLabel>
+                {subjects.map((subject) => (
+                  <button
+                    key={subject.id}
+                    type="button"
+                    onClick={() => setActiveSubjectId(subject.id)}
+                    aria-pressed={subject.id === activeSubjectId}
+                    className={`rounded-md border px-2.5 py-1 font-mono text-xs font-medium transition ${
+                      subject.id === activeSubjectId
+                        ? 'border-accent bg-accent-muted text-accent'
+                        : 'border-subtle bg-surface text-content-subtle hover:border-strong'
+                    }`}
+                  >
+                    {subject.label}
+                  </button>
+                ))}
               </div>
+            )}
 
-              <section className="space-y-3">
-                {topics.map((topic) => {
-                  const topicSubtopics = subtopicsByTopic.get(topic.id) ?? [];
-                  const isOpen = expanded.has(topic.id);
-                  const topicRated = topicSubtopics.filter((subtopic) => ratings.has(subtopic.id)).length;
+            {isLoadingSpec ? (
+              <p className="p-5 text-body text-content-subtle">Loading topics…</p>
+            ) : topics.length === 0 ? (
+              <div className="p-5">
+                <EmptyState
+                  icon={GraduationCap}
+                  title="No topics for this specification"
+                  description="This specification has no seeded topics yet, so there is nothing to rate."
+                />
+              </div>
+            ) : (
+              <>
+                <StatusBar>
+                  <span>
+                    <span className="font-semibold text-content">{ratedCount}</span> of{' '}
+                    <span className="font-semibold text-content">{subtopics.length}</span> subtopics rated
+                  </span>
+                  <span>{topics.length} topics</span>
+                </StatusBar>
 
-                  return (
-                    <div key={topic.id} className="rounded-card border border-subtle bg-surface shadow-card">
-                      <button
-                        type="button"
-                        onClick={() => toggleTopic(topic.id)}
-                        aria-expanded={isOpen}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                      >
-                        {isOpen ? (
-                          <ChevronDown className="h-4 w-4 shrink-0 text-content-subtle" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 shrink-0 text-content-subtle" />
-                        )}
-                        <span className="min-w-0 flex-1 font-semibold text-content">{topic.name}</span>
-                        <span className="shrink-0 text-caption text-content-subtle">
-                          {topicRated}/{topicSubtopics.length}
-                        </span>
-                      </button>
+                <section className="flex-1 space-y-2 p-5" aria-label="Specification topics">
+                  {topics.map((topic) => {
+                    const topicSubtopics = subtopicsByTopic.get(topic.id) ?? [];
+                    const isOpen = expanded.has(topic.id);
+                    const topicRated = topicSubtopics.filter((subtopic) => ratings.has(subtopic.id)).length;
 
-                      {isOpen && (
-                        <ul className="divide-y divide-subtle border-t border-subtle">
-                          {topicSubtopics.map((subtopic) => {
-                            const measured = mastery.get(subtopic.id);
-                            const band = measured?.band ?? 'unknown';
-                            const selected = ratings.get(subtopic.id) ?? null;
+                    return (
+                      <div key={topic.id} className="rounded-lg border border-subtle bg-surface">
+                        <button
+                          type="button"
+                          onClick={() => toggleTopic(topic.id)}
+                          aria-expanded={isOpen}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                        >
+                          {isOpen ? (
+                            <ChevronDown className="h-4 w-4 shrink-0 text-content-subtle" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-content-subtle" />
+                          )}
+                          <span className="min-w-0 flex-1 font-semibold text-content">{topic.name}</span>
+                          <span className="shrink-0 font-mono text-xs text-content-subtle">
+                            {topicRated}/{topicSubtopics.length}
+                          </span>
+                        </button>
 
-                            return (
-                              <li
-                                key={subtopic.id}
-                                className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap"
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-body text-content">{subtopic.name}</p>
-                                  <span
-                                    className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-caption font-semibold ${masteryBadgeTone(band)}`}
-                                  >
-                                    {MASTERY_LABEL[band]}
-                                  </span>
-                                </div>
+                        {isOpen && (
+                          <ul className="divide-y divide-subtle border-t border-subtle">
+                            {topicSubtopics.map((subtopic) => {
+                              const measured = mastery.get(subtopic.id);
+                              const band = measured?.band ?? 'unknown';
+                              const selected = ratings.get(subtopic.id) ?? null;
 
-                                <div
-                                  role="group"
-                                  aria-label={`Confidence for ${subtopic.name}`}
-                                  className="flex shrink-0 gap-1.5"
-                                >
-                                  {SELF_RATINGS.map((rating) => (
-                                    <button
-                                      key={rating}
-                                      type="button"
-                                      disabled={saving.has(subtopic.id)}
-                                      onClick={() => void rate(subtopic.id, rating)}
-                                      aria-pressed={selected === rating}
-                                      title={RATING_HINT[rating]}
-                                      className={`rounded-lg border px-3 py-1.5 text-caption font-semibold transition disabled:opacity-60 ${ratingTone(rating, selected === rating)}`}
+                              return (
+                                <li key={subtopic.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-body text-content">{subtopic.name}</p>
+                                    <span
+                                      className={`mt-1 inline-flex rounded-md px-2 py-0.5 font-mono text-[11px] font-semibold ${masteryBadgeTone(band)}`}
                                     >
-                                      {RATING_LABEL[rating]}
-                                    </button>
-                                  ))}
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })}
-              </section>
-            </>
-          )}
-        </>
-      )}
-    </div>
+                                      {MASTERY_LABEL[band]}
+                                    </span>
+                                  </div>
+
+                                  <div role="group" aria-label={`Confidence for ${subtopic.name}`} className="flex shrink-0 gap-1.5">
+                                    {SELF_RATINGS.map((rating) => (
+                                      <button
+                                        key={rating}
+                                        type="button"
+                                        disabled={saving.has(subtopic.id)}
+                                        onClick={() => void rate(subtopic.id, rating)}
+                                        aria-pressed={selected === rating}
+                                        title={RATING_HINT[rating]}
+                                        className={`rounded-md border px-3 py-1.5 font-mono text-xs font-semibold transition disabled:opacity-60 ${ratingTone(rating, selected === rating)}`}
+                                      >
+                                        {RATING_LABEL[rating]}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </section>
+              </>
+            )}
+          </>
+        )}
+      </WorkspaceBody>
+    </Workspace>
   );
 }

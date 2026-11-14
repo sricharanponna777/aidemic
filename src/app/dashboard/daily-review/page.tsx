@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ListChecks, RotateCcw, Sparkles, Target } from 'lucide-react';
+import { ArrowRight, Layers, ListChecks, Radar, RotateCcw, Sparkles, Target } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { Chip, Meter, MonoLabel, Panel, PanelHeading, Stat, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { REVIEW_GRADES, useReviewShortcuts } from '@/hooks/useReviewShortcuts';
 import { hasCloze, maskAllCloze, revealAllCloze } from '@/lib/cloze';
 import { normalizeInsightLabel } from '@/lib/weaknesses';
@@ -550,274 +551,380 @@ export default function DailyReviewPage() {
     setSelectedOption('');
   };
 
+  const doneCount = phase === 'summary' ? queue.length : currentIndex;
+  const remaining = queue.slice(currentIndex);
+  const flashcardsLeft = remaining.filter((item) => item.kind === 'flashcard').length;
+  const questionsLeft = remaining.length - flashcardsLeft;
+  const nothingDue = !isLoadingSummary && dueFlashcardCount === 0 && weakTopics.length === 0;
+
+  const reportColumn = (
+    <>
+      <PanelHeading
+        icon={Radar}
+        aside={
+          phase === 'summary' ? (
+            <Chip tone="success">Complete</Chip>
+          ) : phase === 'reviewing' ? (
+            <Chip tone="success">● Live session</Chip>
+          ) : null
+        }
+      >
+        Session report
+      </PanelHeading>
+
+      {(phase === 'idle' || phase === 'loading') && (
+        <Panel>
+          <p className="text-sm font-semibold text-content">How this session works</p>
+          <ul className="mt-2 space-y-1.5 text-[13px] text-content-subtle">
+            <li>Your due flashcards come first in the mix</li>
+            <li>One quick question for every {FLASHCARDS_PER_MICROQUESTION} cards, aimed at a weak spot</li>
+            <li>Rate each card and answer each question</li>
+            <li>Your next review dates update as you go</li>
+          </ul>
+        </Panel>
+      )}
+
+      {phase === 'reviewing' && (
+        <>
+          <Panel>
+            <div className="flex items-baseline justify-between gap-2">
+              <MonoLabel>Progress</MonoLabel>
+              <span className="font-mono text-xs text-content-subtle">
+                {doneCount} / {queue.length}
+              </span>
+            </div>
+            <Meter fraction={queue.length ? doneCount / queue.length : 0} className="mt-3" label="Review progress" />
+          </Panel>
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Cards left" value={flashcardsLeft} />
+            <Stat label="Questions left" value={questionsLeft} />
+          </div>
+        </>
+      )}
+
+      {phase === 'summary' && summary && (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Cards reviewed" value={summary.flashcardsStudied} />
+            <Stat
+              label="Questions right"
+              value={summary.microAttempted > 0 ? `${summary.microCorrect}/${summary.microAttempted}` : '—'}
+              tone={summary.microAttempted > 0 && summary.microCorrect === summary.microAttempted ? 'success' : 'default'}
+            />
+          </div>
+          <Panel>
+            <p className="text-sm font-semibold text-content">What next</p>
+            <p className="mt-1 text-[13px] text-content-subtle">
+              Weak spots you missed come back in a later queue. To work on one properly, open it in Smart Practice.
+            </p>
+          </Panel>
+        </>
+      )}
+    </>
+  );
+
   return (
-    <div className="space-y-6" aria-labelledby="daily-review-title">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={ListChecks}
+        eyebrow="Review / Mixed queue"
         titleId="daily-review-title"
         title="Daily Review"
         description="One mixed queue: your due flashcards interleaved with quick questions targeting your recurring weak spots."
         actions={
           <>
-            <Link href="/dashboard/study-sessions" className={buttonStyles({ variant: 'secondary' })}>Flashcard Revision</Link>
-            <Link href="/dashboard/ai-questions" className={buttonStyles({ variant: 'secondary' })}>Smart Practice</Link>
+            <Chip>● Mode: spaced repetition</Chip>
+            <Chip tone="warning">
+              <Layers className="h-3 w-3" /> {isLoadingSummary ? '…' : sessionFlashcardCount} cards due
+            </Chip>
+            <Chip tone="danger">
+              <Target className="h-3 w-3" /> {isLoadingSummary ? '…' : weakTopics.length} weak spots
+            </Chip>
           </>
         }
       />
 
-      {phase === 'idle' && (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-subtle p-4">
-              <p className="text-sm font-medium text-content-muted">Flashcards this session</p>
-              {/* The session is capped, so this is the capped number: it has to
-                  match the "Item 1 of N" the student sees once they start. The
-                  full backlog is spelled out underneath rather than hidden. */}
-              <p className="mt-2 text-3xl font-bold text-content">
-                {isLoadingSummary ? '…' : sessionFlashcardCount}
-              </p>
-              {!isLoadingSummary && dueFlashcardCount > sessionFlashcardCount ? (
-                <p className="mt-1 text-caption text-content-subtle">
-                  {dueFlashcardCount} due — the rest carry over to your next session
-                </p>
-              ) : null}
-            </div>
-            <div className="rounded-xl border border-subtle p-4">
-              <p className="text-sm font-medium text-content-muted">Weak spots targeted</p>
-              <p className="mt-2 text-3xl font-bold text-content">{isLoadingSummary ? '…' : weakTopics.length}</p>
-            </div>
-          </div>
-
-          {weakTopics.length > 0 ? (
-            <ul className="mt-5 space-y-2">
-              {weakTopics.map((topic) => (
-                <li
-                  key={topic.tag}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 text-sm font-semibold text-content">
-                      <Target className="h-3.5 w-3.5 shrink-0 text-accent" />
-                      <span className="truncate">{topic.tag}</span>
-                    </p>
-                    {topic.topicName ? (
-                      <p className="mt-0.5 truncate text-caption text-content-subtle">
-                        {getSubjectLabel(topic.subject)} · {topic.topicName}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {/* masteryBand already returns 'unknown' below the confidence
-                        floor, so there is no threshold to re-check here. */}
-                    {topic.band ? (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${masteryBadgeTone(topic.band)}`}
-                      >
-                        {MASTERY_LABEL[topic.band]}
-                      </span>
-                    ) : null}
-                    <Link
-                      href={`/dashboard/ai-questions?${new URLSearchParams({
-                        topic: topic.topicName ?? topic.tag,
-                        ...(topic.subtopicName ? { subtopic: topic.subtopicName } : {}),
-                      })}`}
-                      className={buttonStyles({ variant: 'ghost', size: 'chip' })}
-                    >
-                      Practise this
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          <div className="mt-6">
-            <button
-              className={buttonStyles({ variant: 'primary', size: 'lg' })}
-              onClick={handleStart}
-              disabled={isLoadingSummary || (dueFlashcardCount === 0 && weakTopics.length === 0)}
-            >
-              <Sparkles className="h-4 w-4" />
-              Start Daily Review
-              <ArrowRight className="h-4 w-4" />
-            </button>
-            {!isLoadingSummary && dueFlashcardCount === 0 && weakTopics.length === 0 ? (
-              <p className="mt-3 text-sm text-content-subtle">
-                Nothing due right now. Come back once flashcards are due or after your next Smart Practice attempt.
-              </p>
-            ) : null}
-          </div>
-        </section>
-      )}
-
-      {phase === 'loading' && (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <style>{`@keyframes daily-review-loading{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
-          <div className="h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-surface/10">
-            <div className="h-full w-2/5 rounded-full bg-linear-to-r from-indigo-600 to-purple-500" style={{ animation: 'daily-review-loading 1.4s ease-in-out infinite' }} />
-          </div>
-          <p className="mt-3 text-sm text-content-muted">Building your review queue…</p>
-        </section>
-      )}
-
-      {phase === 'reviewing' && currentItem && (
-        <section className="space-y-5 rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-accent">
-                Item {currentIndex + 1} of {queue.length}
-              </p>
-              <h2 className="mt-1 text-2xl font-bold text-content">
-                {currentItem.kind === 'flashcard' ? 'Flashcard' : `Weak spot: ${currentItem.weaknessTag}`}
-              </h2>
-            </div>
-            {currentItem.kind === 'microquestion' ? (
-              <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-950/45 dark:text-indigo-300">
-                {currentItem.subjectLabel}
-              </span>
-            ) : null}
-          </div>
-
-          <div className="rounded-lg border border-subtle bg-surface-sunken p-5 dark:bg-surface/3" aria-labelledby="current-item-heading">
-            <p id="current-item-heading" className="text-xs font-semibold uppercase tracking-wide text-content-subtle">
-              {currentItem.kind === 'flashcard' && hasCloze(currentItem.front)
-                ? 'Fill the gap'
-                : currentItem.kind === 'flashcard'
-                ? 'Front'
-                : 'Question'}
-            </p>
-            <MarkdownContent
-              className="prose prose-sm mt-2 max-w-none text-content"
-              content={hasCloze(currentItem.front) ? maskAllCloze(currentItem.front) : currentItem.front}
-            />
-
-            {isMcqItem && currentItem.kind === 'microquestion' ? (
-              <div className="mt-5 grid gap-2" role="group" aria-label="Answer options">
-                {currentItem.options.map((optionText, index) => {
-                  const letter = (['A', 'B', 'C', 'D'] as const)[index];
-                  if (!letter || !optionText) return null;
-                  const isCorrectOption = letter === currentItem.correctOption;
-                  const isSelected = letter === selectedOption;
-                  const answered = !!selectedOption;
-                  const stateClass = !answered
-                    ? 'border-subtle hover:border-accent hover:bg-surface-sunken'
-                    : isCorrectOption
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-200'
-                    : isSelected
-                    ? 'border-red-500 bg-red-50 text-red-900 dark:bg-red-950/35 dark:text-red-200'
-                    : 'border-subtle opacity-60';
-                  return (
-                    <button
-                      key={letter}
-                      type="button"
-                      className={`flex items-center gap-3 rounded-field border px-4 py-3 text-left text-body transition-colors ${stateClass}`}
-                      onClick={() => handleSelectOption(letter)}
-                      disabled={answered}
-                      aria-pressed={isSelected}
-                    >
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-current text-caption font-semibold">
-                        {letter}
-                      </span>
-                      <MarkdownContent className="prose prose-sm max-w-none" content={optionText} />
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {showBack ? (
-              <>
-                <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-content-subtle">
-                  {currentItem.kind === 'flashcard' ? 'Back' : 'Answer'}
-                </p>
-                <MarkdownContent
-                  className="prose prose-sm mt-2 max-w-none text-content-muted dark:text-slate-200"
-                  content={hasCloze(currentItem.front) ? revealAllCloze(currentItem.front) : currentItem.back}
+      <WorkspaceBody aside={reportColumn}>
+        {phase === 'idle' && (
+          <>
+            <div className="border-b border-subtle p-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* The session is capped, so this is the capped number: it has to
+                    match the "Item 1 of N" the student sees once they start. The
+                    full backlog is spelled out underneath rather than hidden. */}
+                <Stat
+                  label="Flashcards this session"
+                  value={isLoadingSummary ? '…' : sessionFlashcardCount}
+                  hint={
+                    !isLoadingSummary && dueFlashcardCount > sessionFlashcardCount
+                      ? `${dueFlashcardCount} due — the rest carry over to your next session`
+                      : undefined
+                  }
                 />
-              </>
-            ) : !isMcqItem ? (
-              <button
-                className={buttonStyles({ variant: 'primary', className: 'mt-5' })}
-                onClick={() => setShowBack(true)}
-                aria-label="Reveal answer"
-                aria-keyshortcuts="Space Enter"
-              >
-                Show answer
-                <kbd className="rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-semibold">Space</kbd>
-              </button>
-            ) : null}
-          </div>
+                <Stat label="Weak spots targeted" value={isLoadingSummary ? '…' : weakTopics.length} />
+              </div>
+            </div>
 
-          {showBack && isMcqItem && (
-            <div className="space-y-3">
-              <button className={buttonStyles({ variant: 'primary' })} onClick={handleMcqContinue}>
-                Continue
+            <div className="flex-1 p-5">
+              <PanelHeading icon={Target} className="mb-3">
+                Weak spots
+              </PanelHeading>
+              {weakTopics.length > 0 ? (
+                <ul className="space-y-2">
+                  {weakTopics.map((topic) => (
+                    <li
+                      key={topic.tag}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-subtle bg-surface px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-content">{topic.tag}</p>
+                        {topic.topicName ? (
+                          <p className="mt-0.5 truncate font-mono text-xs text-content-subtle">
+                            {getSubjectLabel(topic.subject)} · {topic.topicName}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {/* masteryBand already returns 'unknown' below the confidence
+                            floor, so there is no threshold to re-check here. */}
+                        {topic.band ? (
+                          <span
+                            className={`rounded-md px-2 py-0.5 font-mono text-[11px] font-semibold ${masteryBadgeTone(topic.band)}`}
+                          >
+                            {MASTERY_LABEL[topic.band]}
+                          </span>
+                        ) : null}
+                        <Link
+                          href={`/dashboard/ai-questions?${new URLSearchParams({
+                            topic: topic.topicName ?? topic.tag,
+                            ...(topic.subtopicName ? { subtopic: topic.subtopicName } : {}),
+                          })}`}
+                          className={buttonStyles({ variant: 'ghost', size: 'chip' })}
+                        >
+                          Practise this
+                        </Link>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-body text-content-subtle">
+                  {isLoadingSummary
+                    ? 'Looking for weak spots…'
+                    : 'No recurring weak spots yet. They come from the marks on your Smart Practice attempts.'}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+              {nothingDue ? (
+                <p className="text-sm text-content-subtle">
+                  Nothing due right now. Come back once flashcards are due or after your next Smart Practice attempt.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-4 font-mono text-xs text-content-subtle max-sm:hidden">
+                  <Link href="/dashboard/study-sessions" className="transition-colors hover:text-content">
+                    Flashcard Revision →
+                  </Link>
+                  <Link href="/dashboard/ai-questions" className="transition-colors hover:text-content">
+                    Smart Practice →
+                  </Link>
+                </div>
+              )}
+              <button
+                className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
+                onClick={handleStart}
+                disabled={isLoadingSummary || nothingDue}
+              >
+                <Sparkles className="h-4 w-4" />
+                Start Daily Review
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>
-          )}
+          </>
+        )}
 
-          {showBack && !isMcqItem && (
-            <div className="space-y-3" role="group" aria-labelledby="recall-rating-label">
-              <p id="recall-rating-label" className="text-body font-medium text-content-muted">
-                Rate your recall
-              </p>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {gradeButtons.map(({ label, quality, color, shortcut, subtext }) => (
-                  <button
-                    key={quality}
-                    className={buttonStyles({
-                      variant: 'plain',
-                      size: 'none',
-                      className: `flex-col rounded-field border border-transparent px-4 py-3 shadow-card transition-all hover:brightness-110 hover:shadow-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${color}`,
+        {phase === 'loading' && (
+          <div className="p-5">
+            <style>{`@keyframes daily-review-loading{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}`}</style>
+            <div className="h-1 overflow-hidden rounded-full bg-surface-sunken">
+              <div
+                className="h-full w-2/5 rounded-full bg-linear-to-r from-accent to-accent-2"
+                style={{ animation: 'daily-review-loading 1.4s ease-in-out infinite' }}
+              />
+            </div>
+            <p className="mt-3 text-sm text-content-muted">Building your review queue…</p>
+          </div>
+        )}
+
+        {phase === 'reviewing' && currentItem && (
+          <>
+            <StatusBar>
+              <span className="font-semibold text-content">
+                Item {currentIndex + 1} of {queue.length}
+              </span>
+              <span>{currentItem.kind === 'flashcard' ? 'Flashcard' : 'Weak-spot question'}</span>
+              {currentItem.kind === 'microquestion' ? <Chip>{currentItem.subjectLabel}</Chip> : null}
+            </StatusBar>
+
+            <div className="flex-1 space-y-4 p-5">
+              <h2 className={currentItem.kind === 'microquestion' ? 'text-title text-content' : 'sr-only'}>
+                {currentItem.kind === 'flashcard' ? 'Flashcard' : `Weak spot: ${currentItem.weaknessTag}`}
+              </h2>
+
+              <div className="rounded-lg border border-subtle bg-surface-sunken p-5" aria-labelledby="current-item-heading">
+                <MonoLabel>
+                  <span id="current-item-heading">
+                    {currentItem.kind === 'flashcard' && hasCloze(currentItem.front)
+                      ? 'Fill the gap'
+                      : currentItem.kind === 'flashcard'
+                      ? 'Front'
+                      : 'Question'}
+                  </span>
+                </MonoLabel>
+                <MarkdownContent
+                  className="prose prose-sm mt-2 max-w-none text-content"
+                  content={hasCloze(currentItem.front) ? maskAllCloze(currentItem.front) : currentItem.front}
+                />
+
+                {isMcqItem && currentItem.kind === 'microquestion' ? (
+                  <div className="mt-5 grid gap-2" role="group" aria-label="Answer options">
+                    {currentItem.options.map((optionText, index) => {
+                      const letter = (['A', 'B', 'C', 'D'] as const)[index];
+                      if (!letter || !optionText) return null;
+                      const isCorrectOption = letter === currentItem.correctOption;
+                      const isSelected = letter === selectedOption;
+                      const answered = !!selectedOption;
+                      const stateClass = !answered
+                        ? 'border-subtle bg-surface hover:border-accent'
+                        : isCorrectOption
+                        ? 'border-success bg-success-muted text-success'
+                        : isSelected
+                        ? 'border-danger bg-danger-muted text-danger'
+                        : 'border-subtle bg-surface opacity-60';
+                      return (
+                        <button
+                          key={letter}
+                          type="button"
+                          className={`flex items-center gap-3 rounded-field border px-4 py-3 text-left text-body transition-colors ${stateClass}`}
+                          onClick={() => handleSelectOption(letter)}
+                          disabled={answered}
+                          aria-pressed={isSelected}
+                        >
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-current font-mono text-caption font-semibold">
+                            {letter}
+                          </span>
+                          <MarkdownContent className="prose prose-sm max-w-none" content={optionText} />
+                        </button>
+                      );
                     })}
-                    onClick={() => handleGrade(quality)}
-                    aria-label={`${label}: ${subtext}`}
-                    aria-keyshortcuts={shortcut}
-                  >
-                    <span className="flex items-center gap-1.5 text-body font-semibold">
-                      {label}
-                      <kbd className="rounded border border-white/35 px-1 text-[10px] font-semibold opacity-90">{shortcut}</kbd>
-                    </span>
-                    <span className="block text-caption opacity-90">{subtext}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-caption text-content-subtle">
-                Keyboard: <kbd className="rounded bg-surface-sunken px-1">Space</kbd> reveal or Good ·{' '}
-                <kbd className="rounded bg-surface-sunken px-1">1</kbd>–<kbd className="rounded bg-surface-sunken px-1">4</kbd> to grade
-              </p>
-            </div>
-          )}
-        </section>
-      )}
+                  </div>
+                ) : null}
 
-      {phase === 'summary' && summary && (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <div className="flex items-start gap-4">
-            <div className="rounded-xl bg-emerald-100 dark:bg-emerald-500/15 p-3 text-emerald-600 dark:text-emerald-400">
-              <RotateCcw className="h-6 w-6" />
+                {showBack ? (
+                  <div className="mt-5 border-t border-subtle pt-4">
+                    <MonoLabel>{currentItem.kind === 'flashcard' ? 'Back' : 'Answer'}</MonoLabel>
+                    <MarkdownContent
+                      className="prose prose-sm mt-2 max-w-none text-content"
+                      content={hasCloze(currentItem.front) ? revealAllCloze(currentItem.front) : currentItem.back}
+                    />
+                  </div>
+                ) : null}
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-content">Review complete</h2>
-              <p className="mt-1 text-sm text-content-muted">
-                {summary.flashcardsStudied} flashcard{summary.flashcardsStudied === 1 ? '' : 's'} reviewed
-                {summary.microAttempted > 0
-                  ? ` · ${summary.microCorrect}/${summary.microAttempted} weak-spot questions right`
-                  : ''}.
-              </p>
+
+            <div className="border-t border-subtle p-4">
+              {!showBack && !isMcqItem ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="font-mono text-xs text-content-subtle max-sm:hidden">Press Space to reveal</p>
+                  <button
+                    className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
+                    onClick={() => setShowBack(true)}
+                    aria-label="Reveal answer"
+                    aria-keyshortcuts="Space Enter"
+                  >
+                    Show answer
+                    <kbd className="rounded border border-white/30 px-1.5 py-0.5 text-[10px] font-semibold">Space</kbd>
+                  </button>
+                </div>
+              ) : null}
+
+              {!showBack && isMcqItem ? <p className="font-mono text-xs text-content-subtle">Pick an answer above</p> : null}
+
+              {showBack && isMcqItem && (
+                <div className="flex justify-end">
+                  <button className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })} onClick={handleMcqContinue}>
+                    Continue
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
+              {showBack && !isMcqItem && (
+                <div className="space-y-3" role="group" aria-labelledby="recall-rating-label">
+                  <MonoLabel>
+                    <span id="recall-rating-label">Rate your recall</span>
+                  </MonoLabel>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {gradeButtons.map(({ label, quality, color, shortcut, subtext }) => (
+                      <button
+                        key={quality}
+                        className={buttonStyles({
+                          variant: 'plain',
+                          size: 'none',
+                          className: `flex-col rounded-field border border-transparent px-4 py-3 transition-all hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${color}`,
+                        })}
+                        onClick={() => handleGrade(quality)}
+                        aria-label={`${label}: ${subtext}`}
+                        aria-keyshortcuts={shortcut}
+                      >
+                        <span className="flex items-center gap-1.5 text-body font-semibold">
+                          {label}
+                          <kbd className="rounded border border-white/35 px-1 text-[10px] font-semibold opacity-90">{shortcut}</kbd>
+                        </span>
+                        <span className="block font-mono text-caption opacity-90">{subtext}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="font-mono text-xs text-content-subtle">Space: reveal or Good · 1–4: grade</p>
+                </div>
+              )}
             </div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <button className={buttonStyles({ variant: 'primary' })} onClick={resetToIdle}>
-              Back to Daily Review
-            </button>
-            <Link href="/dashboard" className={buttonStyles({ variant: 'secondary' })}>
-              Dashboard
-            </Link>
-          </div>
-        </section>
-      )}
-    </div>
+          </>
+        )}
+
+        {phase === 'summary' && summary && (
+          <>
+            <div className="flex-1 p-5">
+              <div className="flex gap-3 rounded-lg border border-subtle bg-surface-sunken p-4">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-success">
+                  <RotateCcw className="h-4 w-4" />
+                </span>
+                <div>
+                  <MonoLabel>Session complete</MonoLabel>
+                  <h2 className="mt-1 text-title text-content">Review complete</h2>
+                  <p className="mt-1 text-body text-content-muted">
+                    {summary.flashcardsStudied} flashcard{summary.flashcardsStudied === 1 ? '' : 's'} reviewed
+                    {summary.microAttempted > 0
+                      ? ` · ${summary.microCorrect}/${summary.microAttempted} weak-spot questions right`
+                      : ''}
+                    .
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-subtle p-4">
+              <Link href="/dashboard" className={buttonStyles({ variant: 'secondary' })}>
+                Dashboard
+              </Link>
+              <button className={buttonStyles({ variant: 'primary' })} onClick={resetToIdle}>
+                <RotateCcw className="h-4 w-4" /> Back to Daily Review
+              </button>
+            </div>
+          </>
+        )}
+      </WorkspaceBody>
+    </Workspace>
   );
 }

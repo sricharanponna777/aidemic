@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Compass, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import { CheckCircle2, Compass, Radar, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { Chip, MonoLabel, Panel, PanelHeading, Stat, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ToastProvider';
 import { cachedAiFetch } from '@/lib/aiCache';
@@ -17,11 +18,11 @@ const RECENT_WINDOW = 5;
 
 const BAND_ORDER = ['No credit yet', 'Limited', 'Developing', 'Secure', 'Top band'];
 const BAND_COLORS: Record<string, string> = {
-  'No credit yet': 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
-  Limited: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-  Developing: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
-  Secure: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-  'Top band': 'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300',
+  'No credit yet': 'bg-danger-muted text-danger',
+  Limited: 'bg-warning-muted text-warning',
+  Developing: 'bg-info-muted text-info',
+  Secure: 'bg-success-muted text-success',
+  'Top band': 'bg-xp-muted text-xp',
 };
 
 type MarkedAnswer = { band?: string; weaknessTags?: string[] };
@@ -154,133 +155,198 @@ export default function ExamCoachPage() {
 
   const hasEnoughData = attempts.length > 0;
 
-  return (
-    <div className="space-y-6" aria-labelledby="exam-coach-title">
-      <PageHero
-        icon={Compass}
-        titleId="exam-coach-title"
-        title="Exam Coach"
-        description="Patterns in why you keep losing marks, drawn from every Smart Practice attempt you've marked so far."
-        actions={
-          <Link href="/dashboard/ai-questions/stats" className={buttonStyles({ variant: 'secondary' })}>
-            Practice stats
-          </Link>
-        }
-      />
-
-      {isLoading ? (
-        <p className="text-sm text-content-subtle">Loading your practice history…</p>
-      ) : !hasEnoughData ? (
-        <section className="rounded-2xl border border-dashed border-subtle bg-surface-sunken p-6 text-sm text-content-muted dark:bg-surface/3">
-          Mark at least one Smart Practice attempt first — the coach needs real performance data to work from.
-          <div className="mt-4">
-            <Link href="/dashboard/ai-questions" className={buttonStyles({ variant: 'primary' })}>Go to Smart Practice</Link>
-          </div>
-        </section>
-      ) : (
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Practice data</PanelHeading>
+      {hasEnoughData ? (
         <>
-          <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-            <h2 className="text-lg font-bold text-content">Band distribution</h2>
-            <p className="mt-1 text-sm text-content-muted">Across {analysis.totalQuestions} marked questions from your last {attempts.length} attempts.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Stat label="Attempts" value={attempts.length} />
+            <Stat label="Questions" value={analysis.totalQuestions} />
+          </div>
+
+          <Panel>
+            <PanelHeading as="h3">Band distribution</PanelHeading>
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {analysis.bandDistribution.length === 0 ? (
-                <p className="text-sm text-content-subtle">No per-question band data yet.</p>
+                <p className="text-[13px] text-content-subtle">No per-question band data yet.</p>
               ) : (
                 analysis.bandDistribution.map(({ band, count }) => (
-                  <span key={band} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${BAND_COLORS[band] || 'bg-slate-100 text-content-muted dark:bg-surface/10'}`}>
+                  <span
+                    key={band}
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-xs font-semibold ${BAND_COLORS[band] || 'bg-surface-sunken text-content-muted'}`}
+                  >
                     {band}: {count}
                   </span>
                 ))
               )}
             </div>
+          </Panel>
 
-            {analysis.subjectStats.length > 0 ? (
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {analysis.subjectStats.map((s) => (
-                  <div key={s.subject} className="rounded-xl border border-subtle p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-content">{getSubjectLabel(s.subject)}</p>
-                      {s.trend === 'improving' ? (
-                        <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      ) : s.trend === 'declining' ? (
-                        <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
-                      ) : null}
-                    </div>
-                    <p className="mt-1 text-sm text-content-muted">{s.avgPercentage}% avg · {s.attempts} attempt{s.attempts === 1 ? '' : 's'}</p>
-                  </div>
-                ))}
+          {analysis.subjectStats.length > 0 ? (
+            <Panel className="p-0">
+              <div className="border-b border-subtle px-4 py-3">
+                <PanelHeading as="h3">By subject</PanelHeading>
               </div>
-            ) : null}
-          </section>
+              <ul className="divide-y divide-subtle">
+                {analysis.subjectStats.map((s) => (
+                  <li key={s.subject} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-content">{getSubjectLabel(s.subject)}</p>
+                      <p className="font-mono text-[11px] text-content-subtle">
+                        {s.attempts} attempt{s.attempts === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1.5 font-mono text-sm font-semibold text-content">
+                      {s.avgPercentage}%
+                      {s.trend === 'improving' ? (
+                        <TrendingUp className="h-4 w-4 text-success" aria-label="Improving" />
+                      ) : s.trend === 'declining' ? (
+                        <TrendingDown className="h-4 w-4 text-danger" aria-label="Declining" />
+                      ) : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          ) : null}
+        </>
+      ) : (
+        <Panel>
+          <p className="text-sm font-semibold text-content">Nothing to analyse yet</p>
+          <p className="mt-1 text-[13px] text-content-subtle">Your marked Smart Practice attempts appear here.</p>
+        </Panel>
+      )}
+      <Link
+        href="/dashboard/ai-questions/stats"
+        className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'w-full justify-center' })}
+      >
+        Practice stats
+      </Link>
+    </>
+  );
 
-          <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-bold text-content">Your report</h2>
-              <button className={buttonStyles({ variant: 'primary' })} onClick={handleGenerate} disabled={isGenerating}>
+  return (
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
+        icon={Compass}
+        eyebrow="Improve / Exam technique"
+        titleId="exam-coach-title"
+        title="Exam Coach"
+        description="Patterns in why you keep losing marks, drawn from every Smart Practice attempt you've marked so far."
+        actions={
+          <>
+            <Chip>● Mode: technique report</Chip>
+            {hasEnoughData ? (
+              <Chip tone="success">
+                Last {attempts.length} attempt{attempts.length === 1 ? '' : 's'}
+              </Chip>
+            ) : null}
+          </>
+        }
+      />
+
+      <WorkspaceBody aside={reportColumn}>
+        {isLoading ? (
+          <p className="p-5 text-sm text-content-subtle">Loading your practice history…</p>
+        ) : !hasEnoughData ? (
+          <div className="p-5">
+            <div className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-sm text-content-muted">
+              Mark at least one Smart Practice attempt first — the coach needs real performance data to work from.
+              <div className="mt-4">
+                <Link href="/dashboard/ai-questions" className={buttonStyles({ variant: 'primary' })}>
+                  Go to Smart Practice
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <section className="flex-1 space-y-5 p-5">
+              <PanelHeading icon={Sparkles}>Your report</PanelHeading>
+              {report ? (
+                <>
+                  <div className="flex gap-3 rounded-lg border border-subtle bg-surface-sunken p-4">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface text-content-subtle">
+                      <Compass className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <MonoLabel>Headline</MonoLabel>
+                      <p className="mt-1 text-body font-semibold text-content">{report.headline}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <MonoLabel className="text-warning">Why you&apos;re losing marks</MonoLabel>
+                    <ul className="mt-2 space-y-2">
+                      {report.patterns.map((pattern, index) => (
+                        <li key={index} className="rounded-lg border border-warning/30 bg-warning-muted p-3 text-sm text-content">
+                          {pattern}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <MonoLabel className="text-success">Do this next</MonoLabel>
+                    <ul className="mt-2 space-y-2">
+                      {report.nextSteps.map((step, index) => (
+                        <li key={index} className="flex items-start gap-2 rounded-lg border border-success/30 bg-success-muted p-3 text-sm text-content">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                          {step}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-content-muted">
+                  Generate a report to see the recurring, mark-scheme-language patterns behind your lost marks and what to do about them this week.
+                </p>
+              )}
+
+              {analysis.topWeaknesses.length > 0 ? (
+                <div className="border-t border-subtle pt-5">
+                  <PanelHeading className="mb-3">Recurring weak areas</PanelHeading>
+                  <div className="space-y-2">
+                    {analysis.topWeaknesses.map((w) => (
+                      <div key={w.tag} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-subtle bg-surface px-3 py-2">
+                        <span className="text-sm text-content">{w.tag}</span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Chip>
+                            seen {w.count}× · {trendLabel(w.trend)}
+                          </Chip>
+                          <Link
+                            href={`/dashboard/ai-questions?topic=${encodeURIComponent(w.tag)}`}
+                            className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                          >
+                            Retest this
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+              <p className="font-mono text-xs text-content-subtle max-sm:hidden">
+                From {analysis.totalQuestions} marked questions
+              </p>
+              <button
+                className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
+                onClick={handleGenerate}
+                disabled={isGenerating}
+              >
                 <Sparkles className="h-4 w-4" />
                 {isGenerating ? 'Analysing...' : report ? 'Regenerate report' : 'Generate my exam-technique report'}
               </button>
             </div>
-
-            {report ? (
-              <div className="mt-5 space-y-5">
-                <p className="text-base font-semibold text-content">{report.headline}</p>
-
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-content-subtle">Why you&apos;re losing marks</h3>
-                  <ul className="mt-2 space-y-2">
-                    {report.patterns.map((pattern, index) => (
-                      <li key={index} className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/20 dark:text-amber-200">
-                        {pattern}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-content-subtle">Do this next</h3>
-                  <ul className="mt-2 space-y-2">
-                    {report.nextSteps.map((step, index) => (
-                      <li key={index} className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm text-emerald-900 dark:border-emerald-700/40 dark:bg-emerald-950/20 dark:text-emerald-200">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                        {step}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-content-muted">
-                Generate a report to see the recurring, mark-scheme-language patterns behind your lost marks and what to do about them this week.
-              </p>
-            )}
-          </section>
-
-          {analysis.topWeaknesses.length > 0 ? (
-            <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-              <h2 className="text-lg font-bold text-content">Recurring weak areas</h2>
-              <div className="mt-4 space-y-2">
-                {analysis.topWeaknesses.map((w) => (
-                  <div key={w.tag} className="flex items-center justify-between gap-3 rounded-lg border border-subtle px-3 py-2">
-                    <span className="text-sm text-content-muted dark:text-slate-200">{w.tag}</span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-content-muted dark:bg-surface/10">
-                        seen {w.count}× · {trendLabel(w.trend)}
-                      </span>
-                      <Link
-                        href={`/dashboard/ai-questions?topic=${encodeURIComponent(w.tag)}`}
-                        className={buttonStyles({ variant: 'secondary', size: 'sm' })}
-                      >
-                        Retest this
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </WorkspaceBody>
+    </Workspace>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, CheckCircle2, Layers, Loader2, MessageCircle, RotateCcw, Send, Sparkles, Target, XCircle } from 'lucide-react';
+import { BookOpen, CheckCircle2, Loader2, MessageCircle, Radar, RotateCcw, Send, Sparkles, Target, XCircle } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
@@ -31,7 +31,9 @@ import {
 } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
 import { cachedAiFetch } from '@/lib/aiCache';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { fieldStyles } from '@/components/ui/field';
+import { Chip, MonoLabel, Panel, PanelHeading, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 // GAMIFICATION PAUSED: import { announceXp } from '@/lib/gamification/client';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
@@ -162,14 +164,12 @@ function UnderstandingCheck({ topicId }: { topicId: string | null }) {
             {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Target className="h-4 w-4" />}
             {isBusy ? 'Writing a question…' : 'Check my understanding'}
           </button>
-          {errorMessage ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errorMessage}</p> : null}
+          {errorMessage ? <p className="mt-2 text-sm text-danger">{errorMessage}</p> : null}
         </>
       ) : (
         <div className="space-y-3">
           {question.subtopicName ? (
-            <p className="text-caption font-semibold uppercase tracking-wide text-content-subtle">
-              {question.subtopicName}
-            </p>
+            <MonoLabel>{question.subtopicName}</MonoLabel>
           ) : null}
           <MarkdownContent content={question.question} className="text-sm text-content" />
 
@@ -183,9 +183,9 @@ function UnderstandingCheck({ topicId }: { topicId: string | null }) {
                   ? 'border-accent bg-accent-muted'
                   : 'border-subtle bg-surface hover:border-strong'
                 : isKey
-                  ? 'border-emerald-500 bg-emerald-100 dark:bg-emerald-500/15'
+                  ? 'border-success bg-success-muted'
                   : isChosen
-                    ? 'border-red-500 bg-red-100 dark:bg-red-500/15'
+                    ? 'border-danger bg-danger-muted'
                     : 'border-subtle bg-surface opacity-70';
 
               return (
@@ -196,7 +196,7 @@ function UnderstandingCheck({ topicId }: { topicId: string | null }) {
                   onClick={() => void answer(letter)}
                   className={`flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left text-sm text-content transition disabled:cursor-default ${tone}`}
                 >
-                  <span className="font-semibold">{letter}</span>
+                  <span className="font-mono font-semibold">{letter}</span>
                   <span className="min-w-0 flex-1">{option}</span>
                 </button>
               );
@@ -207,7 +207,7 @@ function UnderstandingCheck({ topicId }: { topicId: string | null }) {
             <div className="space-y-2">
               <p
                 className={`inline-flex items-center gap-1.5 text-sm font-semibold ${
-                  result.correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                  result.correct ? 'text-success' : 'text-danger'
                 }`}
               >
                 {result.correct ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
@@ -228,7 +228,7 @@ function UnderstandingCheck({ topicId }: { topicId: string | null }) {
             </div>
           ) : null}
 
-          {errorMessage ? <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p> : null}
+          {errorMessage ? <p className="text-sm text-danger">{errorMessage}</p> : null}
         </div>
       )}
     </div>
@@ -304,18 +304,9 @@ function StudyChat({
   };
 
   return (
-    <aside className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="rounded-xl bg-indigo-100 p-2 text-accent dark:bg-indigo-500/15">
-          <MessageCircle className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="font-semibold text-content">Study Chat</h2>
-          <p className="mt-1 text-sm text-content-muted">
-            Ask for a simpler explanation, example, or quick check.
-          </p>
-        </div>
-      </div>
+    <Panel>
+      <PanelHeading icon={MessageCircle}>Study chat</PanelHeading>
+      <p className="mt-1 text-[13px] text-content-subtle">Ask for a simpler explanation, example, or quick check.</p>
 
       <div className="mt-4 space-y-3">
         {messages.length === 0 ? (
@@ -338,15 +329,15 @@ function StudyChat({
                 key={`${message.role}-${index}`}
                 className={`rounded-xl px-3 py-2 text-sm ${
                   message.role === 'user'
-                    ? 'ml-6 bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white'
-                    : 'mr-6 bg-slate-100 text-content-muted dark:bg-surface/8 text-content'
+                    ? 'ml-6 bg-accent text-accent-fg'
+                    : 'mr-6 bg-surface-sunken text-content'
                 }`}
               >
                 <MarkdownContent content={message.content} />
               </div>
             ))}
             {isSending ? (
-              <div className="mr-6 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-content-muted dark:bg-surface/8">
+              <div className="mr-6 inline-flex items-center gap-2 rounded-xl bg-surface-sunken px-3 py-2 font-mono text-xs text-content-muted">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Thinking...
               </div>
@@ -355,14 +346,14 @@ function StudyChat({
         )}
       </div>
 
-      {errorMessage ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{errorMessage}</p> : null}
+      {errorMessage ? <p className="mt-3 text-sm text-danger">{errorMessage}</p> : null}
 
       <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Ask a follow-up..."
-          className="min-w-0 flex-1 rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
+          className={fieldStyles('min-w-0 flex-1')}
         />
         <button
           type="submit"
@@ -375,7 +366,7 @@ function StudyChat({
       </form>
 
       <UnderstandingCheck topicId={topicId} />
-    </aside>
+    </Panel>
   );
 }
 
@@ -502,32 +493,75 @@ export default function NotesPage() {
     setErrorMessage('');
   };
 
+  const reportColumn = activeTopic ? (
+    <>
+      <PanelHeading icon={Radar}>Study tools</PanelHeading>
+      {activeSubject ? (
+        <StudyChat
+          concept={activeTopic}
+          topicId={activeTopicOption?.id ?? null}
+          subject={activeSubject.subject}
+          examBoard={activeSubject.exam_board}
+          examType={activeSubject.exam_type}
+          messages={chatMessages}
+          setMessages={setChatMessages}
+        />
+      ) : null}
+    </>
+  ) : (
+    <>
+      <PanelHeading icon={Radar}>Study tools</PanelHeading>
+      <Panel>
+        <p className="text-sm font-semibold text-content">Your notes come with</p>
+        <ul className="mt-2 space-y-1.5 text-[13px] text-content-subtle">
+          <li>Notes written to your exam board&apos;s specification</li>
+          <li>Recall checkpoints to test yourself</li>
+          <li>A study chat for follow-up questions</li>
+          <li>Quick questions to check you understood</li>
+        </ul>
+      </Panel>
+      <Panel>
+        <p className="text-sm font-semibold text-content">Then</p>
+        <p className="mt-1 text-[13px] text-content-subtle">
+          Turn what you learned into{' '}
+          <Link href="/dashboard/flashcards" className="font-semibold text-accent hover:underline">
+            flashcards
+          </Link>{' '}
+          or test it with{' '}
+          <Link href="/dashboard/blurt" className="font-semibold text-accent hover:underline">
+            blurting
+          </Link>
+          .
+        </p>
+      </Panel>
+    </>
+  );
+
   return (
-    <div className="space-y-6" aria-labelledby="notes-title">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={BookOpen}
+        eyebrow="Learn / Study notes"
         titleId="notes-title"
         title="Learn"
         description="Generate focused study notes from one of your saved subjects."
         actions={
           <>
-            <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'secondary' })}>
-              <ArrowLeft className="h-4 w-4" />
-              Subjects
-            </Link>
-            <Link href="/dashboard/flashcards" className={buttonStyles({ variant: 'primary' })}>
-              <Layers className="h-4 w-4" />
-              Flashcards
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <Chip>● Mode: study notes</Chip>
+            {activeSubject ? (
+              <Chip tone="success">
+                {getExamBoardLabel(activeSubject.exam_board)} {getExamTypeLabel(activeSubject.exam_type)}
+              </Chip>
+            ) : null}
           </>
         }
       />
 
+      <WorkspaceBody aside={reportColumn}>
       {!activeTopic ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <h2 className="text-lg font-semibold text-content">Create study notes</h2>
-          <form onSubmit={generateNotes} className="mt-5 space-y-5">
+        <form onSubmit={generateNotes} className="flex flex-1 flex-col">
+          <div className="flex-1 space-y-5 p-5">
             <SubjectSpecSelector
               subjects={subjects}
               isLoading={subjectsLoading}
@@ -565,8 +599,8 @@ export default function NotesPage() {
 
             {isSelectedPoetryCluster ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
-                  First poem
+                <label className="block">
+                  <MonoLabel className="mb-1">First poem</MonoLabel>
                   <select
                     value={poemOne}
                     onChange={(event) => {
@@ -575,7 +609,7 @@ export default function NotesPage() {
                       setSubtopic('');
                       if (event.target.value === poemTwo) setPoemTwo('');
                     }}
-                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                    className={fieldStyles()}
                   >
                     <option value="">Select first poem</option>
                     {poetryPoems.map((poem) => (
@@ -583,8 +617,8 @@ export default function NotesPage() {
                     ))}
                   </select>
                 </label>
-                <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
-                  Second poem <span className="font-normal text-content-subtle">(optional)</span>
+                <label className="block">
+                  <MonoLabel className="mb-1">Second poem (optional)</MonoLabel>
                   <select
                     value={poemTwo}
                     onChange={(event) => {
@@ -593,7 +627,7 @@ export default function NotesPage() {
                       setSubtopic('');
                     }}
                     disabled={!poemOne}
-                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent disabled:disabled:text-content-subtle text-content dark:disabled:bg-surface/5"
+                    className={fieldStyles()}
                   >
                     <option value="">No comparison poem</option>
                     {poetryPoems.filter((poem) => poem !== poemOne).map((poem) => (
@@ -628,12 +662,12 @@ export default function NotesPage() {
             ) : null}
 
             {learningObjectiveOptions.length > 0 ? (
-              <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
-                Learning objective (optional)
+              <label className="block">
+                <MonoLabel className="mb-1">Learning objective (optional)</MonoLabel>
                 <select
                   value={learningObjective}
                   onChange={(event) => setLearningObjective(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 >
                   <option value="">No specific focus</option>
                   {learningObjectiveOptions.map((objective) => (
@@ -644,12 +678,12 @@ export default function NotesPage() {
             ) : null}
 
             {paperOptions.length > 0 ? (
-              <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
-                Paper (optional)
+              <label className="block">
+                <MonoLabel className="mb-1">Paper (optional)</MonoLabel>
                 <select
                   value={paper}
                   onChange={(event) => setPaper(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 >
                   <option value="">General (any paper)</option>
                   {paperOptions.map((paperOption) => (
@@ -660,79 +694,67 @@ export default function NotesPage() {
             ) : null}
 
             {validationMessage ? (
-              <p className={`text-xs ${errorMessage || subjectsError ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'}`}>
+              <p className={`text-xs ${errorMessage || subjectsError ? 'text-danger' : 'text-warning'}`}>
                 {validationMessage}
               </p>
             ) : null}
+          </div>
 
-            <button type="submit" disabled={!canGenerate} className={buttonStyles({ variant: 'primary', size: 'lg' })}>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+            <div className="flex flex-wrap gap-4 font-mono text-xs text-content-subtle max-sm:hidden">
+              <Link href="/dashboard/subjects" className="transition-colors hover:text-content">
+                ← Subjects
+              </Link>
+              <Link href="/dashboard/flashcards" className="transition-colors hover:text-content">
+                Flashcards →
+              </Link>
+            </div>
+            <button type="submit" disabled={!canGenerate} className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}>
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               {isGenerating ? 'Generating notes...' : 'Create study notes'}
             </button>
-          </form>
-        </section>
-      ) : (
-        <section className="space-y-5">
-          <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Study notes</p>
-                <p className="mt-0.5 text-lg font-semibold text-content">{activeTopic}</p>
-                {activeSubject ? (
-                  <p className="text-sm text-content-subtle">
-                    {getSubjectLabel(activeSubject.subject)} - {getExamBoardLabel(activeSubject.exam_board)} {getExamTypeLabel(activeSubject.exam_type)}
-                  </p>
-                ) : null}
-              </div>
-              <button type="button" onClick={reset} className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'shrink-0' })}>
-                <RotateCcw className="h-3.5 w-3.5" />
-                Change topic
-              </button>
-            </div>
           </div>
+        </form>
+      ) : (
+        <>
+          <StatusBar className="justify-between">
+            <span className="min-w-0 truncate">
+              {activeSubject ? `${getSubjectLabel(activeSubject.subject)} · ` : ''}
+              <span className="font-semibold text-content">{activeTopic}</span>
+            </span>
+            <button type="button" onClick={reset} className="flex items-center gap-1.5 transition-colors hover:text-content">
+              <RotateCcw className="h-3.5 w-3.5" />
+              Change topic
+            </button>
+          </StatusBar>
 
-          <div className="grid gap-5 xl:grid-cols-[1fr_0.72fr]">
-            <div className="space-y-5">
-              <article className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-                {notes ? (
-                  <MarkdownContent className="prose prose-slate max-w-none dark:prose-invert" content={notes} />
-                ) : (
-                  <p className="text-sm text-content-subtle">No notes were returned.</p>
-                )}
-              </article>
-              {checkpoints.length > 0 ? (
-                <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-6 dark:border-indigo-500/20 dark:bg-indigo-500/5">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-accent" />
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">Recall checkpoints</h2>
-                  </div>
-                  <p className="mt-1 text-xs text-content-subtle">Quick self-test prompts drawn from these notes.</p>
-                  <ol className="mt-4 space-y-2">
-                    {checkpoints.map((checkpoint, index) => (
-                      <li key={index} className="flex gap-3 rounded-lg border border-subtle bg-surface p-3">
-                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">{index + 1}</span>
-                        <MarkdownContent className="prose prose-sm prose-slate max-w-none dark:prose-invert" content={checkpoint} />
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              ) : null}
-            </div>
-            {activeSubject ? (
-              <StudyChat
-                concept={activeTopic}
-                topicId={activeTopicOption?.id ?? null}
-                subject={activeSubject.subject}
-                examBoard={activeSubject.exam_board}
-                examType={activeSubject.exam_type}
-                messages={chatMessages}
-                setMessages={setChatMessages}
-              />
+          <div className="flex-1 space-y-5 p-5">
+            <article>
+              <h2 className="sr-only">Study notes: {activeTopic}</h2>
+              {notes ? (
+                <MarkdownContent className="prose prose-slate max-w-none dark:prose-invert" content={notes} />
+              ) : (
+                <p className="text-sm text-content-subtle">No notes were returned.</p>
+              )}
+            </article>
+            {checkpoints.length > 0 ? (
+              <section className="rounded-lg border border-subtle bg-surface-sunken p-5">
+                <PanelHeading icon={Sparkles}>Recall checkpoints</PanelHeading>
+                <p className="mt-1 text-xs text-content-subtle">Quick self-test prompts drawn from these notes.</p>
+                <ol className="mt-4 space-y-2">
+                  {checkpoints.map((checkpoint, index) => (
+                    <li key={index} className="flex gap-3 rounded-lg border border-subtle bg-surface p-3">
+                      <span className="mt-0.5 w-6 shrink-0 font-mono text-xs text-content-subtle">{String(index + 1).padStart(2, '0')}</span>
+                      <MarkdownContent className="prose prose-sm prose-slate max-w-none dark:prose-invert" content={checkpoint} />
+                    </li>
+                  ))}
+                </ol>
+              </section>
             ) : null}
           </div>
-        </section>
+        </>
       )}
-
-    </div>
+      </WorkspaceBody>
+    </Workspace>
   );
 }

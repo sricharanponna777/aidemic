@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Brain, Edit, Layers, Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Brain, Edit, Layers, Plus, Radar, Search, Tag, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-client';
 import { Flashcard, FlashcardDeck, FlashcardTag, FlashcardTagMapping } from '@/types';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { fieldStyles } from '@/components/ui/field';
+import { Chip, MonoLabel, Panel, PanelHeading, Stat, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { countLeeches, isLeech } from '@/lib/leeches';
 import { countDueCards } from '@/lib/flashcardsDue';
 
@@ -250,44 +252,28 @@ export default function DeckPage() {
   };
 
   if (loading) return <p className="text-content-muted">Loading deck...</p>;
-  if (!deck) return <p className="text-red-600">Deck not found.</p>;
+  if (!deck) return <p className="text-danger">Deck not found.</p>;
 
-  return (
-    <div className="space-y-6" aria-labelledby="deck-page-title">
-      <PageHero
-        icon={Layers}
-        titleId="deck-page-title"
-        title={deck.name}
-        description={deck.description || undefined}
-        backHref="/dashboard/flashcards"
-        backLabel="Flashcards"
-        actions={
-          <Link href={`/dashboard/study-sessions?deckId=${deckId}`} className={buttonStyles({ variant: 'primary' })}>
-            <Brain className="h-4 w-4" />
-            Flashcard Revision
-          </Link>
-        }
-      >
-        <div className="mt-4 flex flex-wrap gap-3 text-sm">
-          <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{deck.card_count || cards.length} cards</span>
-          <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{dueCards} due now</span>
-          <span className="rounded-full bg-surface px-3 py-1 text-content-muted shadow-sm">{tags.length} tags</span>
-          {deck.ai_generated ? <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-900/45 dark:text-blue-200">AI deck</span> : null}
-        </div>
-      </PageHero>
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Deck report</PanelHeading>
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Cards" value={deck.card_count || cards.length} />
+        <Stat label="Due now" value={dueCards} tone={dueCards > 0 ? 'warning' : 'default'} />
+        <Stat label="Tags" value={tags.length} />
+        <Stat label="Leeches" value={leechCount} tone={leechCount > 0 ? 'danger' : 'default'} />
+      </div>
 
-      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-content">Tags</h2>
+      <Panel>
+        <PanelHeading icon={Tag} as="h3">
+          Tags
+        </PanelHeading>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             className={buttonStyles({
               variant: 'plain',
               size: 'chip',
-              className: `${
-                !activeFilterTagId
-                  ? 'bg-slate-900 text-white dark:bg-blue-600'
-                  : 'bg-slate-100 text-content-muted dark:bg-surface/8'
-              }`,
+              className: !activeFilterTagId ? 'bg-accent text-accent-fg' : 'bg-surface-sunken text-content-muted',
             })}
             onClick={() => setActiveFilterTagId('')}
             aria-label="Show all cards"
@@ -313,136 +299,171 @@ export default function DeckPage() {
             </button>
           ))}
         </div>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-3 flex gap-2">
           <input
             value={newTag}
             onChange={(event) => setNewTag(event.target.value)}
             placeholder="Create a new tag"
             aria-label="New tag name"
-            className="flex-1 rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
+            className={fieldStyles('min-w-0 flex-1')}
           />
-          <button onClick={handleAddTag} className={buttonStyles({ variant: 'primary' })}>
-            <Tag className="h-4 w-4" />
-            Add tag
+          <button onClick={handleAddTag} className={buttonStyles({ variant: 'secondary', size: 'icon' })} aria-label="Add tag">
+            <Plus className="h-4 w-4" />
           </button>
         </div>
-      </section>
+      </Panel>
 
-      <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-content">Cards ({filteredCards.length})</h2>
-          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+      <Panel>
+        <p className="text-sm font-semibold text-content">Revise this deck</p>
+        <p className="mt-1 text-[13px] text-content-subtle">
+          {dueCards > 0 ? `${dueCards} card${dueCards === 1 ? ' is' : 's are'} due now.` : 'Nothing due right now.'}
+        </p>
+        <Link
+          href={`/dashboard/study-sessions?deckId=${deckId}`}
+          className={buttonStyles({ variant: 'primary', size: 'sm', className: 'mt-3 w-full justify-center' })}
+        >
+          <Brain className="h-4 w-4" />
+          Flashcard Revision
+        </Link>
+      </Panel>
+    </>
+  );
+
+  return (
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
+        icon={Layers}
+        eyebrow="Flashcards / Deck"
+        titleId="deck-page-title"
+        title={deck.name}
+        description={deck.description || undefined}
+        backHref="/dashboard/flashcards"
+        backLabel="Flashcards"
+        actions={
+          <>
+            <Chip>● {deck.card_count || cards.length} cards</Chip>
+            <Chip tone={dueCards > 0 ? 'warning' : 'neutral'}>{dueCards} due now</Chip>
+            {deck.ai_generated ? <Chip tone="xp">AI deck</Chip> : null}
+          </>
+        }
+      />
+
+      <WorkspaceBody aside={reportColumn}>
+        <div className="flex flex-wrap items-center gap-2 border-b border-subtle p-5">
+          <div className="relative min-w-56 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-content-subtle" />
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search card text..."
+              aria-label="Search cards"
+              className={fieldStyles('pl-9')}
+            />
+          </div>
+          {leechCount > 0 && (
             <button
               type="button"
-              onClick={() => {
-                setStatus('');
-                setShowAddCard(true);
-              }}
-              className={buttonStyles({ variant: 'primary' })}
+              onClick={() => setShowLeechesOnly((v) => !v)}
+              aria-pressed={showLeechesOnly}
+              className={buttonStyles({
+                variant: showLeechesOnly ? 'danger' : 'secondary',
+              })}
+              title="Cards you repeatedly get wrong — fix these first"
             >
-              <Plus className="h-4 w-4" />
-              Add card
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {showLeechesOnly ? 'Showing leeches' : `${leechCount} leech${leechCount === 1 ? '' : 'es'}`}
             </button>
-            {leechCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowLeechesOnly((v) => !v)}
-                aria-pressed={showLeechesOnly}
-                className={buttonStyles({
-                  variant: showLeechesOnly ? 'danger' : 'secondary',
-                  size: 'sm',
-                })}
-                title="Cards you repeatedly get wrong — fix these first"
-              >
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {showLeechesOnly ? 'Showing leeches' : `${leechCount} leech${leechCount === 1 ? '' : 'es'}`}
-              </button>
-            )}
-            <div className="relative min-w-56 flex-1 sm:w-72 sm:flex-none">
-              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-content-subtle" />
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search card text..."
-                aria-label="Search cards"
-                className="w-full rounded-lg border border-subtle py-2 pl-9 pr-3 text-sm outline-none focus:border-accent bg-surface text-content"
-              />
-            </div>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setStatus('');
+              setShowAddCard(true);
+            }}
+            className={buttonStyles({ variant: 'primary' })}
+          >
+            <Plus className="h-4 w-4" />
+            Add card
+          </button>
         </div>
-        {status ? (
-          <p role="status" aria-live="polite" className="mt-3 text-sm text-content-muted">
-            {status}
-          </p>
-        ) : null}
 
-        {filteredCards.length > 0 ? (
-          <div className="mt-5 grid gap-3">
-            {filteredCards.map((card) => (
-              <article key={card.id} className="rounded-xl border border-subtle p-4 bg-surface/70">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-content-subtle">
-                      Front
-                      {isLeech(card) && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-danger-muted px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal text-danger">
-                          <AlertTriangle className="h-3 w-3" /> Leech
-                        </span>
-                      )}
-                    </p>
-                    <MarkdownContent
-                      className="prose prose-sm mt-1 max-w-none text-content"
-                      content={card.front}
-                    />
-                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-content-subtle">Back</p>
-                    <MarkdownContent
-                      className="prose prose-sm mt-1 max-w-none text-content-muted dark:text-slate-200"
-                      content={card.back}
-                    />
+        <StatusBar>
+          <h2 className="font-semibold text-content">Cards ({filteredCards.length})</h2>
+          {activeFilterTagId ? <span>Filtered by tag</span> : null}
+          {status ? (
+            <span role="status" aria-live="polite" className="text-content-muted">
+              {status}
+            </span>
+          ) : null}
+        </StatusBar>
 
+        <div className="flex-1 p-5">
+          {filteredCards.length > 0 ? (
+            <div className="grid gap-3">
+              {filteredCards.map((card) => (
+                <article key={card.id} className="rounded-lg border border-subtle bg-surface p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <MonoLabel className="flex items-center gap-2">
+                        Front
+                        {isLeech(card) && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-danger-muted px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal text-danger">
+                            <AlertTriangle className="h-3 w-3" /> Leech
+                          </span>
+                        )}
+                      </MonoLabel>
+                      <MarkdownContent className="prose prose-sm mt-1 max-w-none text-content" content={card.front} />
+                      <MonoLabel className="mt-3">Back</MonoLabel>
+                      <MarkdownContent className="prose prose-sm mt-1 max-w-none text-content-muted" content={card.back} />
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleEditCard(card)}
+                        className={buttonStyles({ variant: 'ghost', size: 'icon' })}
+                        title="Edit card"
+                        aria-label="Edit card"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCard(card.id)}
+                        className={buttonStyles({ variant: 'danger-ghost', size: 'icon' })}
+                        title="Delete card"
+                        aria-label="Delete card"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleEditCard(card)}
-                      className={buttonStyles({ variant: 'ghost', size: 'icon' })}
-                      title="Edit card"
-                      aria-label="Edit card"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCard(card.id)}
-                      className={buttonStyles({ variant: 'danger-ghost', size: 'icon' })}
-                      title="Delete card"
-                      aria-label="Delete card"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
 
-                {cardTags[card.id] && cardTags[card.id].length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {cardTags[card.id].map((tagId) => {
-                      const tag = tags.find((item) => item.id === tagId);
-                      if (!tag) return null;
-                      return (
-                        <span key={tag.id} className="rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: tag.color || '#2563eb' }}>
-                          {tag.name}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-content-muted">No cards match this filter.</p>
-        )}
-      </section>
+                  {cardTags[card.id] && cardTags[card.id].length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {cardTags[card.id].map((tagId) => {
+                        const tag = tags.find((item) => item.id === tagId);
+                        if (!tag) return null;
+                        return (
+                          <span
+                            key={tag.id}
+                            className="rounded-md px-2 py-0.5 font-mono text-[11px] font-semibold text-white"
+                            style={{ backgroundColor: tag.color || '#2563eb' }}
+                          >
+                            {tag.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-content-muted">No cards match this filter.</p>
+          )}
+        </div>
+      </WorkspaceBody>
 
       {showAddCard ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
@@ -457,7 +478,7 @@ export default function DeckPage() {
             }
           `}</style>
           <div
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowAddCard(false)}
             style={{ animation: 'deck-modal-backdrop-in 160ms ease-out both' }}
           />
@@ -465,12 +486,13 @@ export default function DeckPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="add-card-heading"
-            className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-subtle bg-surface p-6 shadow-2xl"
+            className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-card border border-subtle bg-surface p-6 shadow-overlay"
             style={{ animation: 'deck-modal-panel-in 190ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 id="add-card-heading" className="text-xl font-semibold text-content">Add Card</h2>
+                <MonoLabel>{deck.name} / New card</MonoLabel>
+                <h2 id="add-card-heading" className="mt-1 text-title text-content">Add card</h2>
                 <p className="mt-1 text-sm text-content-muted">Use formatting shortcuts, cloze syntax, and preview before saving.</p>
               </div>
               <button
@@ -500,7 +522,7 @@ export default function DeckPage() {
               />
 
               <div>
-                <p className="mb-2 text-sm font-medium text-content-muted dark:text-slate-300">Attach tags</p>
+                <MonoLabel className="mb-2">Attach tags</MonoLabel>
                 <div className="flex flex-wrap gap-2">
                   {tags.length > 0 ? tags.map((tag) => {
                     const selected = selectedTags.includes(tag.id);
@@ -558,14 +580,15 @@ export default function DeckPage() {
 
       {editingCard ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/50" onClick={handleCancelEdit} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCancelEdit} />
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="edit-card-heading"
-            className="relative z-10 w-full max-w-2xl rounded-2xl border border-subtle bg-surface p-6 shadow-2xl"
+            className="relative z-10 w-full max-w-2xl rounded-card border border-subtle bg-surface p-6 shadow-overlay"
           >
-            <h2 id="edit-card-heading" className="text-xl font-semibold text-content">Edit Card</h2>
+            <MonoLabel>{deck.name} / Edit card</MonoLabel>
+            <h2 id="edit-card-heading" className="mt-1 text-title text-content">Edit card</h2>
             <p className="mt-1 text-sm text-content-muted">Update the card content and tags.</p>
 
             <div className="mt-4 space-y-4">
@@ -585,7 +608,7 @@ export default function DeckPage() {
               />
 
               <div>
-                <p className="mb-2 text-sm font-medium text-content-muted dark:text-slate-300">Attach tags</p>
+                <MonoLabel className="mb-2">Attach tags</MonoLabel>
                 <div className="flex flex-wrap gap-2">
                   {tags.map((tag) => {
                     const selected = editSelectedTags.includes(tag.id);
@@ -633,6 +656,6 @@ export default function DeckPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </Workspace>
   );
 }

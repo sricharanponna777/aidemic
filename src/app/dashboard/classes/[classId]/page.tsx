@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, Circle, Users } from 'lucide-react';
+import { CheckCircle2, Circle, Radar, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { Chip, Meter, PanelHeading, Stat, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 // GAMIFICATION PAUSED: import { ClassLeaderboard } from '@/components/gamification/ClassLeaderboard';
 
 type ClassInfo = { id: string; name: string };
@@ -85,54 +86,97 @@ export default function StudentClassPage() {
     return <PageLoader text="Loading class..." />;
   }
 
+  const completedAttempts = assignments
+    .map((assignment) => attempts[assignment.id])
+    .filter((attempt) => attempt?.status === 'completed');
+  const averagePercentage = completedAttempts.length
+    ? Math.round(completedAttempts.reduce((sum, attempt) => sum + (attempt.percentage ?? 0), 0) / completedAttempts.length)
+    : null;
+
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Class report</PanelHeading>
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Assignments" value={assignments.length} />
+        <Stat label="Done" value={completedAttempts.length} tone={completedAttempts.length > 0 ? 'success' : 'default'} />
+      </div>
+      {assignments.length > 0 ? (
+        <Meter fraction={completedAttempts.length / assignments.length} label="Assignments done" />
+      ) : null}
+      <Stat label="Average score" value={averagePercentage === null ? '—' : `${averagePercentage}%`} hint="Across assignments you have finished" />
+    </>
+  );
+
   return (
-    <div className="space-y-6">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={Users}
+        eyebrow="Classes / Class"
         title={classInfo.name}
         backHref="/dashboard/classes"
         backLabel="My Classes"
+        actions={
+          <>
+            <Chip>● {assignments.length} assignments</Chip>
+            {assignments.length - completedAttempts.length > 0 ? (
+              <Chip tone="warning">{assignments.length - completedAttempts.length} to do</Chip>
+            ) : null}
+          </>
+        }
       />
 
-      {assignments.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
-          No assignments yet.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {assignments.map((assignment) => {
-            const attempt = attempts[assignment.id];
-            const completed = attempt?.status === 'completed';
-            return (
-              <Link
-                key={assignment.id}
-                href={`/dashboard/classes/${classId}/assignments/${assignment.id}`}
-                className="flex items-center justify-between rounded-xl border border-subtle bg-surface px-4 py-3 shadow-sm transition hover:border-indigo-300 dark:hover:border-indigo-500/40"
-              >
-                <div className="flex items-center gap-3">
-                  {completed ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Circle className="h-5 w-5 text-slate-300 dark:text-content-muted" />}
-                  <div>
-                    <p className="font-medium text-content">{assignment.title}</p>
-                    <p className="text-xs capitalize text-content-subtle">
-                      {assignment.assignment_type}
-                      {assignment.due_date ? ` · due ${new Date(assignment.due_date).toLocaleDateString()}` : ''}
-                    </p>
-                  </div>
-                </div>
-                {completed ? (
-                  <span className="text-sm font-semibold text-content-muted">
-                    {Math.round(attempt.percentage ?? 0)}% · {attempt.predicted_grade}
-                  </span>
-                ) : (
-                  <span className="text-sm text-accent">Start</span>
-                )}
-              </Link>
-            );
-          })}
+      <WorkspaceBody aside={reportColumn}>
+        <StatusBar>
+          <h2 className="font-semibold text-content">Assignments</h2>
+          <span>Newest first</span>
+        </StatusBar>
+        <div className="flex-1 p-5">
+          {assignments.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted">
+              No assignments yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {assignments.map((assignment) => {
+                const attempt = attempts[assignment.id];
+                const completed = attempt?.status === 'completed';
+                return (
+                  <Link
+                    key={assignment.id}
+                    href={`/dashboard/classes/${classId}/assignments/${assignment.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface px-4 py-3 transition-colors hover:border-strong"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      {completed ? (
+                        <CheckCircle2 className="h-5 w-5 shrink-0 text-success" />
+                      ) : (
+                        <Circle className="h-5 w-5 shrink-0 text-content-subtle" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-content">{assignment.title}</p>
+                        <p className="font-mono text-[11px] capitalize text-content-subtle">
+                          {assignment.assignment_type}
+                          {assignment.due_date ? ` · due ${new Date(assignment.due_date).toLocaleDateString()}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    {completed ? (
+                      <span className="shrink-0 font-mono text-sm font-semibold text-content">
+                        {Math.round(attempt.percentage ?? 0)}% · {attempt.predicted_grade}
+                      </span>
+                    ) : (
+                      <Chip tone="inverse">Start</Chip>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+      </WorkspaceBody>
 
       {/* GAMIFICATION PAUSED: <ClassLeaderboard classId={classId} /> */}
-    </div>
+    </Workspace>
   );
 }

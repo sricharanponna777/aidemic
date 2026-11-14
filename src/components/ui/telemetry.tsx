@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { LucideIcon } from 'lucide-react';
 
 /**
  * The orbital-workspace visual language (docs/design/orbital-workspace):
@@ -80,4 +81,91 @@ export function Meter({
 /** The bordered panel every telemetry block sits in. */
 export function Panel({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <section className={`rounded-xl border border-subtle bg-surface p-4 ${className}`.trim()}>{children}</section>;
+}
+
+/** A section title: icon plus mono label, with an optional chip or link on
+ *  the right. A real heading element, so pages keep their outline. */
+export function PanelHeading({
+  icon: Icon,
+  as: Tag = 'h2',
+  aside,
+  className = '',
+  children,
+}: {
+  icon?: LucideIcon;
+  as?: 'h2' | 'h3';
+  aside?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-2 ${className}`.trim()}>
+      <Tag className="flex min-w-0 items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-content">
+        {Icon && <Icon className="h-4 w-4 shrink-0 text-content-subtle" aria-hidden="true" />}
+        {children}
+      </Tag>
+      {aside}
+    </div>
+  );
+}
+
+/** One labelled number, as in the blurt report's stat boxes. */
+export function Stat({
+  label,
+  value,
+  hint,
+  tone = 'default',
+  className = '',
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+  tone?: 'default' | 'accent' | 'success' | 'warning' | 'danger' | 'xp';
+  className?: string;
+}) {
+  const text = {
+    default: 'text-content',
+    accent: 'text-accent',
+    success: 'text-success',
+    warning: 'text-warning',
+    danger: 'text-danger',
+    xp: 'text-xp',
+  }[tone];
+  return (
+    <div className={`rounded-lg border border-subtle bg-surface p-3 ${className}`.trim()}>
+      <MonoLabel>{label}</MonoLabel>
+      <p className={`mt-1 font-mono text-xl font-semibold ${text}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-[13px] text-content-subtle">{hint}</p>}
+    </div>
+  );
+}
+
+/** The blurt screen's frame: one bordered card that holds a `PageHeader`
+ *  (pass it `className="border-b border-subtle"`) and a `WorkspaceBody`. */
+export function Workspace({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <div className={`overflow-hidden rounded-card border border-subtle bg-surface ${className}`.trim()}>{children}</div>;
+}
+
+/** The work column and, on large screens, the report column beside it. The
+ *  report stacks below the work on smaller screens. */
+export function WorkspaceBody({ aside, children }: { aside?: ReactNode; children: ReactNode }) {
+  if (!aside) return <div className="min-w-0">{children}</div>;
+  return (
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="flex min-w-0 flex-col lg:border-r lg:border-subtle">{children}</div>
+      <aside className="space-y-4 border-t border-subtle bg-surface-sunken/60 p-5 lg:border-t-0">{aside}</aside>
+    </div>
+  );
+}
+
+/** A full-width mono strip between workspace sections: timer, counts, save
+ *  state. */
+export function StatusBar({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-subtle px-5 py-3 font-mono text-xs text-content-subtle ${className}`.trim()}
+    >
+      {children}
+    </div>
+  );
 }

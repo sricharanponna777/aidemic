@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { Headphones, Loader2, RotateCcw, Sparkles } from 'lucide-react';
+import { Headphones, Loader2, Radar, RotateCcw, Sparkles } from 'lucide-react';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
 import { TopicInput } from '@/components/TopicInput';
 import { buttonStyles } from '@/components/ui/button';
@@ -14,7 +14,8 @@ import {
 } from '@/lib/ai/majorTopics';
 import { getSubjectLabel, isSubjectSpecComplete } from '@/lib/ai/subjectConfig';
 import { getTopicRelevanceError } from '@/lib/ai/topicRelevance';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { Chip, MonoLabel, Panel, PanelHeading, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import type { GeneratedPodcast } from '@/types';
 
 type DialogueTurn = { speaker: 'HOST' | 'GUEST'; text: string };
@@ -133,135 +134,160 @@ export default function PodcastsPage() {
     setErrorMessage('');
   };
 
-  return (
-    <div className="space-y-6" aria-labelledby="podcasts-title">
-      <PageHero
-        icon={Headphones}
-        titleId="podcasts-title"
-        title="Podcasts"
-        description="Generate a short AI-narrated audio episode for any of your saved subjects."
-      />
-
-      {!activePodcast ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <h2 className="text-lg font-semibold text-content">Create a podcast</h2>
-          <form onSubmit={generatePodcast} className="mt-5 space-y-5">
-            <SubjectSpecSelector
-              subjects={subjects}
-              isLoading={subjectsLoading}
-              selectedSubjectId={effectiveSubjectId}
-              onSubjectChange={(id) => {
-                setSelectedSubjectId(id);
-                setTopic('');
-                setSubtopic('');
-              }}
-            />
-
-            <TopicInput
-              label="Topic (optional)"
-              value={topic}
-              onChange={(value) => {
-                setTopic(value);
-                setSubtopic('');
-                setErrorMessage('');
-              }}
-              suggestions={topicSuggestions}
-              isValidSelection={topicIsAllowed}
-              placeholder="Start typing a topic, or leave blank to generalise"
-            />
-
-            {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
-              <TopicInput
-                label="Subtopic (optional)"
-                value={subtopic}
-                onChange={setSubtopic}
-                suggestions={subtopicSuggestions}
-                placeholder="Narrow the focus within this topic"
-              />
-            ) : null}
-
-            {validationMessage ? (
-              <p className={`text-xs ${errorMessage || subjectsError ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'}`}>
-                {validationMessage}
-              </p>
-            ) : null}
-
-            <button type="submit" disabled={!canGenerate} className={buttonStyles({ variant: 'primary', size: 'lg' })}>
-              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {isGenerating ? 'Generating podcast...' : 'Create podcast'}
-            </button>
-          </form>
-        </section>
-      ) : (
-        <section className="space-y-5">
-          <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-content-subtle">Podcast</p>
-                <p className="mt-0.5 text-lg font-semibold text-content">
-                  {activePodcast.topic}
-                  {activePodcast.subtopic ? <span className="font-normal text-content-subtle"> · {activePodcast.subtopic}</span> : null}
-                </p>
-                <p className="text-sm text-content-subtle">{getSubjectLabel(activePodcast.subject)}</p>
-              </div>
-              <button type="button" onClick={reset} className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'shrink-0' })}>
-                <RotateCcw className="h-3.5 w-3.5" />
-                New podcast
-              </button>
-            </div>
-            <audio controls src={activePodcast.audio_url} className="mt-4 w-full" />
-          </div>
-
-          <article className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-            <h2 className="text-sm font-semibold text-content">Transcript</h2>
-            <div className="mt-4 space-y-3">
-              {parseDialogueTurns(activePodcast.script_content).map((turn, index) => (
-                <div
-                  key={index}
-                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                    turn.speaker === 'HOST'
-                      ? 'bg-linear-to-r from-indigo-600/90 to-purple-600/90 text-white'
-                      : 'ml-auto bg-slate-100 text-content-muted dark:bg-surface/8 text-content'
-                  }`}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wide opacity-70">
-                    {turn.speaker === 'HOST' ? 'Host' : 'Guest'}
-                  </p>
-                  <p className="mt-0.5">{turn.text}</p>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
-      )}
-
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar} aside={history.length > 0 ? <Chip>{history.length} episodes</Chip> : null}>
+        Episode history
+      </PanelHeading>
       {history.length > 0 ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card">
-          <h2 className="text-lg font-semibold text-content">History</h2>
-          <ul className="mt-4 divide-y divide-slate-100 dark:divide-white/6">
+        <Panel className="p-0">
+          <ul className="max-h-[32rem] divide-y divide-subtle overflow-y-auto">
             {history.map((podcast) => (
               <li key={podcast.id}>
                 <button
                   type="button"
                   onClick={() => setActivePodcast(podcast)}
-                  className="flex w-full items-center justify-between gap-3 py-3 text-left text-sm hover:text-accent dark:hover:text-indigo-400"
+                  aria-current={activePodcast?.id === podcast.id ? 'true' : undefined}
+                  className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-sunken ${
+                    activePodcast?.id === podcast.id ? 'bg-accent-muted' : ''
+                  }`}
                 >
-                  <span>
-                    <span className="font-medium text-content">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-content">
                       {podcast.topic}
                       {podcast.subtopic ? <span className="font-normal text-content-subtle"> · {podcast.subtopic}</span> : null}
                     </span>
-                    <span className="ml-2 text-content-subtle">{getSubjectLabel(podcast.subject)}</span>
+                    <span className="mt-0.5 block font-mono text-[11px] text-content-subtle">{getSubjectLabel(podcast.subject)}</span>
                   </span>
-                  <span className="shrink-0 text-xs text-content-subtle dark:text-content-subtle">
+                  <span className="shrink-0 font-mono text-[11px] text-content-subtle">
                     {new Date(podcast.created_at).toLocaleDateString()}
                   </span>
                 </button>
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
-    </div>
+        </Panel>
+      ) : (
+        <Panel>
+          <p className="text-sm font-semibold text-content">No episodes yet</p>
+          <p className="mt-1 text-[13px] text-content-subtle">
+            Each episode is a short conversation between a host and a guest about one topic, with a transcript.
+          </p>
+        </Panel>
+      )}
+    </>
+  );
+
+  return (
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
+        icon={Headphones}
+        eyebrow="Learn / Audio"
+        titleId="podcasts-title"
+        title="Podcasts"
+        description="Generate a short AI-narrated audio episode for any of your saved subjects."
+        actions={
+          <>
+            <Chip>● Mode: audio episode</Chip>
+            {activePodcast ? <Chip tone="success">{getSubjectLabel(activePodcast.subject)}</Chip> : null}
+          </>
+        }
+      />
+
+      <WorkspaceBody aside={reportColumn}>
+        {!activePodcast ? (
+          <form onSubmit={generatePodcast} className="flex flex-1 flex-col">
+            <div className="flex-1 space-y-5 p-5">
+              <SubjectSpecSelector
+                subjects={subjects}
+                isLoading={subjectsLoading}
+                selectedSubjectId={effectiveSubjectId}
+                onSubjectChange={(id) => {
+                  setSelectedSubjectId(id);
+                  setTopic('');
+                  setSubtopic('');
+                }}
+              />
+
+              <TopicInput
+                label="Topic (optional)"
+                value={topic}
+                onChange={(value) => {
+                  setTopic(value);
+                  setSubtopic('');
+                  setErrorMessage('');
+                }}
+                suggestions={topicSuggestions}
+                isValidSelection={topicIsAllowed}
+                placeholder="Start typing a topic, or leave blank to generalise"
+              />
+
+              {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
+                <TopicInput
+                  label="Subtopic (optional)"
+                  value={subtopic}
+                  onChange={setSubtopic}
+                  suggestions={subtopicSuggestions}
+                  placeholder="Narrow the focus within this topic"
+                />
+              ) : null}
+
+              {validationMessage ? (
+                <p className={`text-xs ${errorMessage || subjectsError ? 'text-danger' : 'text-warning'}`}>{validationMessage}</p>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+              <p className="font-mono text-xs text-content-subtle max-sm:hidden">A few minutes long, with a transcript</p>
+              <button type="submit" disabled={!canGenerate} className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}>
+                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {isGenerating ? 'Generating podcast...' : 'Create podcast'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <StatusBar className="justify-between">
+              <span className="min-w-0 truncate">
+                {getSubjectLabel(activePodcast.subject)} ·{' '}
+                <span className="font-semibold text-content">
+                  {activePodcast.topic}
+                  {activePodcast.subtopic ? ` · ${activePodcast.subtopic}` : ''}
+                </span>
+              </span>
+              <button type="button" onClick={reset} className="flex items-center gap-1.5 transition-colors hover:text-content">
+                <RotateCcw className="h-3.5 w-3.5" />
+                New podcast
+              </button>
+            </StatusBar>
+
+            <div className="border-b border-subtle p-5">
+              <MonoLabel className="mb-2">Episode</MonoLabel>
+              <audio controls src={activePodcast.audio_url} className="w-full" />
+            </div>
+
+            <article className="flex-1 p-5">
+              <PanelHeading>Transcript</PanelHeading>
+              <div className="mt-4 space-y-3">
+                {parseDialogueTurns(activePodcast.script_content).map((turn, index) => (
+                  <div
+                    key={index}
+                    className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                      turn.speaker === 'HOST' ? 'bg-accent text-accent-fg' : 'ml-auto bg-surface-sunken text-content'
+                    }`}
+                  >
+                    <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] opacity-70">
+                      {turn.speaker === 'HOST' ? 'Host' : 'Guest'}
+                    </p>
+                    <p className="mt-0.5">{turn.text}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </>
+        )}
+      </WorkspaceBody>
+    </Workspace>
   );
 }

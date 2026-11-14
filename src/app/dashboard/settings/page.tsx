@@ -5,11 +5,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/supabase-client";
 import { ThemeMode, hasChosenTheme, useTheme } from "@/hooks/useTheme";
 import { useRouter } from "next/navigation";
-import { BookOpen, Compass, ListChecks, LogOut, Moon, Settings as SettingsIcon, Sun, Target } from "lucide-react";
+import { BookOpen, Compass, ListChecks, LogOut, Moon, Radar, Settings as SettingsIcon, Sun, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 import { buttonStyles } from "@/components/ui/button";
-import { Alert, Label, fieldStyles } from "@/components/ui/field";
-import { PageHero } from "@/components/ui/feedback";
+import { Alert, fieldStyles } from "@/components/ui/field";
+import { PageHeader } from "@/components/ui/feedback";
+import { Chip, MonoLabel, Panel, PanelHeading, Workspace, WorkspaceBody } from "@/components/ui/telemetry";
 import {
   DAILY_CARD_TARGET_RANGE,
   DEFAULT_STUDY_GOALS,
@@ -30,10 +31,10 @@ function SettingsCard({
   className?: string;
 }) {
   return (
-    <section className={`rounded-card border border-subtle bg-surface p-6 shadow-card sm:p-8 ${className}`.trim()}>
-      <div className="mb-6">
-        <h2 className="text-title text-content">{title}</h2>
-        {description && <p className="mt-1 text-body text-content-subtle">{description}</p>}
+    <section className={`border-b border-subtle p-5 last:border-b-0 ${className}`.trim()}>
+      <div className="mb-4">
+        <PanelHeading>{title}</PanelHeading>
+        {description && <p className="mt-1 text-[13px] text-content-subtle">{description}</p>}
       </div>
       {children}
     </section>
@@ -179,15 +180,67 @@ export default function Settings() {
   // as a student, flashing student-only cards at teachers and parents.
   const isStudent = !!loadedProfile && loadedProfile.role !== "teacher" && loadedProfile.role !== "parent";
 
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Account</PanelHeading>
+      <Panel>
+        <MonoLabel>Signed in as</MonoLabel>
+        <p className="mt-1 truncate text-sm font-semibold text-content">{session?.user.email}</p>
+        {loadedProfile?.role ? (
+          <Chip className="mt-2 capitalize">{loadedProfile.role}</Chip>
+        ) : null}
+      </Panel>
+
+      {isStudent && (
+        <Panel>
+          <PanelHeading icon={BookOpen} as="h3">
+            Subjects
+          </PanelHeading>
+          <p className="mt-1 text-[13px] text-content-subtle">Manage saved qualifications from the main Subjects page.</p>
+          <Link href="/dashboard/subjects" className={buttonStyles({ variant: "secondary", size: "sm", className: "mt-3 w-full justify-center" })}>
+            Subjects
+          </Link>
+        </Panel>
+      )}
+
+      <section className="rounded-xl border border-danger/30 bg-danger-muted p-4">
+        <PanelHeading icon={LogOut} as="h3">
+          Sign out
+        </PanelHeading>
+        <p className="mt-1 text-[13px] text-content-muted">
+          Sign out of your account on this device. You&apos;ll need to sign in again to continue.
+        </p>
+        <button
+          onClick={handleSignOut}
+          disabled={isLoading}
+          className={buttonStyles({ variant: "danger", size: "sm", className: "mt-3 w-full justify-center" })}
+        >
+          {isLoading ? "Signing out…" : "Sign out"}
+        </button>
+      </section>
+    </>
+  );
+
   return (
-    <div className="space-y-6">
-      <PageHero icon={SettingsIcon} title="Settings" description="Manage your account and preferences." />
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
+        icon={SettingsIcon}
+        eyebrow="Configuration / Settings"
+        title="Settings"
+        description="Manage your account and preferences."
+        actions={<Chip>● {theme === "dark" ? "Dark" : "Light"} mode</Chip>}
+      />
+
+      <WorkspaceBody aside={reportColumn}>
 
       <SettingsCard title="Profile" description="Update your name and username.">
         <form onSubmit={handleProfileSave}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="settings-first-name">First name</Label>
+              <label htmlFor="settings-first-name" className="mb-1 block">
+                <MonoLabel>First name</MonoLabel>
+              </label>
               <input
                 id="settings-first-name"
                 type="text"
@@ -197,7 +250,9 @@ export default function Settings() {
               />
             </div>
             <div>
-              <Label htmlFor="settings-last-name">Last name</Label>
+              <label htmlFor="settings-last-name" className="mb-1 block">
+                <MonoLabel>Last name</MonoLabel>
+              </label>
               <input
                 id="settings-last-name"
                 type="text"
@@ -207,7 +262,9 @@ export default function Settings() {
               />
             </div>
           <div className="sm:col-span-2">
-              <Label htmlFor="settings-username">Username</Label>
+              <label htmlFor="settings-username" className="mb-1 block">
+                <MonoLabel>Username</MonoLabel>
+              </label>
               <input
                 id="settings-username"
                 type="text"
@@ -239,12 +296,12 @@ export default function Settings() {
           <form onSubmit={handleGoalsSave}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <Label htmlFor="daily-card-target">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-accent" />
+                <label htmlFor="daily-card-target" className="mb-1 block">
+                  <MonoLabel className="flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5" />
                     Daily card target
-                  </span>
-                </Label>
+                  </MonoLabel>
+                </label>
                 <input
                   id="daily-card-target"
                   type="number"
@@ -260,7 +317,9 @@ export default function Settings() {
                 </p>
               </div>
               <div>
-                <Label htmlFor="weekly-minute-target">Weekly study minutes</Label>
+                <label htmlFor="weekly-minute-target" className="mb-1 block">
+                <MonoLabel>Weekly study minutes</MonoLabel>
+              </label>
                 <input
                   id="weekly-minute-target"
                   type="number"
@@ -289,24 +348,6 @@ export default function Settings() {
         </SettingsCard>
       )}
 
-      {isStudent && (
-        <section className="rounded-card border border-subtle bg-surface p-6 shadow-card">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-2xl">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-accent" />
-                <h2 className="text-title text-content">Subjects</h2>
-              </div>
-              <p className="mt-1 text-body text-content-subtle">
-                Manage saved qualifications from the main Subjects page.
-              </p>
-            </div>
-            <Link href="/dashboard/subjects" className={buttonStyles({ variant: "secondary" })}>
-              Subjects
-            </Link>
-          </div>
-        </section>
-      )}
 
       <SettingsCard title="Appearance" description="Pick the mode that feels best for your reviews.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -393,18 +434,7 @@ export default function Settings() {
         </div>
       </SettingsCard>
 
-      <section className="rounded-card border border-subtle bg-danger-muted p-6 sm:p-8">
-        <div className="mb-4 flex items-center gap-3">
-          <LogOut className="h-5 w-5 text-danger" />
-          <h2 className="text-title text-danger">Sign out</h2>
-        </div>
-        <p className="mb-6 text-body text-content-muted">
-          Sign out of your account on this device. You&apos;ll need to sign in again to continue.
-        </p>
-        <button onClick={handleSignOut} disabled={isLoading} className={buttonStyles({ variant: "danger" })}>
-          {isLoading ? "Signing out…" : "Sign out"}
-        </button>
-      </section>
-    </div>
+      </WorkspaceBody>
+    </Workspace>
   );
 }

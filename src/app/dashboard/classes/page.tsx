@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { LogIn, Users } from 'lucide-react';
+import { LogIn, Radar, Users } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { fieldStyles } from '@/components/ui/field';
+import { Chip, MonoLabel, Panel, PanelHeading, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { specChainParts } from '@/lib/specLabel';
@@ -115,62 +117,88 @@ export default function StudentClassesPage() {
     return <PageLoader text="Loading your classes..." />;
   }
 
-  return (
-    <div className="space-y-6">
-      <PageHero
-        icon={Users}
-        title="My Classes"
-        description="Join a class with an invite code from your teacher."
-      />
-
-      <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-        <label className="text-sm font-semibold text-content-muted text-content">Join a class</label>
-        <div className="mt-2 flex gap-2">
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Join a class</PanelHeading>
+      <Panel>
+        <label className="block">
+          <MonoLabel className="mb-1">Invite code</MonoLabel>
           <input
             type="text"
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
             placeholder="Enter invite code"
-            className="flex-1 rounded-lg border border-subtle px-3 py-2 text-sm font-mono uppercase tracking-widest outline-none focus:border-accent bg-surface text-content"
+            className={fieldStyles('font-mono uppercase tracking-widest')}
           />
-          <button type="button" onClick={handleJoin} disabled={isJoining} className={buttonStyles({ variant: 'primary' })}>
-            <LogIn className="h-4 w-4" />
-            {isJoining ? 'Joining...' : 'Join'}
-          </button>
-        </div>
-        {joinError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{joinError}</p> : null}
-      </div>
-
-      {classes.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
-          You haven&apos;t joined any classes yet.
+        </label>
+        <button
+          type="button"
+          onClick={handleJoin}
+          disabled={isJoining}
+          className={buttonStyles({ variant: 'primary', className: 'mt-3 w-full justify-center' })}
+        >
+          <LogIn className="h-4 w-4" />
+          {isJoining ? 'Joining...' : 'Join'}
+        </button>
+        {joinError ? <p className="mt-2 text-sm text-danger">{joinError}</p> : null}
+      </Panel>
+      <Panel>
+        <p className="text-sm font-semibold text-content">Where do I get a code?</p>
+        <p className="mt-1 text-[13px] text-content-subtle">
+          Your teacher shares it. Once you join, their assignments appear on the class page.
         </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {classes.map((entry) => {
-            const cls = entry.classes;
-            if (!cls) return null;
-            const specParts = specChainParts(cls.specifications);
-            return (
-              <Link
-                key={cls.id}
-                href={`/dashboard/classes/${cls.id}`}
-                className="block rounded-2xl border border-subtle bg-surface p-5 shadow-sm transition hover:border-indigo-300 dark:hover:border-indigo-500/40"
-              >
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-indigo-500" />
-                  <h3 className="font-semibold text-content">{cls.name}</h3>
-                </div>
-                <p className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-content-subtle">
-                  {specParts.map((part, i) => (
-                    <span key={i}>{i > 0 ? '· ' : ''}{part}</span>
-                  ))}
-                </p>
-              </Link>
-            );
-          })}
+      </Panel>
+    </>
+  );
+
+  return (
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
+        icon={Users}
+        eyebrow="Configuration / Classes"
+        title="My Classes"
+        description="Join a class with an invite code from your teacher."
+        actions={<Chip>● {classes.length} {classes.length === 1 ? 'class' : 'classes'}</Chip>}
+      />
+
+      <WorkspaceBody aside={reportColumn}>
+        <div className="flex-1 p-5">
+          {classes.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted">
+              You haven&apos;t joined any classes yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {classes.map((entry) => {
+                const cls = entry.classes;
+                if (!cls) return null;
+                const specParts = specChainParts(cls.specifications);
+                return (
+                  <Link
+                    key={cls.id}
+                    href={`/dashboard/classes/${cls.id}`}
+                    className="block rounded-lg border border-subtle bg-surface p-4 transition-colors hover:border-strong"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-content-subtle" />
+                      <h2 className="font-semibold text-content">{cls.name}</h2>
+                    </div>
+                    <p className="mt-1.5 flex flex-wrap gap-1.5 font-mono text-[11px] text-content-subtle">
+                      {specParts.map((part, i) => (
+                        <span key={i}>
+                          {i > 0 ? '· ' : ''}
+                          {part}
+                        </span>
+                      ))}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </WorkspaceBody>
+    </Workspace>
   );
 }

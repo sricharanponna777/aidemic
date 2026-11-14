@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Plus, Sparkles, Trash2, Brain, Layers } from 'lucide-react';
+import { ArrowRight, Bot, Plus, Radar, Sparkles, Trash2, Brain, Layers } from 'lucide-react';
 import { Flashcard, FlashcardDeck } from '@/types';
 import { createClient } from '@/lib/supabase-client';
 import { Button, buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { Alert, fieldStyles } from '@/components/ui/field';
+import { Chip, MonoLabel, Panel, PanelHeading, Stat, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { isCardDue } from '@/lib/flashcardsDue';
 
 type Deck = Pick<FlashcardDeck, 'id' | 'name' | 'card_count' | 'ai_generated' | 'updated_at' | 'created_at' | 'description'> & {
@@ -157,144 +159,153 @@ export default function Flashcards() {
     setStatus({ tone: 'success', text: 'Deck deleted.' });
   };
 
-  const statusClassName = status
-    ? {
-        success: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/70 dark:bg-emerald-950/35 dark:text-emerald-200',
-        error: 'border-red-200 bg-red-50 text-red-800 dark:border-red-700/70 dark:bg-red-950/35 dark:text-red-200',
-      }[status.tone]
-    : '';
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Deck report</PanelHeading>
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Decks" value={stats.totalDecks} />
+        <Stat label="Cards" value={stats.totalCards} />
+        <Stat label="Due now" value={stats.dueNow} tone={stats.dueNow > 0 ? 'warning' : 'default'} />
+        <Stat label="AI decks" value={stats.aiDecks} />
+      </div>
+      <Panel className="space-y-2">
+        <p className="text-sm font-semibold text-content">Make a deck</p>
+        <Button variant="secondary" onClick={() => setShowCreate(true)} className="w-full justify-center">
+          <Plus className="h-4 w-4" />
+          New deck
+        </Button>
+        <Link href="/dashboard/flashcards/ai" className={buttonStyles({ variant: 'secondary', className: 'w-full justify-center' })}>
+          <Sparkles className="h-4 w-4 text-accent" />
+          Generate with AI
+        </Link>
+      </Panel>
+      <Panel>
+        <p className="text-sm font-semibold text-content">Ready to revise?</p>
+        <p className="mt-1 text-[13px] text-content-subtle">
+          {stats.dueNow > 0
+            ? `${stats.dueNow} card${stats.dueNow === 1 ? ' is' : 's are'} due. Due cards come first.`
+            : 'Nothing is due right now. Cards come back as they are due.'}
+        </p>
+        <Link
+          href="/dashboard/study-sessions"
+          className={buttonStyles({ variant: 'primary', size: 'sm', className: 'mt-3 w-full justify-center' })}
+        >
+          <Brain className="h-4 w-4" />
+          Flashcard Revision
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </Panel>
+    </>
+  );
 
   return (
-    <div className="space-y-6" aria-labelledby="flashcards-title">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={Layers}
+        eyebrow="Learn / Flashcards"
         titleId="flashcards-title"
         title="Flashcards"
         description="Build flashcards from what you learned."
         actions={
           <>
-            <Link href="/dashboard/notes" className={buttonStyles({ variant: 'secondary' })}>
-              <ArrowLeft className="h-4 w-4" />
-              Learn
-            </Link>
-            <Button variant="secondary" onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" />
-              New Deck
-            </Button>
-            <Link
-              href="/dashboard/flashcards/ai"
-              className={buttonStyles({ variant: 'secondary' })}
-            >
-              <Sparkles className="h-4 w-4 text-violet-500" />
-              <span className="bg-linear-to-r from-violet-500 to-indigo-600 bg-clip-text text-transparent">Generate with AI</span>
-            </Link>
-            <Link
-              href="/dashboard/study-sessions"
-              className={buttonStyles({
-                variant: 'primary',
-                className: 'shadow-lg shadow-indigo-500/25 hover:-translate-y-px hover:shadow-indigo-500/35',
-              })}
-            >
-              <Brain className="h-4 w-4" />
-              Flashcard Revision
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            <Chip>● {stats.totalDecks} decks</Chip>
+            <Chip tone={stats.dueNow > 0 ? 'warning' : 'neutral'}>
+              <Layers className="h-3 w-3" /> {stats.dueNow} due now
+            </Chip>
           </>
         }
-      >
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-content-subtle">Decks</p>
-            <p className="mt-1 text-2xl font-bold text-content">{stats.totalDecks}</p>
-          </div>
-          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-content-subtle">Cards</p>
-            <p className="mt-1 text-2xl font-bold text-content">{stats.totalCards}</p>
-          </div>
-          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-content-subtle">Due now</p>
-            <p className="mt-1 text-2xl font-bold text-content">{stats.dueNow}</p>
-          </div>
-          <div className="rounded-xl border border-subtle bg-surface px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-content-subtle">AI decks</p>
-            <p className="mt-1 text-2xl font-bold text-content">{stats.aiDecks}</p>
-          </div>
-        </div>
-      </PageHero>
+      />
 
-      <section className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
+      <WorkspaceBody aside={reportColumn}>
+        <div className="flex flex-wrap items-center gap-3 border-b border-subtle p-5">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search deck names or descriptions..."
             aria-label="Search deck names or descriptions"
-            className="min-w-55 flex-1 rounded-lg border border-subtle px-3 py-2 text-sm text-content outline-none focus:border-accent bg-surface"
+            className={fieldStyles('min-w-55 flex-1')}
           />
           <select
             value={sortBy}
             onChange={(event) => setSortBy(event.target.value as 'recent' | 'name' | 'cards')}
             aria-label="Sort decks"
-            className="rounded-lg border border-subtle px-3 py-2 text-sm text-content-muted outline-none focus:border-accent bg-surface"
+            className={fieldStyles('sm:w-auto')}
           >
             <option value="recent">Sort: Recently updated</option>
             <option value="name">Sort: Name</option>
             <option value="cards">Sort: Card count</option>
           </select>
         </div>
-      </section>
 
-      {status ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassName}`}>{status.text}</div> : null}
-
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {isLoading ? <p className="text-sm text-content-muted">Loading decks...</p> : null}
-        {!isLoading && filteredDecks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-subtle p-8 text-center text-content-muted dark:border-white/6 bg-surface">
-            No decks match your filters.
+        {status ? (
+          <div className="border-b border-subtle p-4">
+            <Alert tone={status.tone === 'error' ? 'danger' : 'success'}>{status.text}</Alert>
           </div>
         ) : null}
-        {filteredDecks.map((deck) => (
-          <article key={deck.id} className="rounded-2xl border border-subtle bg-surface p-5 shadow-[0_16px_40px_-36px_rgba(15,23,42,0.8)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_50px_-36px_rgba(15,23,42,0.9)] dark:shadow-[0_20px_50px_-30px_rgba(2,6,23,0.95)]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-content">{deck.name}</h3>
-                {deck.description ? <p className="mt-1 text-sm text-content-muted">{deck.description}</p> : null}
+
+        <StatusBar>
+          <span>
+            Showing <span className="font-semibold text-content">{filteredDecks.length}</span> of {stats.totalDecks} decks
+          </span>
+        </StatusBar>
+
+        <section className="grid flex-1 grid-cols-1 content-start gap-3 p-5 xl:grid-cols-2" aria-label="Decks">
+          {isLoading ? <p className="text-sm text-content-muted">Loading decks...</p> : null}
+          {!isLoading && filteredDecks.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-8 text-center text-sm text-content-muted xl:col-span-2">
+              No decks match your filters.
+            </div>
+          ) : null}
+          {filteredDecks.map((deck) => (
+            <article key={deck.id} className="flex flex-col rounded-lg border border-subtle bg-surface p-4 transition-colors hover:border-strong">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-content">{deck.name}</h3>
+                  {deck.description ? <p className="mt-1 text-sm text-content-muted">{deck.description}</p> : null}
+                </div>
+                <button
+                  onClick={() => handleDeleteDeck(deck.id)}
+                  className={buttonStyles({ variant: 'danger-ghost', size: 'icon' })}
+                  title="Delete deck"
+                  aria-label={`Delete deck "${deck.name}"`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                onClick={() => handleDeleteDeck(deck.id)}
-                className={buttonStyles({ variant: 'danger-ghost', size: 'icon' })}
-                title="Delete deck"
-                aria-label={`Delete deck "${deck.name}"`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-content-muted dark:bg-surface/10">{deck.card_count || 0} cards</span>
-              {deck.due_count ? (
-                <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">{deck.due_count} due now</span>
-              ) : null}
-              {deck.ai_generated ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">
-                  <Bot className="h-3 w-3" />
-                  AI generated
-                </span>
-              ) : null}
-            </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <Chip>{deck.card_count || 0} cards</Chip>
+                {deck.due_count ? <Chip tone="warning">{deck.due_count} due now</Chip> : null}
+                {deck.ai_generated ? (
+                  <Chip tone="xp">
+                    <Bot className="h-3 w-3" />
+                    AI generated
+                  </Chip>
+                ) : null}
+              </div>
 
-            <div className="mt-5 flex items-center justify-between">
-              <p className="text-xs text-content-subtle">Updated {new Date(deck.updated_at || deck.created_at || '').toLocaleDateString()}</p>
-              <Link
-                href={`/dashboard/flashcards/${deck.id}`}
-                className={buttonStyles({ variant: 'primary', size: 'sm' })}
-              >
-                Open deck
-              </Link>
-            </div>
-          </article>
-        ))}
-      </section>
+              <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+                <p className="font-mono text-[11px] text-content-subtle">
+                  Updated {new Date(deck.updated_at || deck.created_at || '').toLocaleDateString()}
+                </p>
+                <Link href={`/dashboard/flashcards/${deck.id}`} className={buttonStyles({ variant: 'primary', size: 'sm' })}>
+                  Open deck
+                </Link>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4 font-mono text-xs text-content-subtle">
+          <Link href="/dashboard/notes" className="transition-colors hover:text-content">
+            ← Learn
+          </Link>
+          <Link href="/dashboard/study-sessions" className="transition-colors hover:text-content">
+            Flashcard Revision →
+          </Link>
+        </div>
+      </WorkspaceBody>
 
       {showCreate ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
@@ -303,28 +314,29 @@ export default function Flashcards() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-deck-title"
-            className="relative z-10 w-full max-w-md rounded-2xl border border-subtle bg-surface p-6 shadow-2xl"
+            className="relative z-10 w-full max-w-md rounded-card border border-subtle bg-surface p-6 shadow-overlay"
           >
-            <h2 id="create-deck-title" className="text-xl font-semibold text-content">Create deck</h2>
+            <MonoLabel>Flashcards / New deck</MonoLabel>
+            <h2 id="create-deck-title" className="mt-1 text-title text-content">Create deck</h2>
             <p className="mt-1 text-sm text-content-muted">Name your deck and start adding cards.</p>
-            <input
-              value={newDeckName}
-              onChange={(event) => setNewDeckName(event.target.value)}
-              placeholder="Example: Renal Physiology Midterm"
-              aria-label="Deck name"
-              className="mt-4 w-full rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
-            />
+            <label className="mt-4 block">
+              <MonoLabel className="mb-1">Deck name</MonoLabel>
+              <input
+                value={newDeckName}
+                onChange={(event) => setNewDeckName(event.target.value)}
+                placeholder="Example: Renal Physiology Midterm"
+                className={fieldStyles()}
+              />
+            </label>
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setShowCreate(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateDeck}>
-                Create
-              </Button>
+              <Button onClick={handleCreateDeck}>Create</Button>
             </div>
           </div>
         </div>
       ) : null}
-    </div>
+    </Workspace>
   );
 }

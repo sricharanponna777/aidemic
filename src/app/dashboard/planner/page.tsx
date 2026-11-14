@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CalendarDays, CheckCircle2, Circle, Sparkles, Trash2, Wand2 } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Circle, Radar, Sparkles, Trash2, Wand2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHero, EmptyState } from '@/components/ui/feedback';
+import { PageHeader, EmptyState } from '@/components/ui/feedback';
+import { Chip, Meter, MonoLabel, Panel, PanelHeading, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { getSubjectLabel } from '@/lib/ai/subjectConfig';
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 import { buildRevisionPlan, daysUntilExam, type PlannerSubject } from '@/lib/revisionPlanner';
@@ -259,151 +260,197 @@ export default function PlannerPage() {
 
   const doneCount = items.filter((i) => i.status === 'done').length;
 
+  const generateButton = (
+    <button
+      type="button"
+      onClick={handleGenerate}
+      disabled={isGenerating || subjects.length === 0}
+      className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
+    >
+      <Wand2 className="h-4 w-4" />
+      {isGenerating ? 'Generating…' : items.length > 0 ? 'Regenerate plan' : 'Generate plan'}
+    </button>
+  );
+
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Exam countdown</PanelHeading>
+      {items.length > 0 ? (
+        <Panel>
+          <div className="flex items-baseline justify-between gap-2">
+            <MonoLabel>Sessions done</MonoLabel>
+            <span className="font-mono text-xs text-content-subtle">
+              {doneCount} / {items.length}
+            </span>
+          </div>
+          <Meter fraction={items.length ? doneCount / items.length : 0} className="mt-3" label="Sessions done" />
+        </Panel>
+      ) : null}
+      {upcomingExams.length > 0 ? (
+        upcomingExams.map((exam) => (
+          <Panel key={exam.id}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-sm font-semibold text-content">{exam.label}</p>
+              {exam.targetGrade && <Chip tone="success">Target {exam.targetGrade}</Chip>}
+            </div>
+            <p className={`mt-2 font-mono text-2xl font-semibold ${exam.days !== null && exam.days <= 14 ? 'text-danger' : 'text-content'}`}>
+              {exam.days === 0 ? 'Today' : `${exam.days} ${exam.days === 1 ? 'day' : 'days'}`}
+            </p>
+            <p className="font-mono text-[11px] text-content-subtle">
+              {new Intl.DateTimeFormat('en', { weekday: 'long', day: 'numeric', month: 'long' }).format(
+                new Date(`${exam.examDate}T00:00:00`)
+              )}
+            </p>
+          </Panel>
+        ))
+      ) : (
+        <Panel>
+          <p className="text-sm font-semibold text-content">No exam dates yet</p>
+          <p className="mt-1 text-[13px] text-content-subtle">
+            Add exam dates on the{' '}
+            <Link href="/dashboard/subjects" className="font-semibold text-accent hover:underline">
+              Subjects
+            </Link>{' '}
+            page and they count down here.
+          </p>
+        </Panel>
+      )}
+    </>
+  );
+
   return (
-    <div className="space-y-6">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={CalendarDays}
+        eyebrow="Review / Timetable"
         title="Revision Planner"
         description="A timetable weighted toward your weakest topics and nearest exams."
         actions={
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isGenerating || subjects.length === 0}
-            className={buttonStyles({ variant: 'primary' })}
-          >
-            <Wand2 className="h-4 w-4" />
-            {isGenerating ? 'Generating…' : items.length > 0 ? 'Regenerate plan' : 'Generate plan'}
-          </button>
+          <>
+            <Chip>● Mode: weak topics first</Chip>
+            {upcomingExams[0] ? (
+              <Chip tone="danger">
+                <CalendarDays className="h-3 w-3" /> Next exam: {upcomingExams[0].days === 0 ? 'today' : `${upcomingExams[0].days}d`}
+              </Chip>
+            ) : null}
+          </>
         }
       />
 
-      {/* Exam countdowns */}
-      {upcomingExams.length > 0 && (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {upcomingExams.map((exam) => (
-            <div key={exam.id} className="rounded-card border border-subtle bg-surface p-4 shadow-card">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold text-content">{exam.label}</p>
-                {exam.targetGrade && (
-                  <span className="rounded-full bg-accent-muted px-2 py-0.5 text-caption font-semibold text-accent">
-                    Target {exam.targetGrade}
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-2xl font-bold text-content">
-                {exam.days === 0 ? 'Today' : `${exam.days} ${exam.days === 1 ? 'day' : 'days'}`}
-              </p>
-              <p className="text-caption text-content-subtle">
-                {new Intl.DateTimeFormat('en', { weekday: 'long', day: 'numeric', month: 'long' }).format(
-                  new Date(`${exam.examDate}T00:00:00`)
-                )}
-              </p>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {isLoading ? (
-        <p className="text-body text-content-subtle">Loading your plan…</p>
-      ) : subjects.length === 0 ? (
-        <EmptyState
-          icon={Sparkles}
-          title="No subjects yet"
-          description="Add your subjects and exam dates, then generate a revision timetable."
-          action={
-            <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'primary' })}>
-              Add subjects
-            </Link>
-          }
-        />
-      ) : upcomingExams.length === 0 ? (
-        <EmptyState
-          icon={CalendarDays}
-          title="Set your exam dates"
-          description="Add an exam date to your subjects so the planner can build a timetable that counts down to each paper."
-          action={
-            <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'primary' })}>
-              Set exam dates
-            </Link>
-          }
-        />
-      ) : items.length === 0 ? (
-        <EmptyState
-          icon={Wand2}
-          title="No plan yet"
-          description="Generate a timetable and it will appear here, weighted toward your weak topics."
-        />
-      ) : (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between rounded-card border border-subtle bg-surface px-4 py-3 shadow-card">
-            <p className="text-body text-content-muted">
-              <span className="font-semibold text-content">{doneCount}</span> of{' '}
-              <span className="font-semibold text-content">{items.length}</span> sessions done
-            </p>
-            <div className="h-2 w-32 overflow-hidden rounded-full bg-surface-sunken">
-              <div
-                className="h-full rounded-full bg-accent transition-all"
-                style={{ width: `${items.length ? (doneCount / items.length) * 100 : 0}%` }}
+      <WorkspaceBody aside={reportColumn}>
+        {isLoading ? (
+          <p className="p-5 text-body text-content-subtle">Loading your plan…</p>
+        ) : subjects.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              icon={Sparkles}
+              title="No subjects yet"
+              description="Add your subjects and exam dates, then generate a revision timetable."
+              action={
+                <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'primary' })}>
+                  Add subjects
+                </Link>
+              }
+            />
+          </div>
+        ) : upcomingExams.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              icon={CalendarDays}
+              title="Set your exam dates"
+              description="Add an exam date to your subjects so the planner can build a timetable that counts down to each paper."
+              action={
+                <Link href="/dashboard/subjects" className={buttonStyles({ variant: 'primary' })}>
+                  Set exam dates
+                </Link>
+              }
+            />
+          </div>
+        ) : items.length === 0 ? (
+          <>
+            <div className="flex-1 p-5">
+              <EmptyState
+                icon={Wand2}
+                title="No plan yet"
+                description="Generate a timetable and it will appear here, weighted toward your weak topics."
               />
             </div>
-          </div>
+            <div className="flex justify-end border-t border-subtle p-4">{generateButton}</div>
+          </>
+        ) : (
+          <>
+            <StatusBar>
+              <span>
+                <span className="font-semibold text-content">{doneCount}</span> of{' '}
+                <span className="font-semibold text-content">{items.length}</span> sessions done
+              </span>
+              <span>{itemsByDate.length} days planned</span>
+            </StatusBar>
 
-          {itemsByDate.map(([date, dayItems]) => (
-            <div key={date} className="rounded-card border border-subtle bg-surface shadow-card">
-              <p className="border-b border-subtle px-4 py-2.5 text-caption font-semibold uppercase tracking-[0.12em] text-content-subtle">
-                {formatDay(date)}
-              </p>
-              <ul className="divide-y divide-subtle">
-                {dayItems.map((item) => (
-                  <li key={item.id} className="flex items-center gap-3 px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleItem(item)}
-                      aria-pressed={item.status === 'done'}
-                      aria-label={item.status === 'done' ? 'Mark as not done' : 'Mark as done'}
-                      className="shrink-0 text-accent"
-                    >
-                      {item.status === 'done' ? (
-                        <CheckCircle2 className="h-5 w-5" />
-                      ) : (
-                        <Circle className="h-5 w-5 text-content-subtle" />
-                      )}
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-body ${item.status === 'done' ? 'text-content-subtle line-through' : 'text-content'}`}>
-                        {item.title}
-                      </p>
-                      <p className="text-caption text-content-subtle">
-                        {item.estimated_minutes ?? 30} min
-                        {item.subtopic_id ? (
-                          <>
-                            {' · '}
-                            <Link
-                              href={`/dashboard/daily-review?subtopic=${item.subtopic_id}`}
-                              className="font-semibold text-accent hover:underline"
-                            >
-                              Practise now
-                            </Link>
-                          </>
-                        ) : null}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteItem(item.id)}
-                      className="shrink-0 text-content-subtle transition hover:text-danger"
-                      aria-label="Remove session"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            <section className="flex-1 space-y-3 p-5" aria-label="Revision timetable">
+              {itemsByDate.map(([date, dayItems]) => (
+                <div key={date} className="rounded-lg border border-subtle bg-surface">
+                  <h2 className="border-b border-subtle px-4 py-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-content-subtle">
+                    {formatDay(date)}
+                  </h2>
+                  <ul className="divide-y divide-subtle">
+                    {dayItems.map((item) => (
+                      <li key={item.id} className="flex items-center gap-3 px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleItem(item)}
+                          aria-pressed={item.status === 'done'}
+                          aria-label={item.status === 'done' ? 'Mark as not done' : 'Mark as done'}
+                          className="shrink-0 text-success"
+                        >
+                          {item.status === 'done' ? (
+                            <CheckCircle2 className="h-5 w-5" />
+                          ) : (
+                            <Circle className="h-5 w-5 text-content-subtle" />
+                          )}
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-body ${item.status === 'done' ? 'text-content-subtle line-through' : 'text-content'}`}>
+                            {item.title}
+                          </p>
+                          <p className="font-mono text-xs text-content-subtle">
+                            {item.estimated_minutes ?? 30} min
+                            {item.subtopic_id ? (
+                              <>
+                                {' · '}
+                                <Link
+                                  href={`/dashboard/daily-review?subtopic=${item.subtopic_id}`}
+                                  className="font-semibold text-accent hover:underline"
+                                >
+                                  Practise now
+                                </Link>
+                              </>
+                            ) : null}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => deleteItem(item.id)}
+                          className="shrink-0 text-content-subtle transition hover:text-danger"
+                          aria-label="Remove session"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </section>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+              <p className="font-mono text-xs text-content-subtle max-sm:hidden">Regenerating replaces today&apos;s and later sessions</p>
+              {generateButton}
             </div>
-          ))}
-        </section>
-      )}
-    </div>
+          </>
+        )}
+      </WorkspaceBody>
+    </Workspace>
   );
 }

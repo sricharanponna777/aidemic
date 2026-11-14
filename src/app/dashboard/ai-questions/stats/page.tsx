@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BarChart3, Target, Trophy } from 'lucide-react';
-import { buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { BarChart3, Radar, Trophy } from 'lucide-react';
+import { PageHeader } from '@/components/ui/feedback';
+import { Alert } from '@/components/ui/field';
+import { Chip, MonoLabel, Panel, PanelHeading, Stat, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { getExamTypeLabel, getSubjectLabel } from '@/lib/ai/subjectConfig';
@@ -181,137 +182,164 @@ export default function SmartPracticeStatsPage() {
     };
   }, [attempts, subjects]);
 
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Report card</PanelHeading>
+      <Stat label="Practice attempts" value={isLoading ? '…' : attempts.length} />
+
+      <Panel>
+        <PanelHeading icon={Trophy} as="h3">
+          Predicted grades
+        </PanelHeading>
+        <div className="mt-3 space-y-2">
+          {isLoading ? (
+            [1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-lg bg-surface-sunken" />)
+          ) : stats.subjectPredictions.length === 0 ? (
+            <p className="text-[13px] text-content-subtle">Complete exam practice to build your report card.</p>
+          ) : (
+            stats.subjectPredictions.map((item) => (
+              <div key={`${item.subject}-${item.examType}`} className="rounded-lg border border-subtle px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate text-sm font-semibold text-content">{getSubjectLabel(item.subject)}</p>
+                  <span
+                    className={`rounded-md px-2 py-0.5 font-mono text-xs font-bold ${gradeBadgeTone({
+                      grade: item.grade,
+                      examType: item.examType,
+                      specTier: item.specTier,
+                    })}`}
+                  >
+                    {item.grade}
+                  </span>
+                </div>
+                <p className="font-mono text-[11px] text-content-subtle">
+                  {formatTieredExamLabel(item.examType, item.specTier, item.grade)} ·{' '}
+                  {item.analysableAttempts === 0 ? 'no analysable grades' : `${item.analysableAttempts}/${item.attempts} attempts`}
+                </p>
+                <p className="mt-1 font-mono text-[11px] font-semibold text-content-muted">
+                  Total score:{' '}
+                  {item.totalMarksAwarded === null || item.totalAvailableMarks === null
+                    ? '--'
+                    : `${item.totalMarksAwarded}/${item.totalAvailableMarks}${item.totalPercentage === null ? '' : ` (${item.totalPercentage}%)`}`}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </Panel>
+
+      <Panel>
+        <PanelHeading as="h3">Recurring weak areas</PanelHeading>
+        <div className="mt-3 space-y-2">
+          {isLoading ? (
+            [1, 2, 3].map((item) => <div key={item} className="h-10 animate-pulse rounded-lg bg-surface-sunken" />)
+          ) : stats.weaknesses.length === 0 ? (
+            <p className="text-[13px] text-content-subtle">No weak areas recorded yet.</p>
+          ) : (
+            stats.weaknesses.map(([label, count]) => (
+              <div key={label} className="flex items-center justify-between gap-3 rounded-lg border border-subtle px-3 py-2">
+                <span className="min-w-0 truncate text-sm text-content">{label}</span>
+                <Chip tone="danger">{count}</Chip>
+              </div>
+            ))
+          )}
+        </div>
+      </Panel>
+    </>
+  );
+
   return (
-    <div className="space-y-6" aria-labelledby="practice-stats-title">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={BarChart3}
+        eyebrow="Practice / Statistics"
         titleId="practice-stats-title"
         title="Practice Statistics"
         description="Review all marked practice attempts, grades, scores, and recurring weak areas."
         backHref="/dashboard/ai-questions"
         backLabel="Smart Practice"
         actions={
-          <Link href="/dashboard" className={buttonStyles({ variant: 'secondary' })}>
-            <ArrowLeft className="h-4 w-4" />
-            Dashboard
-          </Link>
+          <>
+            <Chip>● {isLoading ? '…' : attempts.length} attempts</Chip>
+            {stats.subjectPredictions.length > 0 ? (
+              <Chip tone="success">{stats.subjectPredictions.length} subjects graded</Chip>
+            ) : null}
+          </>
         }
       />
 
-      {errorMessage ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-700/60 dark:bg-red-950/35 dark:text-red-200">
-          {errorMessage}
-        </p>
-      ) : null}
-
-      <section className="grid gap-4 md:grid-cols-[0.55fr_1fr]">
-        <article className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
-          <Target className="h-5 w-5 text-accent" />
-          <p className="mt-3 text-2xl font-bold text-content dark:text-white">{isLoading ? '...' : attempts.length}</p>
-          <p className="text-xs font-semibold text-content-subtle">Exam Practice Attempts</p>
-        </article>
-
-        <article className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
-          <Trophy className="h-5 w-5 text-accent" />
-          <h2 className="mt-3 font-semibold text-content dark:text-white">Predicted Grades</h2>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {isLoading ? (
-              [1, 2].map((item) => <div key={item} className="h-12 animate-pulse rounded-lg bg-slate-100 dark:bg-surface/5" />)
-            ) : stats.subjectPredictions.length === 0 ? (
-              <p className="text-sm text-content-subtle">Complete exam practice to build your report card.</p>
-            ) : (
-              stats.subjectPredictions.map((item) => (
-                <div key={`${item.subject}-${item.examType}`} className="rounded-lg border border-slate-100 px-3 py-2 dark:border-white/6">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="min-w-0 truncate text-sm font-semibold text-content dark:text-white">
-                      {getSubjectLabel(item.subject)}
-                    </p>
-                    <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
-                      grade: item.grade,
-                      examType: item.examType,
-                      specTier: item.specTier,
-                    })}`}>
-                      {item.grade}
-                    </span>
-                  </div>
-                  <p className="text-xs text-content-subtle">
-                    {formatTieredExamLabel(item.examType, item.specTier, item.grade)} - {item.analysableAttempts === 0 ? 'no analysable grades' : `${item.analysableAttempts}/${item.attempts} attempts`}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-content-muted">
-                    Total score: {item.totalMarksAwarded === null || item.totalAvailableMarks === null
-                      ? '--'
-                      : `${item.totalMarksAwarded}/${item.totalAvailableMarks}${item.totalPercentage === null ? '' : ` (${item.totalPercentage}%)`}`}
-                  </p>
-                </div>
-              ))
-            )}
+      <WorkspaceBody aside={reportColumn}>
+        {errorMessage ? (
+          <div className="border-b border-subtle p-4">
+            <Alert>{errorMessage}</Alert>
           </div>
-        </article>
-      </section>
+        ) : null}
 
-      <section className="grid gap-5 lg:grid-cols-[1fr_0.55fr]">
-        <div className="overflow-hidden rounded-2xl border border-subtle bg-surface shadow-sm">
-          <div className="border-b border-subtle px-5 py-4">
-            <h2 className="font-semibold text-content dark:text-white">All Attempts</h2>
+        {scoreTrend.length >= 2 && (
+          <div className="border-b border-subtle p-5">
+            <MonoLabel className="mb-2">Score trend</MonoLabel>
+            <LineChart data={scoreTrend} suffix="%" ariaLabel="Practice score percentage over time" />
           </div>
-          {scoreTrend.length >= 2 && (
-            <div className="border-b border-subtle px-5 py-4">
-              <p className="mb-2 text-caption font-semibold uppercase tracking-[0.12em] text-content-subtle">
-                Score trend
-              </p>
-              <LineChart data={scoreTrend} suffix="%" ariaLabel="Practice score percentage over time" />
-            </div>
-          )}
+        )}
+
+        <StatusBar>
+          <h2 className="font-semibold text-content">All attempts</h2>
+          <span>Newest first</span>
+        </StatusBar>
+
+        <div className="flex-1">
           {isLoading ? (
-            <div className="space-y-px p-4">
+            <div className="space-y-2 p-5">
               {[1, 2, 3, 4, 5].map((item) => (
-                <div key={item} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-surface/5" />
+                <div key={item} className="h-14 animate-pulse rounded-lg bg-surface-sunken" />
               ))}
             </div>
           ) : attempts.length === 0 ? (
-            <div className="p-8 text-center text-sm text-content-subtle">
-              No marked attempts yet.
-            </div>
+            <div className="p-8 text-center text-sm text-content-subtle">No marked attempts yet.</div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-white/6">
+            <div className="divide-y divide-subtle">
               {attempts.map((attempt) => (
                 <Link
                   key={attempt.id}
                   href={`/dashboard/ai-questions/stats/${attempt.id}`}
-                  className="grid gap-3 px-5 py-4 transition hover:bg-indigo-50/50 dark:hover:bg-indigo-500/8 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
+                  className="grid gap-3 px-5 py-4 transition-colors hover:bg-surface-sunken sm:grid-cols-[1fr_auto_auto_auto] sm:items-center"
                 >
                   <div className="min-w-0">
-                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-content dark:text-white">
+                    <p className="flex items-center gap-2 truncate text-sm font-semibold text-content">
                       {attempt.topic}
-                      {attempt.attempt_mode === 'mock' ? (
-                        <span className="shrink-0 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
-                          Mock
-                        </span>
-                      ) : null}
+                      {attempt.attempt_mode === 'mock' ? <Chip tone="xp">Mock</Chip> : null}
                     </p>
-                    <p className="mt-0.5 text-xs text-content-subtle">
-                      {getSubjectLabel(attempt.subject)} - {attempt.exam_board.toUpperCase()} {formatTieredExamLabel(
+                    <p className="mt-0.5 font-mono text-[11px] text-content-subtle">
+                      {getSubjectLabel(attempt.subject)} · {attempt.exam_board.toUpperCase()}{' '}
+                      {formatTieredExamLabel(
                         attempt.exam_type,
-                        subjects.find((subject) =>
-                          subject.subject === attempt.subject &&
-                          subject.exam_type === attempt.exam_type &&
-                          subject.exam_board === attempt.exam_board
+                        subjects.find(
+                          (subject) =>
+                            subject.subject === attempt.subject &&
+                            subject.exam_type === attempt.exam_type &&
+                            subject.exam_board === attempt.exam_board
                         )?.spec_tier ??
-                          subjects.find((subject) => subject.subject === attempt.subject && subject.exam_type === attempt.exam_type)?.spec_tier ??
+                          subjects.find((subject) => subject.subject === attempt.subject && subject.exam_type === attempt.exam_type)
+                            ?.spec_tier ??
                           null,
                         attempt.predicted_grade
-                      )} - {formatDate(attempt.created_at)}
+                      )}{' '}
+                      · {formatDate(attempt.created_at)}
                     </p>
                   </div>
-                  <span className="text-sm font-bold text-content dark:text-white">{attempt.percentage ?? '--'}%</span>
-                  <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${gradeBadgeTone({
-                    grade: attempt.predicted_grade,
-                    examType: attempt.exam_type,
-                    specTier: subjects.find((subject) => subject.subject === attempt.subject && subject.exam_type === attempt.exam_type)?.spec_tier ?? null,
-                  })}`}>
+                  <span className="font-mono text-sm font-bold text-content">{attempt.percentage ?? '--'}%</span>
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-center font-mono text-xs font-bold ${gradeBadgeTone({
+                      grade: attempt.predicted_grade,
+                      examType: attempt.exam_type,
+                      specTier:
+                        subjects.find((subject) => subject.subject === attempt.subject && subject.exam_type === attempt.exam_type)?.spec_tier ??
+                        null,
+                    })}`}
+                  >
                     {attempt.predicted_grade || 'N/A'}
                   </span>
-                  <span className="text-xs text-content-subtle">
+                  <span className="font-mono text-xs text-content-subtle">
                     {attempt.total_marks_awarded ?? '--'} / {attempt.total_available_marks ?? '--'} marks
                   </span>
                 </Link>
@@ -320,26 +348,15 @@ export default function SmartPracticeStatsPage() {
           )}
         </div>
 
-        <aside className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
-          <h2 className="font-semibold text-content dark:text-white">Recurring Weak Areas</h2>
-          <div className="mt-4 space-y-2">
-            {isLoading ? (
-              [1, 2, 3].map((item) => <div key={item} className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-surface/5" />)
-            ) : stats.weaknesses.length === 0 ? (
-              <p className="text-sm text-content-subtle">No weak areas recorded yet.</p>
-            ) : (
-              stats.weaknesses.map(([label, count]) => (
-                <div key={label} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 dark:border-white/6">
-                  <span className="min-w-0 truncate text-sm font-medium text-content-muted text-content">{label}</span>
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                    {count}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </aside>
-      </section>
-    </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4 font-mono text-xs text-content-subtle">
+          <Link href="/dashboard" className="transition-colors hover:text-content">
+            ← Dashboard
+          </Link>
+          <Link href="/dashboard/exam-coach" className="transition-colors hover:text-content">
+            Exam Coach →
+          </Link>
+        </div>
+      </WorkspaceBody>
+    </Workspace>
   );
 }

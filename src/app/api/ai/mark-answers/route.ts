@@ -926,6 +926,13 @@ export async function POST(request: Request) {
     if (payload.questions.length === 0) {
       return NextResponse.json({ error: 'No valid questions were submitted for marking.' }, { status: 400 });
     }
+    // Self-practice counterpart of the paper-mode refusal above: an all-blank
+    // attempt would be saved as a real 0-of-N sitting. The page disables its
+    // button on the same condition; this is the backstop. Assignments are left
+    // alone -- a teacher may need to see that a student handed in nothing.
+    if (!paperId && !assignmentId && !payload.answers.some((answer) => answer.trim())) {
+      return NextResponse.json({ error: 'Write at least one answer before marking the attempt.' }, { status: 400 });
+    }
 
     const config = getAIConfig();
     const missingKeyError = getMissingHostedKeyError(config);

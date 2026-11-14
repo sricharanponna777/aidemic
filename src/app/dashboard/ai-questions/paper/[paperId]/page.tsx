@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Camera,
   CheckCircle2,
+  FileText,
   Loader2,
   Printer,
   ScanLine,
@@ -16,6 +17,9 @@ import {
 } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { buttonStyles } from '@/components/ui/button';
+import { PageHero } from '@/components/ui/feedback';
+import { fieldStyles } from '@/components/ui/field';
+import { Chip, MonoLabel, PanelHeading } from '@/components/ui/telemetry';
 import { createClient } from '@/lib/supabase-client';
 import { useAuth } from '@/hooks/useAuth';
 import { downscaleToJpeg } from '@/lib/papers/downscale';
@@ -40,9 +44,9 @@ const LETTERS = ['A', 'B', 'C', 'D'];
 type Tone = 'info' | 'success' | 'error';
 
 const toneStyles: Record<Tone, string> = {
-  info: 'border-info/30 bg-info-muted text-info',
-  success: 'border-success/30 bg-success-muted text-success',
-  error: 'border-danger/30 bg-danger-muted text-danger',
+  info: 'bg-info-muted text-info',
+  success: 'bg-success-muted text-success',
+  error: 'bg-danger-muted text-danger',
 };
 
 export default function PaperPage() {
@@ -310,44 +314,47 @@ export default function PaperPage() {
   return (
     <div className="space-y-6">
       {/* ── Controls ─────────────────────────────────────────────────────── */}
-      <section className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <div>
-          <Link
-            href="/dashboard/ai-questions"
-            className="inline-flex items-center gap-1.5 text-caption font-semibold text-content-subtle hover:text-content"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Smart Practice
-          </Link>
-          <h1 className="mt-1 text-display text-content">{paper.topic}</h1>
-          <p className="text-caption text-content-subtle">
-            Paper {paper.paperCode} · {paper.questions.length} questions · {totalMarks} marks
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => window.print()} className={buttonStyles({ variant: 'primary' })}>
-            <Printer className="h-4 w-4" />
-            Print / Save as PDF
-          </button>
-          <button type="button" onClick={handleDelete} className={buttonStyles({ variant: 'danger-ghost' })}>
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </button>
-        </div>
-      </section>
+      <div className="print:hidden">
+        <PageHero
+          icon={FileText}
+          eyebrow={`Practice / Paper ${paper.paperCode}`}
+          title={paper.topic}
+          description="Print it, write your answers by hand, then photograph the pages and upload them here to be marked."
+          backHref="/dashboard/ai-questions"
+          backLabel="Smart Practice"
+          actions={
+            <>
+              <Chip>● {paper.questions.length} questions</Chip>
+              <Chip tone="success">{totalMarks} marks</Chip>
+              {isMarked ? <Chip tone="success">Marked</Chip> : null}
+            </>
+          }
+        >
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-subtle pt-4">
+            <button type="button" onClick={() => window.print()} className={buttonStyles({ variant: 'primary' })}>
+              <Printer className="h-4 w-4" />
+              Print / Save as PDF
+            </button>
+            <button type="button" onClick={handleDelete} className={buttonStyles({ variant: 'danger-ghost' })}>
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          </div>
+        </PageHero>
+      </div>
 
       {status ? (
         <div
           role="status"
           aria-live="polite"
-          className={`rounded-xl border px-4 py-3 text-sm print:hidden ${toneStyles[status.tone]}`}
+          className={`rounded-field px-3.5 py-2.5 text-body print:hidden ${toneStyles[status.tone]}`}
         >
           {status.text}
         </div>
       ) : null}
 
       {isMarked ? (
-        <div className="flex items-center gap-2 rounded-xl border border-success/30 bg-success-muted px-4 py-3 text-sm text-success print:hidden">
+        <div className="flex items-center gap-2 rounded-field bg-success-muted px-3.5 py-2.5 text-body text-success print:hidden">
           <CheckCircle2 className="h-4 w-4" />
           This paper has been marked.
           {paper.attemptId ? (
@@ -359,7 +366,7 @@ export default function PaperPage() {
       ) : null}
 
       {/* ── The printable sheet ──────────────────────────────────────────── */}
-      <article className="rounded-2xl border border-subtle bg-surface p-6 shadow-card print:rounded-none print:border-0 print:p-[14mm] print:shadow-none">
+      <article className="rounded-card border border-subtle bg-surface p-6 print:rounded-none print:border-0 print:p-[14mm] print:shadow-none">
         <header className="border-b border-strong pb-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-title text-content">{paper.topic}</h2>
@@ -421,11 +428,8 @@ export default function PaperPage() {
 
       {/* ── Upload ───────────────────────────────────────────────────────── */}
       {!isMarked ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card print:hidden">
-          <h2 className="flex items-center gap-2 text-title text-content">
-            <Camera className="h-5 w-5 text-accent" />
-            Your written pages
-          </h2>
+        <section className="rounded-card border border-subtle bg-surface p-6 print:hidden">
+          <PanelHeading icon={Camera}>Your written pages</PanelHeading>
           <p className="mt-1 text-caption text-content-subtle">
             Photograph each page in order, in good light, with the whole sheet in frame — or upload a PDF
             straight from a scanner app.
@@ -445,7 +449,7 @@ export default function PaperPage() {
                     unoptimized
                     className="h-40 w-full object-cover"
                   />
-                  <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-caption font-semibold text-white">
+                  <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 font-mono text-caption font-semibold text-white">
                     {position + 1}
                   </span>
                   <button
@@ -494,8 +498,8 @@ export default function PaperPage() {
 
       {/* ── Transcript review ────────────────────────────────────────────── */}
       {!isMarked && transcript.length > 0 ? (
-        <section className="rounded-2xl border border-subtle bg-surface p-6 shadow-card print:hidden">
-          <h2 className="text-title text-content">Check what was read</h2>
+        <section className="rounded-card border border-subtle bg-surface p-6 print:hidden">
+          <PanelHeading icon={ScanLine}>Check what was read</PanelHeading>
           <p className="mt-1 text-caption text-content-subtle">
             This is what the AI read from your handwriting, not a mark. Fix anything it got
             wrong before marking — you are marked on the text below.
@@ -510,9 +514,7 @@ export default function PaperPage() {
               return (
                 <li key={entry.questionIndex}>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-caption font-bold text-content-subtle">
-                      Question {entry.questionIndex + 1}
-                    </span>
+                    <MonoLabel>Question {String(entry.questionIndex + 1).padStart(2, '0')}</MonoLabel>
                     {uncertain ? (
                       <span className="inline-flex items-center gap-1 text-caption font-semibold text-warning">
                         <AlertTriangle className="h-3.5 w-3.5" />
@@ -526,9 +528,7 @@ export default function PaperPage() {
                     onChange={(event) => updateTranscript(entry.questionIndex, event.target.value)}
                     rows={question.questionType === 'mcq' ? 1 : 4}
                     placeholder="Nothing was read for this question"
-                    className={`mt-2 w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content ${
-                      uncertain ? 'border-warning' : 'border-subtle'
-                    }`}
+                    className={fieldStyles(`mt-2 ${uncertain ? 'border-warning!' : ''}`)}
                   />
                 </li>
               );

@@ -33,9 +33,9 @@ export function SubjectSpecSelector({
   return (
     <div>
       {isLoading ? (
-        <div className="h-10 animate-pulse rounded-lg bg-slate-100 dark:bg-surface/8" />
+        <div className="h-10 animate-pulse rounded-field bg-surface-sunken" />
       ) : subjects.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+        <div className="rounded-lg border border-dashed border-warning/40 bg-warning-muted p-4 text-sm text-warning">
           Add at least one subject on the Subjects page before using AI generation.
         </div>
       ) : (

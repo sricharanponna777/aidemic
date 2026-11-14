@@ -4,16 +4,17 @@ import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowRight,
   BookOpen,
-  Brain,
   CheckCircle2,
   ClipboardList,
   Layers,
   Loader2,
+  Radar,
   Sparkles,
 } from 'lucide-react';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { fieldStyles } from '@/components/ui/field';
+import { Chip, MonoLabel, PanelHeading, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { SearchSelect } from '@/components/SearchSelect';
 import { SubjectSpecSelector, getSelectedSpecLabel } from '@/components/SubjectSpecSelector';
 import { TopicInput } from '@/components/TopicInput';
@@ -83,9 +84,9 @@ const defaultPrompt = CARD_STYLES[0].prompt;
 const clampCardCount = (count: number) => Math.min(Math.max(Math.floor(count || MIN_CARDS), MIN_CARDS), MAX_CARDS);
 
 const statusClassNames: Record<StatusTone, string> = {
-  info: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-700/70 dark:bg-blue-950/40 dark:text-blue-200',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/70 dark:bg-emerald-950/35 dark:text-emerald-200',
-  error: 'border-red-200 bg-red-50 text-red-800 dark:border-red-700/70 dark:bg-red-950/35 dark:text-red-200',
+  info: 'bg-info-muted text-info',
+  success: 'bg-success-muted text-success',
+  error: 'bg-danger-muted text-danger',
 };
 
 export default function AIFlashcardsPage() {
@@ -233,63 +234,85 @@ export default function AIFlashcardsPage() {
     }
   };
 
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Generation summary</PanelHeading>
+      <section className="rounded-xl border border-subtle bg-surface p-4">
+        <dl className="space-y-3">
+          {summaryRows.map((row) => (
+            <div key={row.label} className="flex items-start justify-between gap-3 border-b border-subtle pb-2 last:border-0">
+              <dt className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-content-subtle">{row.label}</dt>
+              <dd className="text-right text-sm font-medium text-content">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+        {validationMessage ? (
+          <p className={`mt-3 text-xs ${subjectsError ? 'text-danger' : 'text-warning'}`}>
+            {validationMessage}
+          </p>
+        ) : null}
+      </section>
+    </>
+  );
+
   return (
-    <div className="space-y-6" aria-labelledby="ai-flashcards-title">
-      <PageHero
+    <form onSubmit={handleGenerate}>
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={Sparkles}
+        eyebrow="Learn / AI flashcards"
         titleId="ai-flashcards-title"
         title="AI Flashcards"
         description="Turn a topic from notes into a saved deck with focused front/back cards."
         backHref="/dashboard/flashcards"
         backLabel="Flashcards"
         actions={
-          <Link
-            href="/dashboard/study-sessions"
-            className={buttonStyles({ variant: 'primary' })}
-          >
-            <Brain className="h-4 w-4" />
-            Flashcard Revision
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          <>
+            <Chip>● Mode: generate deck</Chip>
+            <Chip tone="success">
+              <Layers className="h-3 w-3" /> {safeCardCount} cards
+            </Chip>
+          </>
         }
       />
 
-      {status && !validationMessage ? <div className={`rounded-xl border px-4 py-3 text-sm ${statusClassNames[status.tone]}`}>{status.text}</div> : null}
+      <WorkspaceBody aside={reportColumn}>
+      {status && !validationMessage ? (
+        <div className="border-b border-subtle p-4">
+          <div role="status" className={`rounded-field px-3.5 py-2.5 text-body ${statusClassNames[status.tone]}`}>
+            {status.text}
+          </div>
+        </div>
+      ) : null}
 
-      <form onSubmit={handleGenerate} className="grid gap-5 xl:grid-cols-[1fr_0.58fr]">
-        <section className="space-y-5 rounded-2xl border border-subtle bg-surface p-6 shadow-card">
+        <section className="flex-1 space-y-5 p-5">
           <div>
-            <div className="flex items-center gap-2">
-              <Layers className="h-5 w-5 text-accent" />
-              <h2 className="text-lg font-semibold text-content">Deck setup</h2>
-            </div>
+            <PanelHeading icon={Layers}>Deck setup</PanelHeading>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <label className="text-sm font-medium text-content-muted dark:text-slate-300">
-                Deck name <span className="font-normal text-content-subtle">(optional)</span>
+              <label className="block">
+                <MonoLabel className="mb-1">Deck name (optional)</MonoLabel>
                 <input
                   value={deckName}
                   onChange={(event) => setDeckName(event.target.value)}
                   placeholder="e.g. Cell Biology Recall"
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 />
               </label>
-              <label className="text-sm font-medium text-content-muted dark:text-slate-300">
-                Deck focus <span className="font-normal text-content-subtle">(optional)</span>
+              <label className="block">
+                <MonoLabel className="mb-1">Deck focus (optional)</MonoLabel>
                 <input
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   placeholder="e.g. Core definitions and calculation traps"
-                  className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                  className={fieldStyles()}
                 />
               </label>
             </div>
           </div>
 
           <div className="border-t border-subtle pt-5">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-              <h2 className="text-lg font-semibold text-content">Exam focus</h2>
-            </div>
+            <PanelHeading icon={BookOpen}>Exam focus</PanelHeading>
             <div className="mt-4">
               <SubjectSpecSelector
                 subjects={userSubjects}
@@ -322,13 +345,13 @@ export default function AIFlashcardsPage() {
                     ...creationOptions.map((option) => ({ value: option, label: option })),
                   ]}
                   placeholder={`Search ${creationOptionLabel.toLowerCase()}...`}
-                  className="mt-4 block text-sm font-medium text-content-muted dark:text-slate-300"
+                  className="mt-4 block"
                 />
               ) : null}
               {isSelectedPoetryCluster ? (
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
-                    First poem
+                  <label className="block">
+                    <MonoLabel className="mb-1">First poem</MonoLabel>
                     <select
                       value={poemOne}
                       onChange={(event) => {
@@ -337,7 +360,7 @@ export default function AIFlashcardsPage() {
                         setSubtopic('');
                         if (event.target.value === poemTwo) setPoemTwo('');
                       }}
-                      className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                      className={fieldStyles()}
                     >
                       <option value="">Select first poem</option>
                       {poetryPoems.map((poem) => (
@@ -345,8 +368,8 @@ export default function AIFlashcardsPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="block text-sm font-medium text-content-muted dark:text-slate-300">
-                    Second poem <span className="font-normal text-content-subtle">(optional)</span>
+                  <label className="block">
+                    <MonoLabel className="mb-1">Second poem (optional)</MonoLabel>
                     <select
                       value={poemTwo}
                       onChange={(event) => {
@@ -355,7 +378,7 @@ export default function AIFlashcardsPage() {
                         setSubtopic('');
                       }}
                       disabled={!poemOne}
-                      className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent disabled:disabled:text-content-subtle text-content dark:disabled:bg-surface/5"
+                      className={fieldStyles()}
                     >
                       <option value="">No comparison poem</option>
                       {poetryPoems.filter((poem) => poem !== poemOne).map((poem) => (
@@ -376,7 +399,7 @@ export default function AIFlashcardsPage() {
                 suggestions={topicSuggestions}
                 isValidSelection={topicIsAllowed}
                 placeholder="Start typing a topic, or leave blank to generalise"
-                className="mt-4 block text-sm font-medium text-content-muted dark:text-slate-300"
+                className="mt-4 block"
               />
               {selectedTopicOption?.id && subtopicSuggestions.length > 0 ? (
                 <TopicInput
@@ -385,16 +408,16 @@ export default function AIFlashcardsPage() {
                   onChange={setSubtopic}
                   suggestions={subtopicSuggestions}
                   placeholder="Narrow the focus within this topic"
-                  className="mt-4 block text-sm font-medium text-content-muted dark:text-slate-300"
+                  className="mt-4 block"
                 />
               ) : null}
               {learningObjectiveOptions.length > 0 ? (
-                <label className="mt-4 block text-sm font-medium text-content-muted dark:text-slate-300">
-                  Learning objective (optional)
+                <label className="mt-4 block">
+                  <MonoLabel className="mb-1">Learning objective (optional)</MonoLabel>
                   <select
                     value={learningObjective}
                     onChange={(event) => setLearningObjective(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                    className={fieldStyles()}
                   >
                     <option value="">No specific focus</option>
                     {learningObjectiveOptions.map((objective) => (
@@ -404,12 +427,12 @@ export default function AIFlashcardsPage() {
                 </label>
               ) : null}
               {paperOptions.length > 0 ? (
-                <label className="mt-4 block text-sm font-medium text-content-muted dark:text-slate-300">
-                  Paper (optional)
+                <label className="mt-4 block">
+                  <MonoLabel className="mb-1">Paper (optional)</MonoLabel>
                   <select
                     value={paper}
                     onChange={(event) => setPaper(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-subtle px-3 py-2 font-normal outline-none focus:border-accent bg-surface text-content"
+                    className={fieldStyles()}
                   >
                     <option value="">General (any paper)</option>
                     {paperOptions.map((paperOption) => (
@@ -422,10 +445,7 @@ export default function AIFlashcardsPage() {
           </div>
 
           <div className="border-t border-subtle pt-5">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-              <h2 className="text-lg font-semibold text-content">Card style</h2>
-            </div>
+            <PanelHeading icon={ClipboardList}>Card style</PanelHeading>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {CARD_STYLES.map((style) => {
                 const selected = cardStyle === style.id;
@@ -439,8 +459,8 @@ export default function AIFlashcardsPage() {
                       size: 'none',
                       className: `justify-start rounded-lg border p-4 text-left ${
                         selected
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-500/10 dark:text-indigo-100'
-                          : 'border-subtle text-content-muted hover:border-subtle hover:bg-surface-sunken dark:hover:bg-surface/10'
+                          ? 'border-accent bg-accent-muted text-content'
+                          : 'border-subtle bg-surface text-content-muted hover:border-strong'
                       }`,
                     })}
                   >
@@ -457,15 +477,15 @@ export default function AIFlashcardsPage() {
 
           <div className="border-t border-subtle pt-5">
             <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-              <label className="text-sm font-medium text-content-muted dark:text-slate-300">
-                Flashcard count
+              <label className="block">
+                <MonoLabel className="mb-1">Flashcard count</MonoLabel>
                 <input
                   type="range"
                   min={MIN_CARDS}
                   max={MAX_CARDS}
                   value={safeCardCount}
                   onChange={(event) => setCardCount(Number(event.target.value))}
-                  className="mt-3 w-full accent-blue-600"
+                  className="mt-3 w-full accent-(--color-accent)"
                 />
               </label>
               <input
@@ -475,42 +495,27 @@ export default function AIFlashcardsPage() {
                 max={MAX_CARDS}
                 value={safeCardCount}
                 onChange={(event) => setCardCount(Number(event.target.value))}
-                className="w-24 rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
+                className={fieldStyles('w-24 font-mono')}
               />
             </div>
           </div>
         </section>
 
-        <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <section className="rounded-2xl border border-subtle bg-surface p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-accent" />
-              <h2 className="font-semibold text-content">Generation summary</h2>
-            </div>
-            <dl className="mt-4 space-y-3">
-              {summaryRows.map((row) => (
-                <div key={row.label} className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-0 dark:border-slate-800">
-                  <dt className="text-xs font-semibold uppercase tracking-wide text-content-subtle">{row.label}</dt>
-                  <dd className="text-right text-sm font-medium text-content-muted text-content">{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-            <button
-              type="submit"
-              disabled={!canGenerate}
-              className={buttonStyles({ variant: 'primary', size: 'lg', className: 'mt-5 w-full' })}
-            >
-              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {isGenerating ? 'Generating deck...' : 'Generate deck'}
-            </button>
-            {validationMessage ? (
-              <p className={`mt-3 text-xs ${subjectsError ? 'text-red-600 dark:text-red-400' : 'text-amber-700 dark:text-amber-300'}`}>
-                {validationMessage}
-              </p>
-            ) : null}
-          </section>
-        </aside>
-      </form>
-    </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
+          <Link href="/dashboard/study-sessions" className="font-mono text-xs text-content-subtle transition-colors hover:text-content max-sm:hidden">
+            Flashcard Revision →
+          </Link>
+          <button
+            type="submit"
+            disabled={!canGenerate}
+            className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
+          >
+            {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {isGenerating ? 'Generating deck...' : 'Generate deck'}
+          </button>
+        </div>
+      </WorkspaceBody>
+    </Workspace>
+    </form>
   );
 }

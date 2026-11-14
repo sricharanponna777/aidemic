@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Copy, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { Check, Copy, Radar, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
-import { PageHero } from '@/components/ui/feedback';
+import { PageHeader } from '@/components/ui/feedback';
+import { Chip, Panel, PanelHeading, Stat, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { useAuth } from '@/hooks/useAuth';
 import { createClient } from '@/lib/supabase-client';
 import { PageLoader } from '@/components/PageLoader';
@@ -132,35 +133,94 @@ export default function FamilyPage() {
   const activeLinks = links.filter((link) => link.status === 'active');
   const pendingLinks = links.filter((link) => link.status === 'pending');
 
+  const parentRequests = pendingLinks.filter((link) => link.link_source === 'parent');
+  const inviteLinks = pendingLinks.filter((link) => link.link_source !== 'parent');
+
+  const reportColumn = (
+    <>
+      <PanelHeading icon={Radar}>Sharing</PanelHeading>
+      <div className="grid grid-cols-2 gap-2">
+        <Stat label="Linked" value={activeLinks.length} tone={activeLinks.length > 0 ? 'success' : 'default'} />
+        <Stat label="Requests" value={parentRequests.length} tone={parentRequests.length > 0 ? 'warning' : 'default'} />
+      </div>
+
+      {/* Pending invite codes (teacher-initiated or legacy) */}
+      {inviteLinks.length > 0 ? (
+        <Panel>
+          <PanelHeading as="h3">Invite codes to share</PanelHeading>
+          <div className="mt-3 space-y-2">
+            {inviteLinks.map((link) => (
+              <div key={link.id} className="flex items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5">
+                <div className="flex min-w-0 flex-col">
+                  <span className="font-mono text-sm font-semibold uppercase tracking-widest text-content">{link.invite_code}</span>
+                  {link.link_source === 'teacher' ? (
+                    <span className="font-mono text-[11px] text-content-subtle">Created by your teacher</span>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" onClick={() => handleCopy(link)} className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
+                    {copiedId === link.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedId === link.id ? 'Copied' : 'Copy'}
+                  </button>
+                  {link.link_source === 'student' ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRevoke(link.id)}
+                      className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
+                      aria-label="Revoke invite code"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+
+      <Panel>
+        <p className="text-sm font-semibold text-content">What a parent can see</p>
+        <p className="mt-1 text-[13px] text-content-subtle">
+          A linked parent can see your progress, but they can never edit your data.
+        </p>
+      </Panel>
+    </>
+  );
+
   return (
-    <div className="space-y-6">
-      <PageHero
+    <Workspace>
+      <PageHeader
+        className="border-b border-subtle"
         icon={UserPlus}
+        eyebrow="Configuration / Family"
         title="Family"
         description="Parents can send a link request using your email or username. Review and respond to requests below. They can never edit your data."
+        actions={
+          <>
+            <Chip>● {activeLinks.length} linked</Chip>
+            {parentRequests.length > 0 ? <Chip tone="warning">{parentRequests.length} waiting</Chip> : null}
+          </>
+        }
       />
 
-      {/* Requests from parents (parent-initiated) */}
-      <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-        <h2 className="mb-3 text-lg font-bold text-content dark:text-white">Requests from your parents</h2>
-        {pendingLinks.filter((link) => link.link_source === 'parent').length === 0 ? (
-          <p className="text-sm text-content-muted">No pending requests.</p>
-        ) : (
-          <div className="space-y-2">
-            {pendingLinks
-              .filter((link) => link.link_source === 'parent')
-              .map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center justify-between rounded-lg border border-subtle bg-surface-sunken px-4 py-3 dark:bg-surface/3"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-content">
+      <WorkspaceBody aside={reportColumn}>
+        {/* Requests from parents (parent-initiated) */}
+        <section className="border-b border-subtle p-5">
+          <PanelHeading className="mb-3">Requests from your parents</PanelHeading>
+          {parentRequests.length === 0 ? (
+            <p className="text-sm text-content-muted">No pending requests.</p>
+          ) : (
+            <div className="space-y-2">
+              {parentRequests.map((link) => (
+                <div key={link.id} className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-sunken px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-content">
                       {link.parent_profile?.full_name || link.parent_profile?.email || 'A parent'}
                     </p>
-                    <p className="text-xs text-content-subtle">{link.parent_profile?.email}</p>
+                    <p className="truncate font-mono text-[11px] text-content-subtle">{link.parent_profile?.email}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <button
                       type="button"
                       onClick={() => handleAccept(link.id)}
@@ -174,90 +234,42 @@ export default function FamilyPage() {
                       onClick={() => handleDecline(link.id)}
                       disabled={handlingRequestId === link.id}
                       className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
+                      aria-label="Decline request"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
               ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </section>
 
-      {/* Pending invite codes (teacher-initiated or legacy) */}
-      {pendingLinks.filter((link) => link.link_source !== 'parent').length > 0 ? (
-        <div className="rounded-2xl border border-subtle bg-surface p-6 shadow-sm">
-          <label className="text-sm font-semibold text-content">Invite codes to share</label>
-          <div className="mt-3 space-y-2">
-            {pendingLinks
-              .filter((link) => link.link_source !== 'parent')
-              .map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center justify-between rounded-lg border border-subtle bg-surface-sunken px-3 py-2.5 dark:bg-surface/3"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-mono text-sm font-semibold uppercase tracking-widest text-content">
-                      {link.invite_code}
+        <section className="flex-1 p-5">
+          <PanelHeading className="mb-3">Linked parents</PanelHeading>
+          {activeLinks.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted">
+              No parent has linked to your account yet.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {activeLinks.map((link) => (
+                <div key={link.id} className="flex items-center gap-2.5 rounded-lg border border-subtle bg-surface p-4">
+                  <Users className="h-4 w-4 shrink-0 text-content-subtle" />
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-semibold text-content">
+                      {link.parent_profile?.full_name || link.parent_profile?.email || 'Linked parent'}
                     </span>
                     {link.link_source === 'teacher' ? (
-                      <span className="text-xs text-content-subtle">Created by your teacher</span>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(link)}
-                      className={buttonStyles({ variant: 'secondary', size: 'sm' })}
-                    >
-                      {copiedId === link.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      {copiedId === link.id ? 'Copied' : 'Copy'}
-                    </button>
-                    {link.link_source === 'student' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRevoke(link.id)}
-                        className={buttonStyles({ variant: 'danger-ghost', size: 'sm' })}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <span className="font-mono text-[11px] text-content-subtle">Linked by your teacher</span>
                     ) : null}
                   </div>
                 </div>
               ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div>
-        <h2 className="mb-3 text-lg font-bold text-content dark:text-white">Linked parents</h2>
-        {activeLinks.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-subtle bg-surface-sunken p-6 text-center text-sm text-content-muted dark:border-white/6 dark:bg-surface/3 dark:text-content-subtle">
-            No parent has linked to your account yet.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {activeLinks.map((link) => (
-              <div
-                key={link.id}
-                className="flex items-center justify-between rounded-2xl border border-subtle bg-surface p-4 shadow-sm"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Users className="h-4 w-4 text-indigo-500" />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-content">
-                      {link.parent_profile?.full_name || link.parent_profile?.email || 'Linked parent'}
-                    </span>
-                    {link.link_source === 'teacher' ? (
-                      <span className="text-xs text-content-subtle">Linked by your teacher</span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+            </div>
+          )}
+        </section>
+      </WorkspaceBody>
+    </Workspace>
   );
 }
