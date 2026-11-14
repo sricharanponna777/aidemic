@@ -560,7 +560,7 @@ export default function StudySessions() {
               <button
                 className={buttonStyles({ variant: 'primary', className: 'max-sm:w-full' })}
                 onClick={handleStartSession}
-                disabled={!selectedDeckId}
+                disabled={!selectedDeck?.due_count}
               >
                 <Play className="h-4 w-4" />
                 Begin review
