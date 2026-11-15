@@ -11,8 +11,9 @@ import { THEME_INITIALIZER_HASH } from './themeScript';
 // pages it renders per request:
 //
 //   /dashboard/*  strict  -- 'nonce-...' + 'strict-dynamic', no 'unsafe-inline'. The
-//                            segment opts into per-request rendering (see
-//                            src/app/dashboard/layout.tsx) precisely so this can work.
+//   /admin/*                 segments opt into per-request rendering (see
+//                            src/app/dashboard/layout.tsx and src/app/admin/layout.tsx)
+//                            precisely so this can work.
 //   everything else       -- still 'unsafe-inline' for scripts. These pages are statically
 //                            prerendered at build time, so their script tags cannot carry
 //                            a nonce; sending one would block every script and serve a
@@ -82,5 +83,7 @@ export function buildContentSecurityPolicy({ nonce, strict, isDev }: CspOptions)
   ].join('; ');
 }
 
-/** The routes rendered per request, and so the only ones that can carry a nonce. */
-export const usesStrictCsp = (pathname: string) => pathname.startsWith('/dashboard');
+/** The routes rendered per request, and so the only ones that can carry a nonce.
+ *  /admin opts in the same way /dashboard does (src/app/admin/layout.tsx). */
+export const usesStrictCsp = (pathname: string) =>
+  pathname.startsWith('/dashboard') || pathname === '/admin' || pathname.startsWith('/admin/');

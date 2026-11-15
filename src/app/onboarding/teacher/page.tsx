@@ -82,8 +82,8 @@ export default function TeacherOnboardingPage() {
     setIsSaving(true);
     setError('');
 
-    // is_school_admin and verification_status are set by the database, not here:
-    // a trigger forces every self-created teacher row to unapproved.
+    // verification_status is set by the database, not here: a trigger forces
+    // every self-created teacher row to unapproved.
     const { error: saveError } = await supabase.from('teachers').upsert(
       {
         user_id: session.user.id,

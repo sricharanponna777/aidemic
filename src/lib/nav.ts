@@ -110,15 +110,16 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
-/** The school admin workspace. A school admin is also a teacher, so the shell
- *  shows a Teaching / School switcher and picks this list by pathname. */
-export const SCHOOL_ADMIN_PREFIX = "/dashboard/school";
+/** The school admin console. Its own top-level URL and shell (src/app/admin),
+ *  outside /dashboard: a school admin account is not a teacher and never sees
+ *  the dashboard. */
+export const SCHOOL_ADMIN_PREFIX = "/admin";
 
 export const SCHOOL_ADMIN_NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard/school", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/school/staff", label: "Staff", icon: UserCog },
-  { href: "/dashboard/school/classes", label: "Classes", icon: Users },
-  { href: "/dashboard/school/students", label: "Students", icon: GraduationCap },
+  { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/admin/staff", label: "Staff", icon: UserCog },
+  { href: "/admin/classes", label: "Classes", icon: Users },
+  { href: "/admin/students", label: "Students", icon: GraduationCap },
 ];
 
 export const PARENT_NAV_ITEMS: NavItem[] = [

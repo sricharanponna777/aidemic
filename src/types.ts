@@ -14,7 +14,9 @@ export interface UserProfile {
   country?: 'uk' | 'india' | 'us' | 'international';
   theme?: 'light' | 'dark';
   notifications_enabled?: boolean;
-  role?: 'student' | 'teacher' | 'parent';
+  /** 'school_admin' is set only by grant_school_admin() (SQL, service role):
+   *  a separate account with a school_admins row and no teachers row. */
+  role?: 'student' | 'teacher' | 'parent' | 'school_admin';
   welcome_email_sent_at?: string | null;
   /** Set when the welcome tour is finished or skipped. */
   onboarding_completed_at?: string | null;
@@ -44,9 +46,6 @@ export interface Teacher {
   department?: string;
   qualification_level?: string;
   school_id?: string;
-  /** Granted by a school admin (school_admin_set_admin) or by AIDemic by hand
-   *  (grant_school_admin, SQL editor only). */
-  is_school_admin?: boolean;
   verification_status: 'pending' | 'approved' | 'rejected';
   /** When they last entered the verification queue. What school_admin_staff()
    *  orders on -- deliberately not updated_at, which every profile edit bumps. */
@@ -110,8 +109,6 @@ export interface SchoolStaffMember {
   department: string | null;
   qualification_level: string | null;
   verification_status: 'pending' | 'approved' | 'rejected';
-  is_school_admin: boolean;
-  is_self: boolean;
   requested_at: string | null;
   joined_at: string | null;
   class_count: number;

@@ -12,7 +12,7 @@ import type {
 } from '@/types';
 
 /**
- * Data for the school admin workspace (/dashboard/school). Every read goes
+ * Data for the school admin workspace (/admin). Every read goes
  * through a school_admin_* RPC, each of which resolves the caller's school
  * itself and raises 'Not a school admin' for anyone else -- so there is no
  * school id to pass, and none to tamper with.

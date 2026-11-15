@@ -11,7 +11,11 @@ import { buildContentSecurityPolicy, usesStrictCsp } from './lib/csp';
  * client and its getClaims() round trip stay gated on the original set rather than running
  * on every asset and API request. */
 const requiresAuthCheck = (pathname: string) =>
-  pathname.startsWith('/dashboard') || pathname === '/login' || pathname.startsWith('/auth');
+  pathname.startsWith('/dashboard') ||
+  pathname === SCHOOL_ADMIN_PREFIX ||
+  pathname.startsWith(`${SCHOOL_ADMIN_PREFIX}/`) ||
+  pathname === '/login' ||
+  pathname.startsWith('/auth');
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -63,7 +67,7 @@ export async function proxy(request: NextRequest) {
   const supabaseEnv = getOptionalSupabaseEnv();
 
   if (!supabaseEnv) {
-    if (pathname.startsWith('/dashboard')) {
+    if (pathname.startsWith('/dashboard') || pathname.startsWith(SCHOOL_ADMIN_PREFIX)) {
       return withCsp(NextResponse.redirect(new URL('/', request.url)));
     }
 
@@ -93,7 +97,9 @@ export async function proxy(request: NextRequest) {
   const isAuthenticated = Boolean(claimsData?.claims);
   const userId = claimsData?.claims.sub;
 
-  if (pathname.startsWith('/dashboard')) {
+  const isAdminConsole = pathname === SCHOOL_ADMIN_PREFIX || pathname.startsWith(`${SCHOOL_ADMIN_PREFIX}/`);
+
+  if (pathname.startsWith('/dashboard') || isAdminConsole) {
     if (!isAuthenticated) {
       const redirectUrl = new URL('/', request.url);
       redirectUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
@@ -102,59 +108,58 @@ export async function proxy(request: NextRequest) {
 
     // Defense-in-depth only: RLS is the real authorization backstop. These
     // checks just stop an unauthorized user from ever rendering the page.
-    // The school admin workspace is a teacher route first: every school admin
-    // is a teacher, so the role check below covers the cheap half of the gate.
-    const isSchoolAdminRoute = pathname === SCHOOL_ADMIN_PREFIX || pathname.startsWith(`${SCHOOL_ADMIN_PREFIX}/`);
-    const isTeacherRoute = pathname.startsWith('/dashboard/teacher') || isSchoolAdminRoute;
+    const isTeacherRoute = pathname.startsWith('/dashboard/teacher');
     const isParentRoute = pathname.startsWith('/dashboard/parent');
     const isStudentRoute = STUDENT_ONLY_PREFIXES.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
     );
 
-    if (isTeacherRoute || isParentRoute || isStudentRoute) {
-      const cachedRole = await readCachedRole(request, userId!);
-      let role: string | null;
-      let freshLookup = false;
+    // Resolved on every dashboard page, not just the gated ones: a school admin
+    // has no dashboard at all, so even /dashboard/settings sends them to /admin.
+    // The role cookie is safe for this one too -- 'school_admin' is only ever
+    // set or cleared by grant_school_admin()/revoke_school_admin() in SQL, and
+    // every school_admin_* RPC re-checks the school_admins row regardless.
+    const cachedRole = await readCachedRole(request, userId!);
+    let role: string | null;
+    let freshLookup = false;
 
-      if (cachedRole !== undefined) {
-        role = cachedRole;
-      } else {
-        const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', userId!).maybeSingle();
-        role = profile?.role ?? null;
-        freshLookup = true;
-      }
-
-      // A null role predates the role column, so treat it as a student.
-      const home = role === 'teacher' ? '/dashboard/teacher' : role === 'parent' ? '/dashboard/parent' : '/dashboard';
-
-      const allowed = isTeacherRoute
-        ? role === 'teacher'
-        : isParentRoute
-        ? role === 'parent'
-        : role !== 'teacher' && role !== 'parent';
-
-      if (!allowed) {
-        const redirectResponse = NextResponse.redirect(new URL(home, request.url));
-        if (freshLookup) await writeCachedRole(redirectResponse, userId!, role);
-        return withCsp(redirectResponse);
-      }
-
-      if (freshLookup) await writeCachedRole(response, userId!, role);
+    if (cachedRole !== undefined) {
+      role = cachedRole;
+    } else {
+      const { data: profile } = await supabase.from('user_profiles').select('role').eq('id', userId!).maybeSingle();
+      role = profile?.role ?? null;
+      freshLookup = true;
     }
 
-    // Not cached with the role: admin rights change from inside the app (a
-    // co-admin promotes or demotes you), and a stale cookie would keep a demoted
-    // admin in the workspace until it expired. Same rule as my_admin_school_id().
-    if (isSchoolAdminRoute) {
-      const { data: teacherRow } = await supabase
-        .from('teachers')
-        .select('is_school_admin, verification_status')
-        .eq('user_id', userId!)
-        .maybeSingle();
-      if (!teacherRow?.is_school_admin || teacherRow.verification_status !== 'approved') {
-        return withCsp(NextResponse.redirect(new URL('/dashboard/teacher', request.url)));
-      }
+    // A null role predates the role column, so treat it as a student.
+    const home =
+      role === 'school_admin'
+        ? SCHOOL_ADMIN_PREFIX
+        : role === 'teacher'
+        ? '/dashboard/teacher'
+        : role === 'parent'
+        ? '/dashboard/parent'
+        : '/dashboard';
+
+    const allowed = isAdminConsole
+      ? role === 'school_admin'
+      : role === 'school_admin'
+      ? false
+      : isTeacherRoute
+      ? role === 'teacher'
+      : isParentRoute
+      ? role === 'parent'
+      : isStudentRoute
+      ? role !== 'teacher' && role !== 'parent'
+      : true;
+
+    if (!allowed) {
+      const redirectResponse = NextResponse.redirect(new URL(home, request.url));
+      if (freshLookup) await writeCachedRole(redirectResponse, userId!, role);
+      return withCsp(redirectResponse);
     }
+
+    if (freshLookup) await writeCachedRole(response, userId!, role);
   }
 
   // `mode=reset` is the one authenticated state that belongs on /login: the

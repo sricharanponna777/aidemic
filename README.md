@@ -20,7 +20,7 @@ The package manager is **Bun**.
 - **Dashboard** — retention, streaks, configurable daily goal, activity charts, predicted grades per subject, and weak-spot tracking.
 
 ### For teachers
-Classes and rosters, assignments with AI-assisted marking and manual override, per-class and per-student reports, AI insights, a question bank, and a separate school admin workspace (staff approvals, co-admins, classes, students and parent links, school analytics).
+Classes and rosters, assignments with AI-assisted marking and manual override, per-class and per-student reports, AI insights, a question bank, and a separate school admin console at `/admin` for school admin accounts (staff approvals, classes, students and parent links, school analytics).
 
 ### For parents
 A read-only projection of a linked child: progress, subjects, activity, assignments, and a weekly email digest. Linking is parent-initiated and takes the child's consent — the parent sends a request, the child accepts it. Parents never get a write policy on any table.
@@ -143,10 +143,10 @@ AI_API_KEY=
 Next.js 16 App Router with TypeScript, Supabase, and an OpenAI-compatible API abstraction.
 
 ### Route protection
-Middleware in [`src/proxy.ts`](src/proxy.ts) guards `/dashboard/*` using `supabase.auth.getUser()`. Unauthenticated requests go to `/login`; role gating for `/dashboard/teacher/*`, `/dashboard/school/*`, and `/dashboard/parent/*` is enforced here as defense-in-depth. **RLS is the real backstop.**
+Middleware in [`src/proxy.ts`](src/proxy.ts) guards `/dashboard/*` and `/admin/*` using `supabase.auth.getUser()`. Unauthenticated requests go to `/login`; role gating for `/dashboard/teacher/*`, `/dashboard/parent/*` and `/admin/*` is enforced here as defense-in-depth. **RLS is the real backstop.**
 
 ### Roles
-`user_profiles.role` is `student | teacher | parent`. Parents are a read-only projection of a linked student, and the link is **parent-initiated**: a parent enters the student's email address or username (`request_parent_link()`), the student accepts or declines it on the Family page (`accept_parent_link_request()` / `decline_parent_link_request()`), and nothing is shared until they accept. Teachers can also create a link for a student on their roster with an invite code the parent redeems (`redeem_parent_invite_code()`); only a teacher can remove that variant. The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper drive every cross-role SELECT policy.
+`user_profiles.role` is `student | teacher | parent | school_admin`; a school admin is a separate account appointed by AIDemic in SQL, with no teacher profile or classes. Parents are a read-only projection of a linked student, and the link is **parent-initiated**: a parent enters the student's email address or username (`request_parent_link()`), the student accepts or declines it on the Family page (`accept_parent_link_request()` / `decline_parent_link_request()`), and nothing is shared until they accept. Teachers can also create a link for a student on their roster with an invite code the parent redeems (`redeem_parent_invite_code()`); only a teacher can remove that variant. The `parent_links` table and the `is_parent_of_student()` SECURITY DEFINER helper drive every cross-role SELECT policy.
 
 ### Supabase clients
 - [`src/lib/supabase-client.ts`](src/lib/supabase-client.ts) — browser client (Client Components/hooks)

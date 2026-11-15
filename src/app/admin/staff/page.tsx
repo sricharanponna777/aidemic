@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, Info, Radar, ShieldCheck, ShieldOff, UserCog, UserX, Undo2, X } from 'lucide-react';
+import { Check, Info, Radar, UserCog, UserX, Undo2, X } from 'lucide-react';
 import { EmptyState, PageHeader } from '@/components/ui/feedback';
 import { Button } from '@/components/ui/button';
 import { Chip, Panel, PanelHeading, Stat, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
@@ -13,39 +13,28 @@ import type { SchoolStaffMember } from '@/types';
 
 type Filter = 'pending' | 'approved' | 'rejected' | 'all';
 
-type Action =
-  | { kind: 'status'; status: 'approved' | 'rejected'; label: string; done: string; confirm?: string }
-  | { kind: 'admin'; isAdmin: boolean; label: string; done: string; confirm?: string };
+type Action = { status: 'approved' | 'rejected'; label: string; done: string; confirm?: string };
 
-/** What each row may do. Mirrors the rules school_admin_set_teacher_status and
- *  school_admin_set_admin enforce, so a button is never offered that the
- *  database would refuse. */
+/** What each row may do -- the transitions school_admin_set_teacher_status
+ *  allows. School admins are separate accounts appointed by AIDemic, so there
+ *  is no promote/demote here and the caller is never in this list. */
 function actionsFor(member: SchoolStaffMember): Action[] {
-  if (member.is_self) return [];
   if (member.verification_status === 'pending') {
     return [
-      { kind: 'status', status: 'approved', label: 'Approve', done: 'approved' },
-      { kind: 'status', status: 'rejected', label: 'Reject', done: 'rejected', confirm: 'Reject this teacher?' },
+      { status: 'approved', label: 'Approve', done: 'approved' },
+      { status: 'rejected', label: 'Reject', done: 'rejected', confirm: 'Reject this teacher?' },
     ];
   }
   if (member.verification_status === 'rejected') {
-    return [{ kind: 'status', status: 'approved', label: 'Restore access', done: 'restored' }];
+    return [{ status: 'approved', label: 'Restore access', done: 'restored' }];
   }
-  if (member.is_school_admin) {
-    return [{ kind: 'admin', isAdmin: false, label: 'Remove admin', done: 'is no longer a school admin', confirm: 'Remove their admin rights?' }];
-  }
-  return [
-    { kind: 'admin', isAdmin: true, label: 'Make admin', done: 'is now a school admin', confirm: 'They will be able to approve and remove staff. Continue?' },
-    { kind: 'status', status: 'rejected', label: 'Revoke access', done: 'revoked', confirm: 'Students will not be able to join their classes. Revoke?' },
-  ];
+  return [{ status: 'rejected', label: 'Revoke access', done: 'revoked', confirm: 'Students will not be able to join their classes. Revoke?' }];
 }
 
 const ACTION_ICONS: Record<string, typeof Check> = {
   Approve: Check,
   Reject: X,
   'Restore access': Undo2,
-  'Remove admin': ShieldOff,
-  'Make admin': ShieldCheck,
   'Revoke access': UserX,
 };
 
@@ -70,7 +59,6 @@ export default function SchoolStaffPage() {
       pending: rows.filter((r) => r.verification_status === 'pending').length,
       approved: rows.filter((r) => r.verification_status === 'approved').length,
       rejected: rows.filter((r) => r.verification_status === 'rejected').length,
-      admins: rows.filter((r) => r.is_school_admin && r.verification_status === 'approved').length,
     }),
     [rows]
   );
@@ -94,17 +82,17 @@ export default function SchoolStaffPage() {
     setConfirming(null);
     setBusyId(member.teacher_id);
     const supabase = createClient();
-    const { error } =
-      action.kind === 'status'
-        ? await supabase.rpc('school_admin_set_teacher_status', { p_teacher_id: member.teacher_id, p_status: action.status })
-        : await supabase.rpc('school_admin_set_admin', { p_teacher_id: member.teacher_id, p_is_admin: action.isAdmin });
+    const { error } = await supabase.rpc('school_admin_set_teacher_status', {
+      p_teacher_id: member.teacher_id,
+      p_status: action.status,
+    });
     setBusyId(null);
     const name = displayName(member, 'Teacher');
     if (error) {
       console.error('School admin staff action failed:', error.message);
-      // The RPCs phrase every refusal for a person ("Remove their school admin
-      // rights before…"), so show those; anything else is a transport problem.
-      showToast('error', /school|admin|approve|access|teacher/i.test(error.message) ? error.message : `Could not update ${name}. Please try again.`);
+      // The RPC phrases its refusals for a person ("That teacher is not at your
+      // school"), so show those; anything else is a transport problem.
+      showToast('error', /school|admin|teacher/i.test(error.message) ? error.message : `Could not update ${name}. Please try again.`);
     } else {
       showToast('success', `${name} ${action.done}.`);
     }
@@ -117,16 +105,14 @@ export default function SchoolStaffPage() {
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Approved" value={counts.approved} tone="success" />
         <Stat label="Pending" value={counts.pending} tone={counts.pending ? 'warning' : 'default'} />
-        <Stat label="Admins" value={counts.admins} />
-        <Stat label="No access" value={counts.rejected} />
+        <Stat label="No access" value={counts.rejected} className="col-span-2" />
       </div>
       <Panel>
         <PanelHeading as="h3" icon={Info}>How access works</PanelHeading>
         <ul className="mt-3 list-disc space-y-2 pl-4 text-[13px] text-content-muted">
           <li>Teachers who pick your school at sign-up wait here until you approve them. Students cannot join their classes until then.</li>
           <li>Revoking access keeps their classes and results, but blocks new students joining. You can restore it at any time.</li>
-          <li>A co-admin has the same rights as you. Remove their admin rights before revoking their access.</li>
-          <li>You cannot change your own access. Another admin, or AIDemic support, can.</li>
+          <li>School admin accounts are separate from teaching accounts and are set up by AIDemic support. Contact them to add or remove an admin.</li>
         </ul>
       </Panel>
     </>
@@ -139,7 +125,7 @@ export default function SchoolStaffPage() {
         icon={UserCog}
         eyebrow="School admin / Staff"
         title="Staff"
-        description="Approve teachers who join your school, revoke access, and choose who else can run it."
+        description="Approve teachers who join your school, and revoke or restore their access."
         actions={
           <>
             <Chip>{counts.approved} approved</Chip>
@@ -181,8 +167,6 @@ export default function SchoolStaffPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-medium text-content">{displayName(member, 'Teacher')}</p>
                         <StatusChip member={member} />
-                        {member.is_school_admin && member.verification_status === 'approved' && <Chip tone="xp">Admin</Chip>}
-                        {member.is_self && <Chip tone="inverse">You</Chip>}
                       </div>
                       <p className="mt-0.5 text-xs text-content-subtle">
                         {[member.email, member.department, member.qualification_level].filter(Boolean).join(' · ')}

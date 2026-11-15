@@ -5,7 +5,7 @@ import { AlertTriangle, Search } from 'lucide-react';
 import { EmptyState } from '@/components/ui/feedback';
 import { PageLoader } from '@/components/PageLoader';
 
-/** Helpers shared by the school admin workspace pages (/dashboard/school/*). */
+/** Helpers shared by the school admin workspace pages (/admin/*). */
 
 export const displayName = (row: { full_name: string | null; email: string | null }, fallback: string) =>
   row.full_name?.trim() || row.email || fallback;

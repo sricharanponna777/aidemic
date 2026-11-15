@@ -87,7 +87,7 @@ export default function SchoolOverviewPage() {
         </p>
         <p className="text-[13px] text-content-subtle">students have a parent linked</p>
         <Meter className="mt-2" fraction={a.students ? a.students_with_parent / a.students : 0} tone="success" label="Students with a parent linked" />
-        <Link href="/dashboard/school/students" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+        <Link href="/admin/students" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
           Link parents <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </Panel>
@@ -125,7 +125,7 @@ export default function SchoolOverviewPage() {
                 {a.teachers_pending} {a.teachers_pending === 1 ? 'teacher is' : 'teachers are'} waiting for you to approve them.
                 Students cannot join their classes until you do.
               </span>
-              <Link href="/dashboard/school/staff" className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
+              <Link href="/admin/staff" className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
                 Review
               </Link>
             </div>
@@ -193,13 +193,13 @@ export default function SchoolOverviewPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-subtle p-4">
           <MonoLabel>Manage</MonoLabel>
           <div className="flex flex-wrap gap-2">
-            <Link href="/dashboard/school/classes" className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
+            <Link href="/admin/classes" className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
               Classes
             </Link>
-            <Link href="/dashboard/school/students" className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
+            <Link href="/admin/students" className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
               Students
             </Link>
-            <Link href="/dashboard/school/staff" className={buttonStyles({ variant: 'primary', size: 'sm' })}>
+            <Link href="/admin/staff" className={buttonStyles({ variant: 'primary', size: 'sm' })}>
               Staff
             </Link>
           </div>

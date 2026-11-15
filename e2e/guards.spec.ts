@@ -19,9 +19,9 @@ test.describe('role guards (student account)', () => {
     });
   }
 
-  // The school admin workspace is a teacher route first, so a student is bounced
-  // by the role check before the is_school_admin lookup ever runs.
-  for (const route of ['/dashboard/school', '/dashboard/school/staff']) {
+  // The admin console is gated on role 'school_admin', which only
+  // grant_school_admin() can set.
+  for (const route of ['/admin', '/admin/staff']) {
     test(`${route} redirects a student to /dashboard`, async ({ page }) => {
       await page.goto(route);
       await page.waitForURL('**/dashboard', { timeout: 20_000 });

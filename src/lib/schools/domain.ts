@@ -1,11 +1,10 @@
 /**
  * Deriving the set of hostnames that count as "official" for a school.
  *
- * A headteacher claim is gated on the claimant's email domain matching one of
- * these (see claim_school_admin() in migration 20260904000000). The comparison
- * itself lives in SQL, so nothing here is duplicated there -- this module only
- * decides what goes into schools.domains at seed time, from whatever the
- * official register happens to publish: a website URL for England and Wales, a
+ * Nothing in the app gates on these any more -- school admins are appointed by
+ * hand (grant_school_admin) -- but they stay on record as evidence for AIDemic
+ * support to check a request against. This module decides what goes into
+ * schools.domains at seed time, from whatever the official register publishes: a website URL for England and Wales, a
  * website and a contact address for Scotland, neither for Northern Ireland.
  */
 

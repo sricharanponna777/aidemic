@@ -30,7 +30,8 @@ function OnboardingContent() {
   const country = countryOverride ?? savedCountry ?? (isCountry(countryFromUrl) ? countryFromUrl : 'uk');
 
   const roleFromUrl = searchParams.get('role');
-  const savedRole = isRole(profile?.role ?? null) ? profile?.role : null;
+  const profileRole = profile?.role ?? null;
+  const savedRole = isRole(profileRole) ? profileRole : null;
   // No 'student' fallback: defaulting here overwrote an existing parent's or
   // teacher's role whenever this page was opened without a ?role= param.
   const role: Role | null = savedRole ?? (isRole(roleFromUrl) ? roleFromUrl : null);
