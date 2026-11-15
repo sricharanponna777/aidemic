@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Check, Info, Radar, UserCog, UserX, Undo2, X } from 'lucide-react';
+import { Check, ChevronDown, Info, Radar, UserCog, UserX, Undo2, X } from 'lucide-react';
 import { EmptyState, PageHeader } from '@/components/ui/feedback';
 import { Button } from '@/components/ui/button';
 import { Chip, Panel, PanelHeading, Stat, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
@@ -38,6 +38,25 @@ const ACTION_ICONS: Record<string, typeof Check> = {
   'Revoke access': UserX,
 };
 
+/** Teachers are grouped by the subjects of their active classes. One with no
+ *  class yet -- every pending teacher -- lands in this group, sorted last. */
+const NO_SUBJECT = 'No classes yet';
+
+/** Subject name -> teachers, alphabetical. A teacher who teaches two subjects
+ *  appears under both. */
+function groupBySubject(members: SchoolStaffMember[]): [string, SchoolStaffMember[]][] {
+  const groups = new Map<string, SchoolStaffMember[]>();
+  for (const member of members) {
+    const subjects = member.subjects?.length ? member.subjects : [NO_SUBJECT];
+    for (const subject of subjects) {
+      const list = groups.get(subject);
+      if (list) list.push(member);
+      else groups.set(subject, [member]);
+    }
+  }
+  return [...groups].sort(([a], [b]) => (a === NO_SUBJECT ? 1 : b === NO_SUBJECT ? -1 : a.localeCompare(b)));
+}
+
 function StatusChip({ member }: { member: SchoolStaffMember }) {
   if (member.verification_status === 'pending') return <Chip tone="warning">Pending</Chip>;
   if (member.verification_status === 'rejected') return <Chip tone="danger">No access</Chip>;
@@ -71,8 +90,9 @@ export default function SchoolStaffPage() {
   const visible = rows.filter(
     (r) =>
       (activeFilter === 'all' || r.verification_status === activeFilter) &&
-      (!q || [r.full_name, r.email, r.department].some((v) => v?.toLowerCase().includes(q)))
+      (!q || [r.full_name, r.email, r.department, ...(r.subjects ?? [])].some((v) => v?.toLowerCase().includes(q)))
   );
+  const groups = groupBySubject(visible);
 
   const run = async (member: SchoolStaffMember, action: Action) => {
     if (action.confirm && confirming?.teacherId !== member.teacher_id) {
@@ -123,8 +143,8 @@ export default function SchoolStaffPage() {
       <PageHeader
         className="border-b border-subtle"
         icon={UserCog}
-        eyebrow="School admin / Staff approvals"
-        title="Staff approvals"
+        eyebrow="Staff approvals"
+        title="Admin Panel"
         description="Approve teachers who join your school, and revoke or restore their access."
         actions={
           <>
@@ -135,7 +155,7 @@ export default function SchoolStaffPage() {
       />
 
       <WorkspaceBody aside={reportColumn}>
-        <ListSearch value={query} onChange={setQuery} placeholder="Search name, email or department">
+        <ListSearch value={query} onChange={setQuery} placeholder="Search name, email, department or subject">
           <FilterTabs
             value={activeFilter}
             onChange={setFilter}
@@ -156,61 +176,74 @@ export default function SchoolStaffPage() {
               description={activeFilter === 'pending' && !q ? 'New teachers who choose your school will appear here for approval.' : undefined}
             />
           ) : (
-            <ul className="divide-y divide-subtle rounded-xl border border-subtle">
-              {visible.map((member) => {
-                const actions = actionsFor(member);
-                const isConfirming = confirming?.teacherId === member.teacher_id;
-                const confirmAction = isConfirming ? actions.find((a) => a.label === confirming.label) : undefined;
-                return (
-                  <li key={member.teacher_id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-content">{displayName(member, 'Teacher')}</p>
-                        <StatusChip member={member} />
-                      </div>
-                      <p className="mt-0.5 text-xs text-content-subtle">
-                        {[member.email, member.department, member.qualification_level].filter(Boolean).join(' · ')}
-                      </p>
-                      <p className="mt-0.5 font-mono text-[11px] text-content-subtle">
-                        {member.verification_status === 'pending'
-                          ? `Waiting since ${formatRelativeDay(member.requested_at).toLowerCase()}`
-                          : `${member.class_count} ${member.class_count === 1 ? 'class' : 'classes'} · ${member.student_count} students`}
-                      </p>
-                    </div>
+            <div className="space-y-4">
+              {groups.map(([subject, members]) => (
+                <details key={subject} open className="group overflow-hidden rounded-xl border border-subtle">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-surface-sunken px-4 py-2.5 [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center gap-2">
+                      <ChevronDown className="h-4 w-4 -rotate-90 text-content-subtle transition-transform group-open:rotate-0" />
+                      <span className="text-sm font-semibold text-content">{subject}</span>
+                    </span>
+                    <Chip>{members.length} {members.length === 1 ? 'teacher' : 'teachers'}</Chip>
+                  </summary>
+                  <ul className="divide-y divide-subtle border-t border-subtle">
+                    {members.map((member) => {
+                      const actions = actionsFor(member);
+                      const isConfirming = confirming?.teacherId === member.teacher_id;
+                      const confirmAction = isConfirming ? actions.find((a) => a.label === confirming.label) : undefined;
+                      return (
+                        <li key={`${subject}:${member.teacher_id}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium text-content">{displayName(member, 'Teacher')}</p>
+                              <StatusChip member={member} />
+                            </div>
+                            <p className="mt-0.5 text-xs text-content-subtle">
+                              {[member.email, member.department, member.qualification_level].filter(Boolean).join(' · ')}
+                            </p>
+                            <p className="mt-0.5 font-mono text-[11px] text-content-subtle">
+                              {member.verification_status === 'pending'
+                                ? `Waiting since ${formatRelativeDay(member.requested_at).toLowerCase()}`
+                                : `${member.class_count} ${member.class_count === 1 ? 'class' : 'classes'} · ${member.student_count} students`}
+                            </p>
+                          </div>
 
-                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      {confirmAction ? (
-                        <>
-                          <span className="text-xs text-content-muted">{confirmAction.confirm}</span>
-                          <Button size="sm" variant="danger" disabled={busyId === member.teacher_id} onClick={() => run(member, confirmAction)}>
-                            {confirmAction.label}
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        actions.map((action, index) => {
-                          const Icon = ACTION_ICONS[action.label] ?? Check;
-                          return (
-                            <Button
-                              key={action.label}
-                              size="sm"
-                              variant={index === 0 && !action.confirm ? 'primary' : 'secondary'}
-                              disabled={busyId === member.teacher_id}
-                              onClick={() => run(member, action)}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              {action.label}
-                            </Button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            {confirmAction ? (
+                              <>
+                                <span className="text-xs text-content-muted">{confirmAction.confirm}</span>
+                                <Button size="sm" variant="danger" disabled={busyId === member.teacher_id} onClick={() => run(member, confirmAction)}>
+                                  {confirmAction.label}
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              actions.map((action, index) => {
+                                const Icon = ACTION_ICONS[action.label] ?? Check;
+                                return (
+                                  <Button
+                                    key={action.label}
+                                    size="sm"
+                                    variant={index === 0 && !action.confirm ? 'primary' : 'secondary'}
+                                    disabled={busyId === member.teacher_id}
+                                    onClick={() => run(member, action)}
+                                  >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {action.label}
+                                  </Button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </details>
+              ))}
+            </div>
           )}
         </div>
       </WorkspaceBody>

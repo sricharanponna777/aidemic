@@ -31,7 +31,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen bg-canvas">
       <header className="sticky top-0 z-30 border-b border-subtle bg-surface/90 backdrop-blur-xl print:hidden">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-[96rem] items-center justify-between gap-4 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Link href={SCHOOL_ADMIN_PREFIX} className="flex shrink-0 items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-accent to-accent-2 text-accent-fg shadow-raised">
@@ -64,7 +64,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 pt-6 pb-10 sm:px-6 lg:pt-8">
+      <main className="mx-auto max-w-[96rem] px-4 pt-6 pb-10 sm:px-6 lg:pt-8">
         <div className="animate-page-enter space-y-6">{children}</div>
       </main>
     </div>

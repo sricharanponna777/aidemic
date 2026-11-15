@@ -113,6 +113,9 @@ export interface SchoolStaffMember {
   joined_at: string | null;
   class_count: number;
   student_count: number;
+  /** Distinct subject names from their active classes; empty when they have
+   *  none yet (every pending teacher). */
+  subjects: string[] | null;
 }
 
 export interface Class {

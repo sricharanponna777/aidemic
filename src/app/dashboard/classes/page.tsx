@@ -102,6 +102,14 @@ export default function StudentClassesPage() {
         setJoinError('That invite code is not valid.');
       } else if (error.message.includes('not open for joining yet')) {
         setJoinError("This class isn't open for joining yet — the teacher's account is still being verified.");
+      } else if (error.message.includes('School email required')) {
+        // "...only admits students with an address at @school.sch.uk"
+        const domains = error.message.split('address at ')[1];
+        setJoinError(
+          domains
+            ? `This class is only open to students signed in with a school email (${domains}).`
+            : 'This class is only open to students signed in with a school email.'
+        );
       } else {
         setJoinError('Could not join that class.');
       }

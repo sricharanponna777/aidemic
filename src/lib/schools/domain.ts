@@ -1,9 +1,9 @@
 /**
  * Deriving the set of hostnames that count as "official" for a school.
  *
- * Nothing in the app gates on these any more -- school admins are appointed by
- * hand (grant_school_admin) -- but they stay on record as evidence for AIDemic
- * support to check a request against. This module decides what goes into
+ * Students gate on these: join_class_by_invite_code() only admits a student
+ * whose email is at one of their school's domains, or a subdomain of one
+ * (migration 20261118000000); a school with none is open. This module decides what goes into
  * schools.domains at seed time, from whatever the official register publishes: a website URL for England and Wales, a
  * website and a contact address for Scotland, neither for Northern Ireland.
  */
@@ -123,9 +123,9 @@ export function hostOf(value: string | null | undefined): string | null {
 /**
  * The school's official email domains, de-duplicated and ordered so the result
  * is stable across re-seeds. Empty is a real outcome for every DE NI school and
- * for English schools with no website in GIAS. Nothing in the app gates on these
- * since headteacher claims were removed (migration 20261114000000); they stay on
- * record for AIDemic support to check a school admin request against by hand.
+ * for English schools with no website in GIAS, and leaves that school's classes
+ * open to students at any address. A non-empty result restricts which student
+ * email addresses can redeem the school's class invite codes.
  */
 export function schoolDomains(values: (string | null | undefined)[]): string[] {
   const hosts = values.map(hostOf).filter((host): host is string => host !== null);
