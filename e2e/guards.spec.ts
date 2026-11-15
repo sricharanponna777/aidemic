@@ -21,7 +21,7 @@ test.describe('role guards (student account)', () => {
 
   // The admin console is gated on role 'school_admin', which only
   // grant_school_admin() can set.
-  for (const route of ['/admin', '/admin/staff']) {
+  for (const route of ['/admin']) {
     test(`${route} redirects a student to /dashboard`, async ({ page }) => {
       await page.goto(route);
       await page.waitForURL('**/dashboard', { timeout: 20_000 });

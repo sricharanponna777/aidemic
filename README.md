@@ -20,7 +20,7 @@ The package manager is **Bun**.
 - **Dashboard** — retention, streaks, configurable daily goal, activity charts, predicted grades per subject, and weak-spot tracking.
 
 ### For teachers
-Classes and rosters, assignments with AI-assisted marking and manual override, per-class and per-student reports, AI insights, a question bank, and a separate school admin console at `/admin` for school admin accounts (staff approvals, classes, students and parent links, school analytics).
+Classes and rosters, assignments with AI-assisted marking and manual override, per-class and per-student reports, AI insights, a question bank, and a separate school admin console at `/admin` where school admin accounts approve the teachers who join their school.
 
 ### For parents
 A read-only projection of a linked child: progress, subjects, activity, assignments, and a weekly email digest. Linking is parent-initiated and takes the child's consent — the parent sends a request, the child accepts it. Parents never get a write policy on any table.

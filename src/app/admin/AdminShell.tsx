@@ -11,9 +11,9 @@ import { MonoLabel } from '@/components/ui/telemetry';
 import { SCHOOL_ADMIN_NAV_ITEMS, SCHOOL_ADMIN_PREFIX, isActiveRoute } from '@/lib/nav';
 
 /**
- * The admin console's own chrome: a fixed sidebar on desktop, a top bar with a
- * row of tabs on mobile. A school admin has four screens and nothing else, so
- * the dashboard shell's command palette and notification bell would be empty
+ * The admin console's own chrome: a fixed sidebar on desktop, a plain top bar
+ * on mobile. A school admin has one screen -- staff approvals -- so the
+ * dashboard shell's command palette and notification bell would be empty
  * weight.
  */
 export default function AdminShell({ children }: { children: React.ReactNode }) {
@@ -96,31 +96,12 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </div>
       </aside>
 
-      {/* Top bar + tabs — mobile */}
+      {/* Top bar — mobile */}
       <header className="sticky top-0 z-30 border-b border-subtle bg-surface/90 backdrop-blur-xl lg:hidden print:hidden">
         <div className="flex h-14 items-center justify-between gap-3 px-4">
           {brand}
           <div className="flex items-center gap-1">{actions}</div>
         </div>
-        <nav aria-label="School admin" className="scrollbar-none flex gap-1 overflow-x-auto px-4">
-          {SCHOOL_ADMIN_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = isActiveRoute(item, pathname);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? 'page' : undefined}
-                className={`flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active ? 'border-accent text-content' : 'border-transparent text-content-muted hover:text-content'
-                }`}
-              >
-                <Icon className={`h-4 w-4 ${active ? 'text-accent' : 'text-content-subtle'}`} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
       </header>
 
       <div className="lg:pl-64 print:pl-0">

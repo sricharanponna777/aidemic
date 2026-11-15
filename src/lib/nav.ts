@@ -115,11 +115,9 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
  *  the dashboard. */
 export const SCHOOL_ADMIN_PREFIX = "/admin";
 
+/** One page: approving the teachers who join the school. */
 export const SCHOOL_ADMIN_NAV_ITEMS: NavItem[] = [
-  { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/admin/staff", label: "Staff", icon: UserCog },
-  { href: "/admin/classes", label: "Classes", icon: Users },
-  { href: "/admin/students", label: "Students", icon: GraduationCap },
+  { href: "/admin", label: "Staff approvals", icon: UserCog, exact: true },
 ];
 
 export const PARENT_NAV_ITEMS: NavItem[] = [

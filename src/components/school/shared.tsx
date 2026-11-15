@@ -5,17 +5,10 @@ import { AlertTriangle, Search } from 'lucide-react';
 import { EmptyState } from '@/components/ui/feedback';
 import { PageLoader } from '@/components/PageLoader';
 
-/** Helpers shared by the school admin workspace pages (/admin/*). */
+/** Helpers for the school admin console (/admin). */
 
 export const displayName = (row: { full_name: string | null; email: string | null }, fallback: string) =>
   row.full_name?.trim() || row.email || fallback;
-
-export const formatPercent = (value: number | null | undefined) =>
-  value === null || value === undefined ? '—' : `${Math.round(Number(value))}%`;
-
-/** completed / expected as a 0..1 fraction, or null when nothing was expected. */
-export const completionFraction = (completed: number, expected: number) =>
-  expected > 0 ? Math.min(1, completed / expected) : null;
 
 const DAY = 24 * 60 * 60 * 1000;
 

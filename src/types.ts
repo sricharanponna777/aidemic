@@ -115,59 +115,6 @@ export interface SchoolStaffMember {
   student_count: number;
 }
 
-/** One class at the admin's school -- a row of school_admin_classes(). */
-export interface SchoolClassSummary {
-  class_id: string;
-  name: string;
-  status: 'active' | 'archived';
-  academic_year: string | null;
-  created_at: string | null;
-  teacher_id: string;
-  teacher_name: string | null;
-  subject_name: string | null;
-  qualification_name: string | null;
-  student_count: number;
-  published_assignments: number;
-  /** One per student per published assignment, current members only. */
-  completed_attempts: number;
-  /** student_count × published_assignments. */
-  expected_attempts: number;
-  average_percentage: number | null;
-  last_activity_at: string | null;
-}
-
-/** One student at the admin's school -- a row of school_admin_students(). */
-export interface SchoolStudentSummary {
-  student_id: string;
-  full_name: string | null;
-  email: string | null;
-  class_names: string[] | null;
-  active_parent_links: number;
-  pending_parent_links: number;
-  /** Assignments set at this school only. */
-  completed_assignments: number;
-  average_percentage: number | null;
-  last_active_at: string | null;
-}
-
-/** school_admin_analytics(). Counts arrive as JSON numbers. */
-export interface SchoolAnalytics {
-  teachers_approved: number;
-  teachers_pending: number;
-  admins: number;
-  classes_active: number;
-  students: number;
-  students_active_7d: number;
-  students_with_parent: number;
-  assignments_published: number;
-  completed_attempts: number;
-  expected_attempts: number;
-  average_percentage: number | null;
-  grades: { grade: string; count: number }[];
-  weak_topics: { topic: string; attempts: number; average_percentage: number }[];
-  weekly_completions: { week: string; count: number }[];
-}
-
 export interface Class {
   id: string;
   teacher_id: string;
