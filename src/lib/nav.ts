@@ -18,7 +18,6 @@ import {
   TrendingUp,
   // GAMIFICATION PAUSED: Trophy,
   Users,
-  UserCog,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -114,11 +113,6 @@ export const TEACHER_NAV_ITEMS: NavItem[] = [
  *  outside /dashboard: a school admin account is not a teacher and never sees
  *  the dashboard. */
 export const SCHOOL_ADMIN_PREFIX = "/admin";
-
-/** One page: approving the teachers who join the school. */
-export const SCHOOL_ADMIN_NAV_ITEMS: NavItem[] = [
-  { href: "/admin", label: "Staff approvals", icon: UserCog, exact: true },
-];
 
 export const PARENT_NAV_ITEMS: NavItem[] = [
   { href: "/dashboard/parent", label: "Dashboard", icon: LayoutDashboard, exact: true },
