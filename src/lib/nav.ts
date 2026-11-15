@@ -44,6 +44,7 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
+      { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardList },
       // GAMIFICATION PAUSED: { href: "/dashboard/progress", label: "Progress", icon: Trophy },
     ],
   },
@@ -128,6 +129,7 @@ export const PARENT_NAV_ITEMS: NavItem[] = [
  *  or already gated by its own prefix check. */
 export const STUDENT_ONLY_PREFIXES = [
   "/dashboard/subjects",
+  "/dashboard/assignments",
   "/dashboard/progress",
   "/dashboard/notes",
   "/dashboard/podcasts",

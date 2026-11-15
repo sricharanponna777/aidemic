@@ -254,8 +254,8 @@ export default function TakeAssignmentPage() {
         eyebrow="Classes / Assignment"
         title={assignment.title}
         description={assignment.description || undefined}
-        backHref={`/dashboard/classes/${classId}`}
-        backLabel="Back to class"
+        backHref="/dashboard/assignments"
+        backLabel="Assignments"
         actions={
           <>
             <Chip>● {questions.length} questions</Chip>
