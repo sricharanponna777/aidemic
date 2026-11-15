@@ -92,8 +92,14 @@ function renderKatex(tex: string, displayMode: boolean): string {
   });
 }
 
+// Over-escaped JSON turns \frac into \\frac, which is *valid* TeX — a line break followed by the
+// letters "frac" — so KaTeX renders it without error and the retry below never runs. Un-double
+// in front of a known command up front. A real break before a command is written `\\ \frac` or
+// `\\\frac`, and neither matches.
+const DOUBLED_COMMAND = new RegExp(String.raw`(?<!\\)\\\\(?=${LATEX_COMMAND_PATTERN}(?![A-Za-z]))`, 'g');
+
 export function renderMath(source: string, displayMode: boolean): string {
-  const tex = escapeStrayMathChars(source.trim());
+  const tex = escapeStrayMathChars(source.trim()).replace(DOUBLED_COMMAND, '\\');
   if (!tex) return '';
 
   // Over-escaped JSON ("\\\\frac") arrives as \\frac, which KaTeX reads as a line break.
@@ -183,8 +189,15 @@ function wrapBareMatrixFormulaLines(value: string): string {
     .join('\n');
 }
 
+// "a single power of \\a\\." \u2014 an over-escaped \(a\) that lost its brackets. Only a lone letter
+// standing as its own word, so a matrix row break like `1 \\ 2` is never touched.
+const DOUBLED_SLASH_LETTER = /(^|[\s(])\\\\([A-Za-z])\\\\(?=$|[\s.,;:!?)])/g;
+
 function normalizeSource(raw: string): string {
-  let text = normalizeLatexControlCharacters(String(raw ?? '')).replace(/[\uE000\uE001]/g, '').replace(/\r\n?/g, '\n');
+  let text = normalizeLatexControlCharacters(String(raw ?? ''))
+    .replace(/[\uE000\uE001]/g, '')
+    .replace(/\r\n?/g, '\n')
+    .replace(DOUBLED_SLASH_LETTER, '$1\\($2\\)');
   if (HTML_TAG.test(text)) text = htmlToMarkdown(text);
   text = normalizeEquationEnvironments(text);
   text = normalizeLatexMatrices(text);

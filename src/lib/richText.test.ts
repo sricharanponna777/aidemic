@@ -34,6 +34,31 @@ describe('math delimiters', () => {
     expect(mathCount(html)).toBe(1);
     expect(html).not.toContain('math-fallback');
     expect(textOf(html)).not.toContain('\\');
+    expect(textOf(html)).not.toContain('frac');
+  });
+
+  // \\frac is valid TeX — a line break followed by the letters "frac" — so KaTeX renders it
+  // without an error and the retry-on-failure repair never ran.
+  it.each([
+    'Simplify \\\\(x^{\\\\frac{3}{2}} \\\\times x^{\\\\frac{1}{3}}\\\\).',
+    'Express \\\\(\\\\sqrt[3]{a^{4}} \\\\times a^{-\\\\frac{1}{2}}\\\\) as a power.',
+    'Simplify \\\\(\\\\dfrac{\\\\sqrt{y^{5}}}{y^{1/3}}\\\\).',
+  ])('un-doubles commands inside over-escaped maths: %s', (source) => {
+    const html = md(source);
+    expect(html).not.toContain('math-fallback');
+    expect(html).not.toContain('newline');
+    expect(textOf(html)).not.toMatch(/frac|sqrt|times/);
+  });
+
+  it('keeps a real line break before a command', () => {
+    expect(md('$$a = b \\\\ \\frac{1}{2}$$')).toContain('newline');
+    expect(md('$$a = b \\\\\\frac{1}{2}$$')).toContain('newline');
+  });
+
+  it('reads a single letter between doubled backslashes as maths', () => {
+    const html = md('Express it as a single power of \\\\a\\\\.');
+    expect(mathCount(html)).toBe(1);
+    expect(textOf(html)).not.toContain('\\');
   });
 
   it('does not treat prices as maths', () => {
