@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { BarChart3, Radar } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
-import { MathContent } from '@/components/MathContent';
 import { PageHeader } from '@/components/ui/feedback';
 import { Alert } from '@/components/ui/field';
 import { Chip, Meter, MonoLabel, Panel, PanelHeading, Stat, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
@@ -301,7 +300,7 @@ export default function AttemptDetailPage() {
 
                     <div className="mt-4 rounded-lg border border-subtle bg-surface-sunken p-3">
                       <MonoLabel>Your answer</MonoLabel>
-                      <MathContent className="mt-1 whitespace-pre-wrap text-sm text-content" content={answer || 'No answer entered.'} />
+                      <MarkdownContent className="mt-1 text-sm text-content" content={answer || 'No answer entered.'} />
                     </div>
 
                     <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">

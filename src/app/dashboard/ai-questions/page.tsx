@@ -8,20 +8,18 @@ import {
   Calculator,
   ClipboardCheck,
   Clock,
-  Eye,
   LayoutDashboard,
   Radar,
   RefreshCw,
   Rocket,
   Printer,
-  Sigma,
   Sparkles,
   Target,
   TrendingUp,
 } from 'lucide-react';
 import { GenerationProgressPanel } from '@/components/ai/GenerationProgressPanel';
 import { MarkdownContent } from '@/components/MarkdownContent';
-import { MathContent } from '@/components/MathContent';
+import { MathAnswerEditor } from '@/components/MathAnswerEditor';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
 import { SearchSelect } from '@/components/SearchSelect';
@@ -294,96 +292,6 @@ const splitEnglishSourceFromQuestion = (questionText: string) => {
     question: questionText.slice(markerMatch.index + markerMatch[0].length).trim() || 'Answer the multiple-choice question.',
   };
 };
-
-function CalculationAnswerEditor({
-  value,
-  onChange,
-  rows,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  rows: number;
-}) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  const insertSnippet = (snippet: string, cursorOffset = snippet.length) => {
-    const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? value.length;
-    const end = textarea?.selectionEnd ?? value.length;
-    const next = `${value.slice(0, start)}${snippet}${value.slice(end)}`;
-    onChange(next);
-    requestAnimationFrame(() => {
-      textarea?.focus();
-      const nextCursor = start + cursorOffset;
-      textarea?.setSelectionRange(nextCursor, nextCursor);
-    });
-  };
-
-  const renderedAnswer = value.trim() || ' ';
-
-  return (
-    <div className="mt-4 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <MonoLabel>Your answer</MonoLabel>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            title="Inline math"
-            aria-label="Insert inline math"
-            onClick={() => insertSnippet('\\(x\\)', 3)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
-          >
-            <Sigma className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            title="Power"
-            aria-label="Insert power notation"
-            onClick={() => insertSnippet('\\(x^{2}\\)', 3)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
-          >
-            x²
-          </button>
-          <button
-            type="button"
-            title="Fraction"
-            aria-label="Insert fraction"
-            onClick={() => insertSnippet('\\(\\frac{a}{b}\\)', 8)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
-          >
-            a/b
-          </button>
-          <button
-            type="button"
-            title="Square root"
-            aria-label="Insert square root"
-            onClick={() => insertSnippet('\\(\\sqrt{x}\\)', 8)}
-            className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg border border-subtle bg-surface px-2 text-xs font-bold text-content-muted font-mono transition hover:border-strong hover:bg-surface-sunken"
-          >
-            √
-          </button>
-        </div>
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          rows={rows}
-          className="w-full rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content"
-        />
-        <div className="min-h-full rounded-lg border border-subtle px-3 py-2 text-sm text-content-muted bg-surface text-content">
-          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-content-subtle">
-            <Eye className="h-3.5 w-3.5" />
-            Rendered
-          </div>
-          <MarkdownContent className="text-sm" content={renderedAnswer} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function AIQuestionsPage() {
   const { session } = useAuth();
@@ -1517,22 +1425,13 @@ export default function AIQuestionsPage() {
                       mode="answer"
                     />
                   </div>
-                ) : question.isCalculation ? (
-                  <CalculationAnswerEditor
+                ) : (
+                  <MathAnswerEditor
+                    className="mt-4"
                     value={answers[index] || ''}
                     onChange={(value) => updateAnswer(index, value)}
                     rows={question.marks >= 9 ? 9 : question.marks >= 6 ? 7 : 5}
                   />
-                ) : (
-                  <label className="mt-4 block">
-                    <MonoLabel className="mb-1">Your answer</MonoLabel>
-                    <textarea
-                      value={answers[index] || ''}
-                      onChange={(event) => updateAnswer(index, event.target.value)}
-                      rows={question.marks >= 9 ? 9 : question.marks >= 6 ? 7 : 5}
-                      className={fieldStyles()}
-                    />
-                  </label>
                 )}
               </article>
             ))}
@@ -1642,7 +1541,7 @@ export default function AIQuestionsPage() {
                   ) : answers[marked.questionIndex]?.trim() ? (
                     <div className="mt-3 rounded-lg border border-subtle bg-surface-sunken px-4 py-3">
                       <MonoLabel>Your answer</MonoLabel>
-                      <MathContent className="mt-1.5 whitespace-pre-wrap text-sm text-content" content={answers[marked.questionIndex]} />
+                      <MarkdownContent className="mt-1.5 text-sm text-content" content={answers[marked.questionIndex]} />
                     </div>
                   ) : (
                     <p className="mt-3 text-sm italic text-content-subtle">No answer entered.</p>

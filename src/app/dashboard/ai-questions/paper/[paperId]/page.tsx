@@ -16,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { MarkdownContent } from '@/components/MarkdownContent';
+import { MathAnswerEditor } from '@/components/MathAnswerEditor';
 import { buttonStyles } from '@/components/ui/button';
 import { PageHero } from '@/components/ui/feedback';
 import { fieldStyles } from '@/components/ui/field';
@@ -523,13 +524,24 @@ export default function PaperPage() {
                     ) : null}
                   </div>
                   <MarkdownContent className="mt-1 text-sm text-content-muted" content={question.question} />
-                  <textarea
-                    value={entry.text}
-                    onChange={(event) => updateTranscript(entry.questionIndex, event.target.value)}
-                    rows={question.questionType === 'mcq' ? 1 : 4}
-                    placeholder="Nothing was read for this question"
-                    className={fieldStyles(`mt-2 ${uncertain ? 'border-warning!' : ''}`)}
-                  />
+                  {question.questionType === 'mcq' ? (
+                    <textarea
+                      value={entry.text}
+                      onChange={(event) => updateTranscript(entry.questionIndex, event.target.value)}
+                      rows={1}
+                      placeholder="Nothing was read for this question"
+                      className={fieldStyles(`mt-2 ${uncertain ? 'border-warning!' : ''}`)}
+                    />
+                  ) : (
+                    <MathAnswerEditor
+                      className="mt-2"
+                      label={null}
+                      value={entry.text}
+                      onChange={(value) => updateTranscript(entry.questionIndex, value)}
+                      placeholder="Nothing was read for this question"
+                      warning={uncertain}
+                    />
+                  )}
                 </li>
               );
             })}

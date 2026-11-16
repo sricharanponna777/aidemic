@@ -499,6 +499,41 @@ h3 {
   list-style: circle;
 }
 
+/* MathAnswerEditor. The content also carries .markdown-content, so lists and paragraphs look
+   the same while typing as they do once the answer is shown back. */
+.answer-editor-content > :first-child {
+  margin-top: 0;
+}
+
+.answer-editor-content > :last-child {
+  margin-bottom: 0;
+}
+
+.answer-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-content-subtle);
+}
+
+.answer-editor-content .tiptap-mathematics-render--editable {
+  cursor: pointer;
+  border-radius: 0.25rem;
+  padding: 0 0.125rem;
+  transition: background-color 120ms;
+}
+
+.answer-editor-content .tiptap-mathematics-render--editable:hover,
+.answer-editor-content .ProseMirror-selectednode.tiptap-mathematics-render {
+  background: var(--color-accent-muted);
+}
+
+.answer-editor-content .inline-math-error,
+.answer-editor-content .block-math-error {
+  color: var(--color-danger);
+}
+
 /* A formula KaTeX could not parse even after repair: shown as its source, never as a red error. */
 .math-fallback {
   font-family: var(--font-mono, ui-monospace, monospace);

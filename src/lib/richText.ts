@@ -2,7 +2,7 @@
  * Markdown + LaTeX → HTML, as one pure function.
  *
  * Every piece of AI- or user-authored study text in the app goes through here (via
- * MarkdownContent / MathContent). It used to inject HTML and then let KaTeX auto-render
+ * MarkdownContent). It used to inject HTML and then let KaTeX auto-render
  * rewrite the live DOM, which made the result impossible to test, re-scanned the page on
  * every render, and handed delimiter detection to a library that reads "$5 and $10" as
  * maths. Rendering each formula with katex.renderToString instead means:
@@ -132,19 +132,38 @@ function decodeEntities(value: string): string {
     .replace(/&amp;/g, '&');
 }
 
+// A Tiptap maths node: `<span data-latex="x^2" data-type="inline-math"></span>`, or a block one in
+// a div. The LaTeX stays entity-encoded here and is decoded once with everything else.
+const MATH_NODE = /<(span|div)\b([^>]*\bdata-type="(inline|block)-math"[^>]*)>[\s\S]*?<\/\1>/gi;
+
+/** Number the items of each `<ol>`, which would otherwise come out as bullets. */
+function numberOrderedLists(value: string): string {
+  return value.replace(/<ol\b[^>]*>([\s\S]*?)<\/ol>/gi, (_m, body: string) => {
+    let n = 0;
+    return `${body.replace(/<li\b[^>]*>/gi, () => `\n${(n += 1)}. `)}\n\n`;
+  });
+}
+
 /**
- * Flashcards edited in RichTextEditor are stored as Tiptap HTML. Turn the handful of tags it
- * produces back into markdown so they keep their meaning, then decode entities — otherwise
- * "&amp;" was escaped a second time and shown literally. Only tag names we know are touched,
- * so "a < b and c > d" in plain text is left alone.
+ * Flashcards (RichTextEditor) and typed answers (MathAnswerEditor) are stored as Tiptap HTML.
+ * Turn the handful of tags it produces back into markdown so they keep their meaning, then
+ * decode entities — otherwise "&amp;" was escaped a second time and shown literally. Only tag
+ * names we know are touched, so "a < b and c > d" in plain text is left alone. Colour, highlight,
+ * underline and alignment have no markdown form and are dropped.
  */
 function htmlToMarkdown(value: string): string {
   const stripTags = (inner: string) => inner.replace(/<[^>]*>/g, '').trim();
-  const next = value
-    .replace(/([A-Za-z0-9)\]])\s*<sub>([\s\S]*?)<\/sub>/gi, (_m, base: string, sub: string) =>
+  const next = numberOrderedLists(value.replace(/<li\b([^>]*)>\s*<p\b[^>]*>([\s\S]*?)<\/p>/gi, '<li$1>$2'))
+    // The base is the whole word or number, so 10<sup>3</sup> is 10³, not 1 then 0³.
+    .replace(/([A-Za-z0-9]+(?:\.\d+)?|[)\]])\s*<sub>([\s\S]*?)<\/sub>/gi, (_m, base: string, sub: string) =>
       stripTags(sub) ? `\\(${base}_{${stripTags(sub)}}\\)` : base)
-    .replace(/([A-Za-z0-9)\]])\s*<sup>([\s\S]*?)<\/sup>/gi, (_m, base: string, sup: string) =>
+    .replace(/([A-Za-z0-9]+(?:\.\d+)?|[)\]])\s*<sup>([\s\S]*?)<\/sup>/gi, (_m, base: string, sup: string) =>
       stripTags(sup) ? `\\(${base}^{${stripTags(sup)}}\\)` : base)
+    .replace(MATH_NODE, (_m, _tag, attrs: string, kind: string) => {
+      const latex = attrs.match(/\bdata-latex="([^"]*)"/)?.[1]?.trim() ?? '';
+      if (!latex) return '';
+      return kind === 'inline' ? `\\(${latex}\\)` : `\n\n\\[${latex}\\]\n\n`;
+    })
     .replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_m, _t, inner: string) => (inner.trim() ? `**${inner}**` : inner))
     .replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_m, _t, inner: string) => (inner.trim() ? `*${inner}*` : inner))
     .replace(/<(s|del)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_m, _t, inner: string) => (inner.trim() ? `~~${inner}~~` : inner))
@@ -156,6 +175,14 @@ function htmlToMarkdown(value: string): string {
     .replace(/<\/(?:p|div|h[1-6]|ul|ol|blockquote|pre)>/gi, '\n\n')
     .replace(new RegExp(HTML_TAG.source, 'gi'), '');
   return decodeEntities(next).replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * A typed answer as the marker should read it: editor HTML becomes markdown + `\( … \)` LaTeX;
+ * anything else (an older plain-text answer, an MCQ letter, plot/diagram JSON) is returned as is.
+ */
+export function answerToText(value: string): string {
+  return HTML_TAG.test(value) ? htmlToMarkdown(value) : value;
 }
 
 function normalizeLatexMatrices(value: string): string {

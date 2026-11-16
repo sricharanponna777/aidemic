@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { ClipboardList, Loader2, Radar } from 'lucide-react';
 import { buttonStyles } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/feedback';
-import { Alert, fieldStyles } from '@/components/ui/field';
+import { Alert } from '@/components/ui/field';
 import { Chip, Meter, MonoLabel, Panel, PanelHeading, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
 import { MarkdownContent } from '@/components/MarkdownContent';
+import { MathAnswerEditor } from '@/components/MathAnswerEditor';
 import { PlotAnswerInput } from '@/components/plot/PlotAnswerInput';
 import { DiagramAnswerInput } from '@/components/diagram/DiagramAnswerInput';
 import { useAuth } from '@/hooks/useAuth';
@@ -329,17 +330,11 @@ export default function TakeAssignmentPage() {
                       studentSubmission={isReview ? parseSubmission(answers[index] ?? '') : undefined}
                     />
                   ) : (
-                    <label className="block">
-                      <MonoLabel className="mb-1">Your answer</MonoLabel>
-                      <textarea
-                        value={answers[index] ?? ''}
-                        onChange={(e) => updateAnswer(index, e.target.value)}
-                        disabled={isReview}
-                        rows={4}
-                        placeholder="Write your answer..."
-                        className={fieldStyles()}
-                      />
-                    </label>
+                    <MathAnswerEditor
+                      value={answers[index] ?? ''}
+                      onChange={(value) => updateAnswer(index, value)}
+                      disabled={isReview}
+                    />
                   )}
                 </div>
 

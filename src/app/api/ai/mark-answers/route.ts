@@ -24,6 +24,7 @@ import { normalizeMathNotation } from '@/lib/ai/math';
 import { normalizePlotSpec } from '@/lib/ai/plotSpec';
 import { normalizeDiagramTemplateSelection, resolveDiagramSpec } from '@/lib/ai/diagramTemplate';
 import { MAX_AI_ERROR_TEXT, safe, sanitizeFigureUrl, txt } from '@/lib/ai/text';
+import { answerToText } from '@/lib/richText';
 import {
   normalizeBoard,
   normalizeExamType,
@@ -315,7 +316,9 @@ const normalizePayload = (raw: MarkAnswersPayload) => {
     .filter((question): question is MarkingQuestion => question !== null);
 
   const rawAnswers = Array.isArray(raw.answers) ? raw.answers : [];
-  const answers = questions.map((_, index) => txt(safe(String(rawAnswers[index] || '')), 5000));
+  // Typed answers arrive as editor HTML; the marker reads markdown + LaTeX, and safe() would
+  // strip the maths nodes outright.
+  const answers = questions.map((_, index) => txt(safe(answerToText(String(rawAnswers[index] || ''))), 5000));
 
   return {
     topic: txt(raw.topic || '', 200),
