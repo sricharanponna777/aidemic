@@ -52,14 +52,29 @@ export const txt = (value: string, length: number) =>
     .trim()
     .slice(0, length);
 
+// Only a real tag is stripped: a known element name, then nothing but well-formed attributes.
+// `<[^>]*>` used to eat everything between a less-than and the next greater-than, so
+// "x < 3 and y > 2" reached the marker as "x  2".
+const HTML_ELEMENT_NAMES = [
+  'a', 'abbr', 'article', 'aside', 'audio', 'b', 'big', 'blockquote', 'body', 'br', 'button', 'canvas', 'caption',
+  'center', 'code', 'col', 'dd', 'del', 'details', 'div', 'dl', 'dt', 'em', 'embed', 'figcaption', 'figure', 'font',
+  'footer', 'form', 'h[1-6]', 'head', 'header', 'hr', 'html', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'label',
+  'li', 'link', 'main', 'mark', 'math', 'meta', 'nav', 'noscript', 'object', 'ol', 'option', 'p', 'pre', 'q', 's',
+  'script', 'section', 'select', 'small', 'source', 'span', 'strike', 'strong', 'style', 'sub', 'summary', 'sup',
+  'svg', 'table', 'tbody', 'td', 'textarea', 'tfoot', 'th', 'thead', 'title', 'tr', 'tt', 'u', 'ul', 'video',
+].join('|');
+const HTML_ATTRIBUTE = String.raw`\s+[A-Za-z_:][-\w:.]*(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=]+))?`;
+const HTML_TAG = new RegExp(String.raw`<\/?(?:${HTML_ELEMENT_NAMES})(?:${HTML_ATTRIBUTE})*\s*\/?>`, 'gi');
+
 export const safe = (value: string) =>
   value
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
     .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
     .replace(/javascript:/gi, '')
-    .replace(/<[^>]*>/g, '');
+    .replace(HTML_TAG, '');
 
 export const cleanText = (value: string, length: number) => txt(safe(value), length);
 
