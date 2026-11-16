@@ -8,13 +8,14 @@ import { createClient } from '@/lib/supabase-client';
 import { buttonStyles } from '@/components/ui/button';
 import { PageHeader, EmptyState } from '@/components/ui/feedback';
 import { Chip, Meter, MonoLabel, Panel, PanelHeading, StatusBar, Workspace, WorkspaceBody } from '@/components/ui/telemetry';
-import { getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { getPaperCount, getSubjectLabel } from '@/lib/ai/subjectConfig';
+import { nextPaperDate, paperNumbers, SESSION_LABELS, type SubjectPaper, type SubjectPaperRow } from '@/lib/examPapers';
 import { mapStudentSubjectRow, STUDENT_SUBJECT_SELECT, type StudentSubjectRow } from '@/lib/ai/studentSubjects';
 import { buildRevisionPlan, daysUntilExam, type PlannerSubject } from '@/lib/revisionPlanner';
 import { readDueSubtopics } from '@/lib/mastery/read';
 import { useToast } from '@/components/ToastProvider';
 
-type SubjectRow = StudentSubjectRow & { exam_date: string | null; target_grade: string | null };
+type SubjectRow = StudentSubjectRow & { target_grade: string | null; current_grade: string | null };
 
 type PlanRow = {
   id: string;
@@ -28,8 +29,12 @@ type PlanRow = {
 type SubjectInfo = {
   id: string;
   label: string;
+  /** The next paper still to sit; the plan schedules toward it. */
   examDate: string | null;
+  papers: SubjectPaper[];
+  paperCount: number;
   targetGrade: string | null;
+  predictedGrade: string | null;
   weakTopics: string[];
   /** Set only for subjects the Learning Spine has measured. */
   weakTopicRetrievability?: number[];
@@ -59,12 +64,16 @@ export default function PlannerPage() {
     setIsLoading(true);
     const supabase = createClient();
 
-    const [{ data: subjectRows }, { data: attemptRows }, { data: termRows }, dueSubtopics] = await Promise.all([
+    const [{ data: subjectRows }, { data: paperRows }, { data: attemptRows }, { data: termRows }, dueSubtopics] = await Promise.all([
       supabase
         .from('student_subjects')
-        .select(`id, exam_date, target_grade, ${STUDENT_SUBJECT_SELECT}`)
+        .select(`id, target_grade, current_grade, ${STUDENT_SUBJECT_SELECT}`)
         .eq('user_id', userId)
         .order('created_at', { ascending: true }),
+      supabase
+        .from('student_subject_papers')
+        .select('student_subject_id, paper_number, exam_date, session')
+        .eq('user_id', userId),
       supabase
         .from('exam_practice_attempts')
         .select('subject, weakness_tags, weakness_analysis')
@@ -96,9 +105,18 @@ export default function PlannerPage() {
       spineBySubject.set(row.scope.subject, [...(spineBySubject.get(row.scope.subject) ?? []), row]);
     }
 
+    const papersBySubject = new Map<string, SubjectPaper[]>();
+    for (const row of (paperRows ?? []) as SubjectPaperRow[]) {
+      papersBySubject.set(row.student_subject_id, [
+        ...(papersBySubject.get(row.student_subject_id) ?? []),
+        { paperNumber: row.paper_number, examDate: row.exam_date, session: row.session },
+      ]);
+    }
+
     const infos: SubjectInfo[] = ((subjectRows ?? []) as unknown as SubjectRow[]).map((row) => {
       const mapped = mapStudentSubjectRow(row);
       const spine = (spineBySubject.get(mapped.subject) ?? []).slice(0, MAX_WEAK_TOPICS);
+      const papers = papersBySubject.get(row.id) ?? [];
 
       // The spine gives real curriculum subtopics with a measured retrievability;
       // weakness_tags gives LLM-authored strings and no measurement. Prefer the
@@ -107,8 +125,11 @@ export default function PlannerPage() {
       const base = {
         id: row.id,
         label: getSubjectLabel(mapped.subject),
-        examDate: row.exam_date,
+        examDate: nextPaperDate(papers),
+        papers,
+        paperCount: paperNumbers(getPaperCount(mapped), papers).length,
         targetGrade: row.target_grade,
+        predictedGrade: row.current_grade,
       };
 
       if (spine.length > 0) {
@@ -149,12 +170,24 @@ export default function PlannerPage() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  // One countdown per paper, soonest first; a morning paper sorts before an
+  // afternoon one on the same day.
   const upcomingExams = useMemo(
     () =>
       subjects
-        .map((s) => ({ ...s, days: daysUntilExam(s.examDate) }))
-        .filter((s) => s.days !== null && (s.days as number) >= 0)
-        .sort((a, b) => (a.days as number) - (b.days as number)),
+        .flatMap((s) =>
+          s.papers.map((paper) => ({
+            key: `${s.id}:${paper.paperNumber}`,
+            label: s.paperCount > 1 ? `${s.label} · Paper ${paper.paperNumber}` : s.label,
+            examDate: paper.examDate,
+            session: paper.session,
+            targetGrade: s.targetGrade,
+            predictedGrade: s.predictedGrade,
+            days: daysUntilExam(paper.examDate),
+          }))
+        )
+        .filter((exam): exam is typeof exam & { days: number; examDate: string } => exam.days !== null && exam.days >= 0)
+        .sort((a, b) => a.days - b.days || (a.session === 'afternoon' ? 1 : 0) - (b.session === 'afternoon' ? 1 : 0)),
     [subjects]
   );
 
@@ -174,7 +207,7 @@ export default function PlannerPage() {
     const plan = buildRevisionPlan(plannerSubjects);
 
     if (plan.length === 0) {
-      showToast('error', 'Add an exam date to at least one subject first.');
+      showToast('error', 'Add a paper date to at least one subject first.');
       setIsGenerating(false);
       return;
     }
@@ -288,18 +321,22 @@ export default function PlannerPage() {
       ) : null}
       {upcomingExams.length > 0 ? (
         upcomingExams.map((exam) => (
-          <Panel key={exam.id}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-sm font-semibold text-content">{exam.label}</p>
-              {exam.targetGrade && <Chip tone="success">Target {exam.targetGrade}</Chip>}
-            </div>
-            <p className={`mt-2 font-mono text-2xl font-semibold ${exam.days !== null && exam.days <= 14 ? 'text-danger' : 'text-content'}`}>
+          <Panel key={exam.key}>
+            <p className="min-w-0 truncate text-sm font-semibold text-content">{exam.label}</p>
+            {exam.predictedGrade || exam.targetGrade ? (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {exam.predictedGrade && <Chip>Predicted {exam.predictedGrade}</Chip>}
+                {exam.targetGrade && <Chip tone="success">Target {exam.targetGrade}</Chip>}
+              </div>
+            ) : null}
+            <p className={`mt-2 font-mono text-2xl font-semibold ${exam.days <= 14 ? 'text-danger' : 'text-content'}`}>
               {exam.days === 0 ? 'Today' : `${exam.days} ${exam.days === 1 ? 'day' : 'days'}`}
             </p>
             <p className="font-mono text-[11px] text-content-subtle">
               {new Intl.DateTimeFormat('en', { weekday: 'long', day: 'numeric', month: 'long' }).format(
                 new Date(`${exam.examDate}T00:00:00`)
               )}
+              {exam.session ? ` · ${SESSION_LABELS[exam.session]}` : ''}
             </p>
           </Panel>
         ))

@@ -27,6 +27,7 @@ import {
 import { type Country } from '@/lib/ai/countryConfig';
 import { getQualificationConfig, getQualifications } from '@/lib/ai/qualifications';
 import { resolveSpecificationId } from '@/lib/ai/studentSubjects';
+import { academicYearOptions, currentAcademicYear } from '@/lib/academicYear';
 
 const selectClass =
   'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content';
@@ -82,7 +83,7 @@ export default function TeacherDashboardPage() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [academicYear, setAcademicYear] = useState('');
+  const [academicYear, setAcademicYear] = useState(() => currentAcademicYear());
   const [qualId, setQualId] = useState('gcse');
   const [subject, setSubject] = useState<SupportedSubject>('biology');
   const [board, setBoard] = useState<ExamBoard>('aqa');
@@ -213,7 +214,7 @@ export default function TeacherDashboardPage() {
   const resetForm = () => {
     setName('');
     setDescription('');
-    setAcademicYear('');
+    setAcademicYear(currentAcademicYear());
     setSpecName('');
     setSpecTier('');
   };
@@ -401,13 +402,17 @@ export default function TeacherDashboardPage() {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-content-subtle">Academic year</label>
-              <input
-                type="text"
+              <select
                 value={academicYear}
                 onChange={(e) => setAcademicYear(e.target.value)}
-                placeholder="e.g. 2025/26"
                 className={`${selectClass} w-full`}
-              />
+              >
+                {academicYearOptions().map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

@@ -11,6 +11,7 @@ import {
   buildSpecString,
   getExamBoardLabel,
   getExamTypeLabel,
+  getPaperCount,
   getSelectableSubjects,
   getSpecEntries,
   getSubjectLabel,
@@ -29,17 +30,69 @@ import {
   type StudentSubjectRow,
 } from '@/lib/ai/studentSubjects';
 import { QualificationPicker } from '@/components/QualificationPicker';
+import {
+  gradeOptions,
+  paperLabel,
+  paperNumbers,
+  SESSION_LABELS,
+  type ExamSession,
+  type SubjectPaper,
+  type SubjectPaperRow,
+} from '@/lib/examPapers';
 
 const selectClass =
   'rounded-lg border border-subtle px-3 py-2 text-sm outline-none focus:border-accent bg-surface text-content w-full';
+
+const smallFieldClass =
+  'rounded-md border border-subtle bg-surface px-2 py-1 font-sans text-xs normal-case tracking-normal text-content outline-none focus:border-accent';
+
+const fieldLabelClass = 'font-mono text-[11px] uppercase tracking-[0.14em] text-content-subtle';
+
+function GradeSelect({
+  label,
+  value,
+  options,
+  subjectLabel,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  subjectLabel: string;
+  onChange: (value: string) => void;
+}) {
+  // A grade typed before the picker existed may not be on the ladder; keep it selectable.
+  const choices = value && !options.includes(value) ? [value, ...options] : options;
+  return (
+    <label className={`flex items-center gap-1.5 ${fieldLabelClass}`}>
+      {label}
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={smallFieldClass}
+        aria-label={`${label} for ${subjectLabel}`}
+      >
+        <option value="">—</option>
+        {choices.map((grade) => (
+          <option key={grade} value={grade}>
+            {grade}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 export function SubjectManager() {
   const { session, profile } = useAuth();
   const supabase = createClient();
   const [subjects, setSubjects] = useState<UserSubject[]>([]);
-  // Exam date + target grade live on the student_subjects row itself (not in the
-  // joined UserSubject shape), so we track them in a parallel map keyed by id.
-  const [subjectMeta, setSubjectMeta] = useState<Record<string, { examDate: string; targetGrade: string }>>({});
+  // Grades live on the student_subjects row itself (not in the joined UserSubject
+  // shape), so we track them in a parallel map keyed by id. current_grade is the
+  // student's current predicted grade.
+  const [subjectMeta, setSubjectMeta] = useState<Record<string, { targetGrade: string; predictedGrade: string }>>({});
+  // Exam dates are per paper (student_subject_papers), keyed by student_subjects.id.
+  const [subjectPapers, setSubjectPapers] = useState<Record<string, SubjectPaper[]>>({});
   const [subjectsLoading, setSubjectsLoading] = useState(true);
   const [newQualId, setNewQualId] = useState('gcse');
   const [newSubject, setNewSubject] = useState<SupportedSubject>('biology');
@@ -102,16 +155,30 @@ export function SubjectManager() {
         setSubjects(((data as unknown as StudentSubjectRow[]) ?? []).map(mapStudentSubjectRow));
       }
 
-      const { data: metaRows } = await supabase
-        .from('student_subjects')
-        .select('id, exam_date, target_grade')
-        .eq('user_id', session.user.id);
+      const [{ data: metaRows }, { data: paperRows }] = await Promise.all([
+        supabase.from('student_subjects').select('id, target_grade, current_grade').eq('user_id', session.user.id),
+        supabase
+          .from('student_subject_papers')
+          .select('student_subject_id, paper_number, exam_date, session')
+          .eq('user_id', session.user.id),
+      ]);
       if (isMounted && metaRows) {
-        const map: Record<string, { examDate: string; targetGrade: string }> = {};
-        for (const row of metaRows as { id: string; exam_date: string | null; target_grade: string | null }[]) {
-          map[row.id] = { examDate: row.exam_date ?? '', targetGrade: row.target_grade ?? '' };
+        const map: Record<string, { targetGrade: string; predictedGrade: string }> = {};
+        for (const row of metaRows as { id: string; target_grade: string | null; current_grade: string | null }[]) {
+          map[row.id] = { targetGrade: row.target_grade ?? '', predictedGrade: row.current_grade ?? '' };
         }
         setSubjectMeta(map);
+      }
+      if (isMounted && paperRows) {
+        const map: Record<string, SubjectPaper[]> = {};
+        for (const row of paperRows as SubjectPaperRow[]) {
+          (map[row.student_subject_id] ??= []).push({
+            paperNumber: row.paper_number,
+            examDate: row.exam_date,
+            session: row.session,
+          });
+        }
+        setSubjectPapers(map);
       }
       setSubjectsLoading(false);
     };
@@ -183,13 +250,37 @@ export function SubjectManager() {
     setSubjects((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const handleMetaChange = async (id: string, field: 'examDate' | 'targetGrade', value: string) => {
+  const handleGradeChange = async (id: string, field: 'targetGrade' | 'predictedGrade', value: string) => {
     setSubjectMeta((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
-    const column = field === 'examDate' ? 'exam_date' : 'target_grade';
+    const column = field === 'targetGrade' ? 'target_grade' : 'current_grade';
     await supabase
       .from('student_subjects')
       .update({ [column]: value || null })
       .eq('id', id);
+  };
+
+  const handlePaperChange = async (
+    subjectId: string,
+    paperNumber: number,
+    patch: Partial<Pick<SubjectPaper, 'examDate' | 'session'>>,
+  ) => {
+    if (!session?.user?.id) return;
+    const existing = (subjectPapers[subjectId] ?? []).find((paper) => paper.paperNumber === paperNumber);
+    const next: SubjectPaper = { paperNumber, examDate: null, session: null, ...existing, ...patch };
+    setSubjectPapers((prev) => ({
+      ...prev,
+      [subjectId]: [...(prev[subjectId] ?? []).filter((paper) => paper.paperNumber !== paperNumber), next],
+    }));
+    await supabase.from('student_subject_papers').upsert(
+      {
+        student_subject_id: subjectId,
+        user_id: session.user.id,
+        paper_number: paperNumber,
+        exam_date: next.examDate || null,
+        session: next.session,
+      },
+      { onConflict: 'student_subject_id,paper_number' },
+    );
   };
 
   // Clears the downstream selections; the board and subject fall back to the first valid
@@ -347,7 +438,7 @@ export function SubjectManager() {
           <p className="mt-2 text-sm text-danger">{subjectError}</p>
         ) : null}
       </Panel>
-      <p className="font-mono text-[11px] text-content-subtle">Exam dates feed the planner&apos;s countdown.</p>
+      <p className="font-mono text-[11px] text-content-subtle">Paper dates feed the planner&apos;s countdown.</p>
     </>
   );
 
@@ -369,7 +460,12 @@ export function SubjectManager() {
               No subjects added yet.
             </p>
           ) : (
-            subjects.map((subject) => (
+            subjects.map((subject) => {
+              const subjectLabel = getSubjectLabel(subject.subject);
+              const grades = gradeOptions(subject.exam_type, subject.spec_tier);
+              const savedPapers = subjectPapers[subject.id] ?? [];
+              const numbers = paperNumbers(getPaperCount(subject), savedPapers);
+              return (
               <div
                 key={subject.id}
                 className="rounded-lg border border-subtle bg-surface px-4 py-3"
@@ -394,32 +490,69 @@ export function SubjectManager() {
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="mt-2.5 flex flex-wrap items-center gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-content-subtle">
-                  <label className="flex items-center gap-1.5">
-                    Exam date
-                    <input
-                      type="date"
-                      value={subjectMeta[subject.id]?.examDate ?? ''}
-                      onChange={(e) => handleMetaChange(subject.id, 'examDate', e.target.value)}
-                      className="rounded-md border border-subtle bg-surface px-2 py-1 font-sans text-xs normal-case tracking-normal text-content outline-none focus:border-accent"
-                      aria-label={`Exam date for ${getSubjectLabel(subject.subject)}`}
-                    />
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    Target grade
-                    <input
-                      type="text"
-                      value={subjectMeta[subject.id]?.targetGrade ?? ''}
-                      onChange={(e) => handleMetaChange(subject.id, 'targetGrade', e.target.value)}
-                      placeholder="e.g. 7"
-                      maxLength={4}
-                      className="w-16 rounded-md border border-subtle bg-surface px-2 py-1 font-sans text-xs normal-case tracking-normal text-content outline-none focus:border-accent"
-                      aria-label={`Target grade for ${getSubjectLabel(subject.subject)}`}
-                    />
-                  </label>
+                <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                  <GradeSelect
+                    label="Predicted grade"
+                    value={subjectMeta[subject.id]?.predictedGrade ?? ''}
+                    options={grades}
+                    subjectLabel={subjectLabel}
+                    onChange={(value) => handleGradeChange(subject.id, 'predictedGrade', value)}
+                  />
+                  <GradeSelect
+                    label="Target grade"
+                    value={subjectMeta[subject.id]?.targetGrade ?? ''}
+                    options={grades}
+                    subjectLabel={subjectLabel}
+                    onChange={(value) => handleGradeChange(subject.id, 'targetGrade', value)}
+                  />
                 </div>
+                <ul className="mt-2.5 space-y-2 border-t border-subtle pt-2.5">
+                  {numbers.map((paperNumber) => {
+                    const paper = savedPapers.find((p) => p.paperNumber === paperNumber);
+                    const name = paperLabel(paperNumber, numbers.length);
+                    return (
+                      <li key={paperNumber} className="flex flex-wrap items-center gap-3">
+                        <span className={`w-16 ${fieldLabelClass}`}>{name}</span>
+                        <input
+                          type="date"
+                          value={paper?.examDate ?? ''}
+                          onChange={(e) => handlePaperChange(subject.id, paperNumber, { examDate: e.target.value || null })}
+                          className={smallFieldClass}
+                          aria-label={`${name} date for ${subjectLabel}`}
+                        />
+                        <div
+                          role="group"
+                          aria-label={`${name} session for ${subjectLabel}`}
+                          className="inline-flex overflow-hidden rounded-md border border-subtle"
+                        >
+                          {(Object.keys(SESSION_LABELS) as ExamSession[]).map((value) => {
+                            const active = paper?.session === value;
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() =>
+                                  handlePaperChange(subject.id, paperNumber, { session: active ? null : value })
+                                }
+                                className={`px-2.5 py-1 text-xs transition ${
+                                  active
+                                    ? 'bg-accent text-accent-fg'
+                                    : 'bg-surface text-content-muted hover:bg-surface-sunken hover:text-content'
+                                }`}
+                              >
+                                {SESSION_LABELS[value]}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </section>
