@@ -92,7 +92,7 @@ export function GetStartedChecklist({ items, loading = false }: { items: Checkli
               </span>
 
               <div className="min-w-0 flex-1">
-                <p className={`text-body font-semibold ${item.done ? 'text-content-subtle line-through' : 'text-content'}`}>
+                <p className={`text-body font-semibold ${item.done ? 'text-content-subtle' : 'text-content'}`}>
                   {item.title}
                 </p>
                 {!item.done && <p className="text-body text-content-subtle">{item.body}</p>}

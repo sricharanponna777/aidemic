@@ -40,7 +40,7 @@ import {
 
 const itemClass = (active: boolean) =>
   `group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
-    active ? "bg-linear-to-r from-accent to-accent-2 text-accent-fg shadow-raised" : "text-content-muted hover:bg-surface-sunken hover:text-content"
+    active ? "bg-accent dark:bg-linear-to-r dark:from-accent dark:to-accent-2 text-accent-fg shadow-raised" : "text-content-muted hover:bg-surface-sunken hover:text-content"
   }`;
 
 const iconClass = (active: boolean) =>
@@ -197,7 +197,7 @@ function SignOutButton({ onSignOut }: { onSignOut: () => Promise<void> }) {
 function AccountCard({ name, email, onSignOut }: { name: string; email: string; onSignOut: () => Promise<void> }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5 rounded-xl border border-subtle bg-surface-sunken p-2.5">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-accent to-accent-2 text-sm font-bold uppercase text-accent-fg">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent dark:bg-linear-to-br dark:from-accent dark:to-accent-2 text-sm font-bold uppercase text-accent-fg">
         {(name || email)[0] ?? "?"}
       </span>
       <div className="min-w-0 flex-1">
@@ -451,7 +451,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   const brand = (
     <Link href={homeHref} className="flex items-center gap-2.5">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-accent to-accent-2 text-accent-fg shadow-raised dark:animate-glow-pulse">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent dark:bg-linear-to-br dark:from-accent dark:to-accent-2 text-accent-fg shadow-raised dark:animate-glow-pulse">
         <Zap className="h-5 w-5 fill-white text-white" />
       </span>
       <span className="text-[17px] font-bold leading-none text-content">AIDemic</span>
