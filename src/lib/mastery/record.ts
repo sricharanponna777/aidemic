@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   applyEvidence,
   initialMasteryState,
+  masteryFromEvents,
   EVIDENCE_WEIGHTS,
   type MasterySource,
   type MasteryState,
@@ -170,4 +171,46 @@ export async function recordMasteryEvents(
 
   result.subtopicsUpdated = upserts.length;
   return result;
+}
+
+/**
+ * Re-derive one subtopic's belief state from whatever is left in its event log.
+ *
+ * Needed when evidence is withdrawn (clearing a self-rating): the fold above only
+ * ever moves forward, so taking an event back means replaying the rest from
+ * scratch. Returns the number of events replayed, or null if a read or write failed.
+ */
+export async function rebuildSubtopicMastery(
+  admin: SupabaseClient,
+  userId: string,
+  subtopicId: string
+): Promise<number | null> {
+  const { data: events, error: readError } = await admin
+    .from('mastery_events')
+    .select('outcome, weight, created_at')
+    .eq('user_id', userId)
+    .eq('subtopic_id', subtopicId)
+    .order('created_at', { ascending: true });
+  if (readError) return null;
+
+  const rows = (events ?? []) as { outcome: number | string; weight: number | string; created_at: string }[];
+  const state = masteryFromEvents(
+    rows.map((row) => ({ outcome: num(row.outcome), weight: num(row.weight), at: row.created_at }))
+  );
+
+  const { error: writeError } = await admin.from('student_subtopic_mastery').upsert(
+    {
+      user_id: userId,
+      subtopic_id: subtopicId,
+      strength: state.strength,
+      stability: state.stability,
+      confidence: state.confidence,
+      evidence_count: state.evidenceCount,
+      last_seen_at: state.lastSeenAt,
+      due_at: state.dueAt,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,subtopic_id' }
+  );
+  return writeError ? null : rows.length;
 }

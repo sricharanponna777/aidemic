@@ -101,7 +101,7 @@ export default function ProgressPage() {
     <div className="space-y-5">
       {/* Header */}
       <section className="rounded-card border border-subtle bg-surface p-6">
-        <MonoLabel>Mission log</MonoLabel>
+        <MonoLabel>Progress</MonoLabel>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-display text-content">Your progress</h1>
@@ -172,7 +172,7 @@ export default function ProgressPage() {
           <Panel>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <MonoLabel>Mission rank</MonoLabel>
+                <MonoLabel>Your rank</MonoLabel>
                 <p className="mt-1 text-title text-content">{progress.title}</p>
                 <p className="text-[13px] text-content-subtle">{progress.blurb}</p>
               </div>

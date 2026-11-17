@@ -210,45 +210,50 @@ export default function ConfidencePage() {
     });
   };
 
+  const setRating = (subtopicId: string, rating: SelfRating | null) =>
+    setRatings((current) => {
+      const next = new Map(current);
+      if (rating) next.set(subtopicId, rating);
+      else next.delete(subtopicId);
+      return next;
+    });
+
+  const setSavingFlag = (subtopicId: string, on: boolean) =>
+    setSaving((current) => {
+      const next = new Set(current);
+      if (on) next.add(subtopicId);
+      else next.delete(subtopicId);
+      return next;
+    });
+
+  // Clicking the rating that is already selected voids it (DELETE); any other
+  // click sets it (POST).
   const rate = useCallback(
     async (subtopicId: string, rating: SelfRating) => {
       const previous = ratings.get(subtopicId) ?? null;
+      const clearing = previous === rating;
       // Optimistic: the rating is the student's own claim, so showing it before
       // the round trip cannot be wrong in a way the server would contradict.
-      setRatings((current) => new Map(current).set(subtopicId, rating));
-      setSaving((current) => new Set(current).add(subtopicId));
+      setRating(subtopicId, clearing ? null : rating);
+      setSavingFlag(subtopicId, true);
 
       try {
         const response = await fetch('/api/mastery/self-rating', {
-          method: 'POST',
+          method: clearing ? 'DELETE' : 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subtopicId, rating }),
+          body: JSON.stringify(clearing ? { subtopicId } : { subtopicId, rating }),
         });
 
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
-          setRatings((current) => {
-            const next = new Map(current);
-            if (previous) next.set(subtopicId, previous);
-            else next.delete(subtopicId);
-            return next;
-          });
-          showToast('error', body.error || 'Could not save your rating.');
+          setRating(subtopicId, previous);
+          showToast('error', body.error || (clearing ? 'Could not clear your rating.' : 'Could not save your rating.'));
         }
       } catch {
-        setRatings((current) => {
-          const next = new Map(current);
-          if (previous) next.set(subtopicId, previous);
-          else next.delete(subtopicId);
-          return next;
-        });
+        setRating(subtopicId, previous);
         showToast('error', 'Network error while saving your rating.');
       } finally {
-        setSaving((current) => {
-          const next = new Set(current);
-          next.delete(subtopicId);
-          return next;
-        });
+        setSavingFlag(subtopicId, false);
       }
     },
     [ratings, showToast]
@@ -312,8 +317,8 @@ export default function ConfidencePage() {
       <PageHeader
         className="border-b border-subtle"
         icon={Gauge}
-        eyebrow="Review / Self-rating"
-        title="Topic Confidence"
+        eyebrow="Review / Topic Browser"
+        title="Topic Browser"
         description="Rate each part of your specification red, amber or green. Your reds go to the front of the review queue."
         actions={
           <>
@@ -433,7 +438,7 @@ export default function ConfidencePage() {
                                         disabled={saving.has(subtopic.id)}
                                         onClick={() => void rate(subtopic.id, rating)}
                                         aria-pressed={selected === rating}
-                                        title={RATING_HINT[rating]}
+                                        title={selected === rating ? 'Click again to clear' : RATING_HINT[rating]}
                                         className={`rounded-md border px-3 py-1.5 font-mono text-xs font-semibold transition disabled:opacity-60 ${ratingTone(rating, selected === rating)}`}
                                       >
                                         {RATING_LABEL[rating]}

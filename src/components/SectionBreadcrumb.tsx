@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { findNavItem, isActiveRoute, type NavGroup } from "@/lib/nav";
 
-/** Top-bar trail: "Missions / Practice ▾ / Blurting". The group crumb opens a
+/** Top-bar trail: "Study / Practice ▾ / Blurting". The group crumb opens a
  *  menu of the pages beside this one -- click rather than hover, so it works
  *  on touch. */
 export function SectionBreadcrumb({ groups }: { groups: NavGroup[] }) {

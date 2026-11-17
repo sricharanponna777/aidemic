@@ -26,7 +26,7 @@ export function RankPanel({ onNavigate }: { onNavigate?: () => void }) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <MonoLabel>Mission rank</MonoLabel>
+          <MonoLabel>Your rank</MonoLabel>
           <p className="mt-0.5 truncate text-sm font-semibold text-content">{progress.title}</p>
         </div>
         <span className="shrink-0 rounded-md border border-strong bg-surface px-1.5 py-0.5 font-mono text-xs font-semibold text-content">

@@ -50,7 +50,7 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Learn",
-    section: "Missions",
+    section: "Study",
     items: [
       { href: "/dashboard/notes", label: "Notes", icon: BookOpen },
       { href: "/dashboard/podcasts", label: "Podcasts", icon: Headphones },
@@ -59,17 +59,17 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Review",
-    section: "Missions",
+    section: "Study",
     items: [
       { href: "/dashboard/daily-review", label: "Daily Review", icon: ListChecks },
       { href: "/dashboard/study-sessions", label: "Flashcard Revision", icon: Brain },
-      { href: "/dashboard/confidence", label: "Topic Confidence", icon: Gauge },
+      { href: "/dashboard/confidence", label: "Topic Browser", icon: Gauge },
       { href: "/dashboard/planner", label: "Planner", icon: CalendarDays },
     ],
   },
   {
     label: "Practice",
-    section: "Missions",
+    section: "Study",
     items: [
       { href: "/dashboard/ai-questions", label: "Smart Practice", icon: Target },
       { href: "/dashboard/blurt", label: "Blurting", icon: PenLine },
@@ -77,7 +77,7 @@ export const STUDENT_NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Improve",
-    section: "Missions",
+    section: "Study",
     items: [
       { href: "/dashboard/exam-coach", label: "Exam Coach", icon: Compass },
     ],

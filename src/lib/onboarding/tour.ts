@@ -133,7 +133,7 @@ const STUDENT_TOUR: TourSlide[] = [
       },
       {
         icon: Gauge,
-        title: 'Topic Confidence',
+        title: 'Topic Browser',
         body: 'Rate each part of your specification red, amber or green. Your reds go to the front of the queue.',
         href: '/dashboard/confidence',
       },

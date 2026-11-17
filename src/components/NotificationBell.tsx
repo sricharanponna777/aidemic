@@ -101,7 +101,7 @@ export function NotificationBell() {
           className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-subtle bg-surface-raised shadow-overlay"
         >
           <div className="border-b border-subtle px-4 py-3">
-            <MonoLabel>Incoming transmissions</MonoLabel>
+            <MonoLabel>Notifications</MonoLabel>
           </div>
           {!items ? (
             <div className="m-4 h-12 animate-pulse rounded bg-surface-sunken" />

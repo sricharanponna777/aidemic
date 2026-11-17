@@ -33,14 +33,15 @@
     --t-content-muted: #475569;
     --t-content-subtle: #64748b;
 
-    /* Brand */
-    --t-accent: #4f46e5;
-    --t-accent-hover: #4338ca;
-    --t-accent-fg: #ffffff;
-    --t-accent-muted: #eef2ff;
-    --t-accent-ring: rgba(79, 70, 229, 0.45);
+    /* Brand: apple green in light mode (dark mode keeps indigo -> purple).
+       Too light for white text, so text on the accent is a deep green. */
+    --t-accent: #7cb518;
+    --t-accent-hover: #6aa012;
+    --t-accent-fg: #1a2e05;
+    --t-accent-muted: #f2f9e3;
+    --t-accent-ring: rgba(124, 181, 24, 0.45);
     /* Gradient end-stop, reserved for brand moments (logo, active nav) */
-    --t-accent-2: #9333ea;
+    --t-accent-2: #a2cf3c;
 
     /* Gamification: XP chips, highlights, streak and level bars. Violet, so
        XP never reads as just another accent-coloured control. */
@@ -58,8 +59,8 @@
     --t-info-muted: #f0f9ff;
 
     /* Elevation */
-    --t-shadow-card: 0 1px 3px 0 rgba(99, 102, 241, 0.06), 0 1px 2px -1px rgba(99, 102, 241, 0.04);
-    --t-shadow-raised: 0 8px 24px -8px rgba(79, 70, 229, 0.18), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
+    --t-shadow-card: 0 1px 3px 0 rgba(124, 181, 24, 0.06), 0 1px 2px -1px rgba(124, 181, 24, 0.04);
+    --t-shadow-raised: 0 8px 24px -8px rgba(106, 160, 18, 0.22), 0 2px 6px -2px rgba(15, 23, 42, 0.06);
     --t-shadow-overlay: 0 24px 48px -12px rgba(15, 23, 42, 0.24);
   }
 
@@ -244,10 +245,10 @@ body {
   font-family: var(--font-space-grotesk), "Segoe UI", sans-serif;
   min-height: 100vh;
   background-image:
-    linear-gradient(rgba(99, 102, 241, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.025) 1px, transparent 1px),
-    radial-gradient(1000px 600px at 5% -15%, rgba(99, 102, 241, 0.13), transparent 50%),
-    radial-gradient(800px 500px at 95% 5%, rgba(139, 92, 246, 0.09), transparent 45%);
+    linear-gradient(rgba(124, 181, 24, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 181, 24, 0.035) 1px, transparent 1px),
+    radial-gradient(1000px 600px at 5% -15%, rgba(124, 181, 24, 0.13), transparent 50%),
+    radial-gradient(800px 500px at 95% 5%, rgba(162, 207, 60, 0.10), transparent 45%);
   background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
   background-attachment: fixed;
 }

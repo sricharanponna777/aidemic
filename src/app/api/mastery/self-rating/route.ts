@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-server';
 import { createAdminClient } from '@/lib/supabase-admin';
-import { recordMasteryEvents } from '@/lib/mastery/record';
+import { rebuildSubtopicMastery, recordMasteryEvents } from '@/lib/mastery/record';
 import { outcomeFromSelfRating } from '@/lib/mastery';
 import { isSelfRating, shouldEmitSelfRatingEvent } from '@/lib/mastery/fromSelfRating';
 import { studentStudiesSubtopic } from '@/lib/curriculum/enrolment';
@@ -109,5 +109,62 @@ export async function POST(request: Request) {
     return NextResponse.json({ rating, evidenceRecorded: emit });
   } catch {
     return NextResponse.json({ error: 'Could not save your rating.' }, { status: 500 });
+  }
+}
+
+type ClearPayload = { subtopicId?: unknown };
+
+/**
+ * Void a self-rating: the student clicked the rating that was already selected.
+ *
+ * Clearing only the label would leave the evidence behind, so a mis-clicked green
+ * would go on counting toward mastery after the student took it back. Every
+ * self_rating event for the subtopic is withdrawn and the belief state replayed
+ * from what remains, which is only measured evidence (practice, marking, review).
+ * Self-rating is weighted 0.2 against exam practice's 1.2, so this costs little.
+ */
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = (await request.json().catch(() => ({}))) as ClearPayload;
+    const subtopicId = typeof body.subtopicId === 'string' ? body.subtopicId : '';
+    if (!subtopicId) return NextResponse.json({ error: 'subtopicId is required.' }, { status: 400 });
+
+    const userId = authData.user.id;
+    if (!(await studentStudiesSubtopic(supabase, userId, subtopicId))) {
+      return NextResponse.json({ error: 'That subtopic is not in your subjects.' }, { status: 403 });
+    }
+
+    const admin = createAdminClient();
+
+    const { error: deleteError } = await admin
+      .from('mastery_events')
+      .delete()
+      .eq('user_id', userId)
+      .eq('subtopic_id', subtopicId)
+      .eq('source', 'self_rating');
+    if (deleteError) return NextResponse.json({ error: 'Could not clear your rating.' }, { status: 500 });
+
+    const eventsLeft = await rebuildSubtopicMastery(admin, userId, subtopicId);
+    if (eventsLeft === null) return NextResponse.json({ error: 'Could not clear your rating.' }, { status: 500 });
+
+    // No evidence left and no rating: remove the row, so the subtopic reads as
+    // never touched rather than as an empty row.
+    const { error: writeError } =
+      eventsLeft === 0
+        ? await admin.from('student_subtopic_mastery').delete().eq('user_id', userId).eq('subtopic_id', subtopicId)
+        : await admin
+            .from('student_subtopic_mastery')
+            .update({ self_rating: null, updated_at: new Date().toISOString() })
+            .eq('user_id', userId)
+            .eq('subtopic_id', subtopicId);
+    if (writeError) return NextResponse.json({ error: 'Could not clear your rating.' }, { status: 500 });
+
+    return NextResponse.json({ rating: null });
+  } catch {
+    return NextResponse.json({ error: 'Could not clear your rating.' }, { status: 500 });
   }
 }
